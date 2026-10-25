@@ -3,6 +3,8 @@ import { UserProfile, UserPreferences } from '../types';
 import { profileRepository } from '../database/repositories/profileRepository';
 import { seedInitialDataIfNeeded, getTodayDateString } from '../database/seed';
 import { resetDatabase } from '../database/client';
+import { useMedicineStore } from './medicineStore';
+import { useReminderStore } from './reminderStore';
 
 interface AppState {
   profile: UserProfile | null;
@@ -26,6 +28,7 @@ interface AppState {
   setSelectedDate: (date: string) => void;
   togglePreference: (key: keyof UserPreferences) => void;
   resetAllData: () => void;
+  clearAllData: () => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -80,15 +83,34 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   resetAllData: () => {
-    // Reset every table first so stale user-created records cannot survive a demo reset.
+    // Replace the database contents rather than layering sample rows over user data.
     resetDatabase();
     seedInitialDataIfNeeded(true);
     const profile = profileRepository.getProfile();
     const preferences = profileRepository.getPreferences();
+    const selectedDate = getTodayDateString();
+    set({ profile, preferences, selectedDate, isInitialized: true });
+    useMedicineStore.getState().loadMedicines();
+    useReminderStore.getState().loadDosesForDate(selectedDate);
+  },
+
+  clearAllData: () => {
+    resetDatabase();
+    const selectedDate = getTodayDateString();
     set({
-      profile,
-      preferences,
-      selectedDate: getTodayDateString(),
+      profile: null,
+      preferences: {
+        inAppReminders: true,
+        aiAssistantEnabled: true,
+        cameraPermissionsGranted: false,
+        notificationsEnabled: true,
+        streakCount: 0,
+        lastActiveDate: selectedDate,
+      },
+      selectedDate,
+      isInitialized: false,
     });
+    useMedicineStore.getState().loadMedicines();
+    useReminderStore.getState().loadDosesForDate(selectedDate);
   },
 }));
