@@ -25,13 +25,13 @@ const INITIAL_SUGGESTIONS = [
 ];
 
 const KNOWLEDGE_RESPONSES: Record<string, string> = {
-  mg: 'Milligrams (mg) measure the weight or mass of a solid active ingredient (such as in a tablet or capsule), while milliliters (mL) measure the volume of a liquid medicine. Always use an oral dosing syringe or measured cup rather than household spoons for liquids.',
+  mg: 'Milligrams (mg) describe mass, while milliliters (mL) describe volume. For liquid medicines, use the measuring device supplied or recommended for that product, not a household spoon.',
   ingredient:
-    'An active ingredient is the actual chemical substance in a medicine that creates the therapeutic effect. Brand names and generic versions of a medicine usually share the exact same active ingredient at the same strength.',
+    'An active ingredient is the actual chemical substance in a medicine that creates the therapeutic effect. Generic medicines generally contain the same active ingredient, but products can differ in formulation or inactive ingredients. Confirm the exact product with its leaflet or a pharmacist.',
   batch:
     'A batch number (or lot number) is a unique alphanumeric code assigned by the manufacturer during production. It allows pharmacies and health authorities to track specific production runs and identify medications in case of quality checks or recalls.',
   store:
-    'Most medications should be stored in a cool, dry place away from direct sunlight, moisture, and heat. Bathrooms and windowsills are usually poor storage locations due to humidity. Always check your specific package for refrigeration requirements.',
+    'Storage instructions vary by product. Follow the storage conditions printed on the original package or patient leaflet, including any refrigeration instructions.',
 };
 
 export default function AIAssistantScreen() {
