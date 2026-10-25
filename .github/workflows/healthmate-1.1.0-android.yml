@@ -1,6 +1,8 @@
 name: HealthMate Android 1.1.0
 
 on:
+  pull_request:
+    branches: [main]
   push:
     branches:
       - release/healthmate-1.1.0
@@ -10,7 +12,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: healthmate-1-1-0-android
+  group: healthmate-1-1-0-android-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -20,11 +22,8 @@ jobs:
     timeout-minutes: 45
 
     steps:
-      - name: Checkout main-derived release branch
+      - name: Checkout release branch
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.ref_name }}
-          persist-credentials: true
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -42,6 +41,7 @@ jobs:
         run: npm install --no-audit --no-fund
 
       - name: Commit refreshed package-lock if changed
+        if: github.event_name == 'push'
         run: |
           if ! git diff --quiet -- package-lock.json; then
             git config user.name "github-actions[bot]"
