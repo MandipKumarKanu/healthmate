@@ -37,6 +37,7 @@ export function isScheduleDueOnDate(
   const target = parseDateParts(date);
   const start = parseDateParts(schedule.startDate);
   if (!target || !start) return false;
+  if (schedule.endDate && (!parseDateParts(schedule.endDate) || schedule.endDate < schedule.startDate)) return false;
   if (date < schedule.startDate || (schedule.endDate && date > schedule.endDate)) return false;
 
   if (schedule.recurrence === 'once') return date === schedule.startDate;
