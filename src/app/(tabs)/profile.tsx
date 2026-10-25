@@ -640,7 +640,7 @@ export default function ProfileScreen() {
       <ConfirmDialog
         visible={showResetConfirm}
         title="Reset Sample Records"
-        message="This will reload the demonstration medicines, schedules, and adherence records matching the reference design."
+        message="This permanently replaces all current local profile data, medicines, schedules, adherence logs, scan history, and preferences with fictional demonstration records."
         confirmText="Reset"
         onConfirm={handleResetData}
         onCancel={() => setShowResetConfirm(false)}
@@ -650,7 +650,7 @@ export default function ProfileScreen() {
       <ConfirmDialog
         visible={showClearConfirm}
         title="Clear Personal Data"
-        message="This will permanently delete all stored medicines, reminder schedules, adherence logs, and scan history from your device."
+        message="This permanently deletes the local profile, preferences, medicines, reminder schedules, adherence logs, scan history, and pending notifications from this device."
         confirmText="Clear All Data"
         destructive
         onConfirm={handleClearAllData}
