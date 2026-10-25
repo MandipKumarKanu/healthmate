@@ -176,7 +176,8 @@ export default function ScanScreen() {
         expiryDate: medExpiry || undefined,
         batchNumber: medBatch || undefined,
         packageDetailsText: 'Captured via camera label scan',
-        originalPackageChecked: true,
+        // OCR extraction is not verification; keep this false until the user explicitly checks the original package.
+        originalPackageChecked: false,
       },
       informationSource: 'Extracted from medication label scan.',
       isSample: false,
