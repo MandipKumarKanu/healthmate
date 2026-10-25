@@ -64,7 +64,7 @@ The application faithfully reproduces the iOS-style reference design, offering a
 - **Camera & Media**: [`expo-camera`](https://docs.expo.dev/versions/latest/sdk/camera/) & [`expo-image-picker`](https://docs.expo.dev/versions/latest/sdk/image-picker/)
 - **Client State**: [`zustand`](https://github.com/pmndrs/zustand)
 - **Icons**: `@expo/vector-icons` (Ionicons, MaterialCommunityIcons, Feather)
-- **Styling**: React Native `StyleSheet.create()` with centralized theme tokens in `src/theme/`
+- **Styling**: React Native `StyleSheet.create()` with a shared color palette in `src/theme/colors.ts`
 
 ---
 
@@ -131,10 +131,8 @@ healthmate/
 │   │   ├── medicineStore.ts
 │   │   └── reminderStore.ts
 │   │
-│   ├── theme/                         # Centralized Design Tokens
-│   │   ├── colors.ts
-│   │   ├── tokens.ts                  # Spacing, Radius, Typography, Shadows
-│   │   └── index.ts
+│   └── theme/
+│       └── colors.ts                  # Shared application color palette
 │   │
 │   └── types/                         # Shared TypeScript Interfaces
 │       └── index.ts
