@@ -42,8 +42,9 @@ describe('Adherence recurrence rules', () => {
     expect(isScheduleDueOnDate(schedule('custom'), '2026-04-22')).toBe(false);
   });
 
-  it('rejects invalid calendar dates', () => {
+  it('rejects invalid calendar dates and end dates before the start date', () => {
     expect(isScheduleDueOnDate(schedule('daily'), '2026-02-30')).toBe(false);
+    expect(isScheduleDueOnDate(schedule('daily', '2026-04-22', '2026-04-20'), '2026-04-22')).toBe(false);
   });
 });
 
