@@ -58,7 +58,7 @@ export default function AIAssistantScreen() {
 
     setTimeout(() => {
       let reply =
-        'HealthMate AI provides general package terminology and medication literacy. For diagnosis, dosages, or personal symptoms, please consult your prescribing physician or pharmacist.';
+        'This offline guide covers a few general medication terms only; it is not a verified drug reference. For diagnosis, doses, symptoms, or treatment decisions, contact your pharmacist or prescriber.';
 
       const lower = text.toLowerCase();
       const asksForPersonalMedicalAdvice = /\b(dose|dosage|take|taking|safe for me|side effects?|interaction\w*|pregnan\w*|symptom\w*|diagnos\w*|overdose|missed dose|stop taking)\b/.test(lower);
