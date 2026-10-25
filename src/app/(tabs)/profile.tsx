@@ -103,10 +103,16 @@ export default function ProfileScreen() {
     setIsEditingProfile(false);
   };
 
-  const handleResetData = () => {
-    resetAllData();
-    setShowResetConfirm(false);
-    Alert.alert('Reset Complete', 'Fictional sample data has been reloaded.');
+  const handleResetData = async () => {
+    try {
+      await notificationService.cancelAll();
+      resetAllData();
+      setShowResetConfirm(false);
+      Alert.alert('Reset Complete', 'All local records were replaced with fictional demonstration data.');
+    } catch (error) {
+      console.error('Could not reset demonstration data:', error);
+      Alert.alert('Reset failed', 'Your data could not be reset. Please try again.');
+    }
   };
 
   const handleClearAllData = async () => {
