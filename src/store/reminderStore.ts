@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { ScheduledDose, DoseStatus, DayAdherenceSummary, ReminderSchedule } from '../types';
 import { adherenceRepository } from '../database/repositories/adherenceRepository';
 import { scheduleRepository } from '../database/repositories/scheduleRepository';
+import { medicineRepository } from '../database/repositories/medicineRepository';
 import { notificationService } from '../services/notificationService';
 
 interface ReminderState {
@@ -39,13 +40,18 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
   },
 
   saveSchedule: async (schedule) => {
+    // Cancel existing triggers before replacing a schedule to avoid duplicates
+    // or stale times after an edit.
+    await notificationService.cancelForSchedule(schedule.id);
     scheduleRepository.save(schedule);
-    // Schedule notification if enabled
+
     if (schedule.enabled && schedule.notificationsEnabled) {
+      const medicine = medicineRepository.getById(schedule.medicineId);
+      const medicineName = medicine?.name ?? 'Medicine';
       for (const t of schedule.times) {
         await notificationService.scheduleDoseReminder(
           schedule.id,
-          'Medicine',
+          medicineName,
           t.amount,
           t.time
         );
@@ -54,6 +60,7 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
   },
 
   deleteSchedule: async (scheduleId) => {
+    await notificationService.cancelForSchedule(scheduleId);
     scheduleRepository.delete(scheduleId);
   },
 }));

@@ -89,6 +89,22 @@ export const notificationService = {
     }
   },
 
+  async cancelForSchedule(scheduleId: string): Promise<void> {
+    try {
+      const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+      const matching = scheduled.filter(
+        (notification) => notification.content.data?.scheduleId === scheduleId
+      );
+      await Promise.all(
+        matching.map((notification) =>
+          Notifications.cancelScheduledNotificationAsync(notification.identifier)
+        )
+      );
+    } catch (error) {
+      console.warn('Failed to cancel schedule notifications:', error);
+    }
+  },
+
   async cancelAll(): Promise<void> {
     try {
       await Notifications.cancelAllScheduledNotificationsAsync();

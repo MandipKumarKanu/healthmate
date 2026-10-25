@@ -39,6 +39,38 @@ function mapRowToMedicine(row: MedicineRow): Medicine {
   };
 }
 
+/**
+ * Parse common expiry formats and return the final millisecond of the expiry
+ * period. Unknown formats return null rather than guessing.
+ */
+function getExpiryTimestamp(value?: string): number | null {
+  if (!value?.trim()) return null;
+  const input = value.trim();
+  let match = input.match(/^(\d{4})-(\d{1,2})(?:-(\d{1,2}))?$/);
+  if (match) {
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = match[3] ? Number(match[3]) : new Date(year, month, 0).getDate();
+    if (month < 1 || month > 12 || day < 1 || day > new Date(year, month, 0).getDate()) return null;
+    return new Date(year, month - 1, day, 23, 59, 59, 999).getTime();
+  }
+  match = input.match(/^(\d{1,2})[/-](\d{2}|\d{4})$/);
+  if (match) {
+    const month = Number(match[1]);
+    let year = Number(match[2]);
+    if (match[2].length === 2) year += year >= 70 ? 1900 : 2000;
+    if (month < 1 || month > 12) return null;
+    return new Date(year, month, 0, 23, 59, 59, 999).getTime();
+  }
+  match = input.match(/^(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+(\d{4})$/i);
+  if (match) {
+    const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+    const month = monthNames.indexOf(match[1].slice(0, 3).toLowerCase());
+    return new Date(Number(match[2]), month + 1, 0, 23, 59, 59, 999).getTime();
+  }
+  return null;
+}
+
 export const medicineRepository = {
   getAll(): Medicine[] {
     const db = getDatabase();
@@ -164,11 +196,10 @@ export const medicineRepository = {
         if (!matchesName && !matchesIngredient) return false;
       }
 
-      // Expiry filter
-      const isExpired =
-        m.packageDetails.expiryDate?.toLowerCase().includes('2026') ||
-        m.packageDetails.packageDetailsText?.toLowerCase().includes('expired') ||
-        false;
+      // Evaluate expiry against today's date, not a hardcoded year.
+      // Unknown/unparseable dates are not falsely classified as expired.
+      const expiryTimestamp = getExpiryTimestamp(m.packageDetails.expiryDate);
+      const isExpired = expiryTimestamp !== null && expiryTimestamp < Date.now();
 
       if (expiryFilter === 'active' && isExpired) return false;
       if (expiryFilter === 'expired' && !isExpired) return false;
