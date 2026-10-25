@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { Medicine } from '../types';
 import { medicineRepository } from '../database/repositories/medicineRepository';
+import { scheduleRepository } from '../database/repositories/scheduleRepository';
+import { notificationService } from '../services/notificationService';
 
 interface MedicineState {
   medicines: Medicine[];
@@ -13,7 +15,7 @@ interface MedicineState {
   setReminderFilter: (f: 'all' | 'with' | 'without') => void;
   addMedicine: (med: Omit<Medicine, 'createdAt' | 'updatedAt'>) => Medicine;
   updateMedicine: (id: string, updates: Partial<Medicine>) => void;
-  deleteMedicine: (id: string) => void;
+  deleteMedicine: (id: string) => Promise<boolean>;
 }
 
 export const useMedicineStore = create<MedicineState>((set, get) => ({
@@ -54,8 +56,18 @@ export const useMedicineStore = create<MedicineState>((set, get) => ({
     get().loadMedicines();
   },
 
-  deleteMedicine: (id: string) => {
-    medicineRepository.delete(id);
-    get().loadMedicines();
+  deleteMedicine: async (id: string) => {
+    const existing = medicineRepository.getById(id);
+    if (!existing) return false;
+
+    // Remove pending OS notifications before deleting the schedule records.
+    const schedules = scheduleRepository.getAll().filter((schedule) => schedule.medicineId === id);
+    for (const schedule of schedules) {
+      await notificationService.cancelForSchedule(schedule.id);
+    }
+
+    const deleted = medicineRepository.delete(id);
+    if (deleted) get().loadMedicines();
+    return deleted;
   },
 }));
