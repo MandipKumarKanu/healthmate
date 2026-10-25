@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { UserProfile, UserPreferences } from '../types';
 import { profileRepository } from '../database/repositories/profileRepository';
 import { seedInitialDataIfNeeded, getTodayDateString } from '../database/seed';
+import { resetDatabase } from '../database/client';
 
 interface AppState {
   profile: UserProfile | null;
@@ -79,6 +80,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   resetAllData: () => {
+    // Reset every table first so stale user-created records cannot survive a demo reset.
+    resetDatabase();
     seedInitialDataIfNeeded(true);
     const profile = profileRepository.getProfile();
     const preferences = profileRepository.getPreferences();
