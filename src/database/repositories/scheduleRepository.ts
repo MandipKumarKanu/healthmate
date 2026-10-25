@@ -87,8 +87,9 @@ export const scheduleRepository = {
 
   delete(id: string): boolean {
     const db = getDatabase();
-    db.runSync('DELETE FROM schedules WHERE id = ?;', [id]);
-    return true;
+    if (!this.getById(id)) return false;
+    const result = db.runSync('DELETE FROM schedules WHERE id = ?;', [id]);
+    return result.changes > 0;
   },
 
   toggleEnabled(id: string, enabled: boolean): void {
