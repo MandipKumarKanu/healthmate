@@ -105,8 +105,8 @@ export default function MedicineDetailsScreen() {
   };
 
   const scheduleDoseNote = schedule?.times[0]?.amount
-    ? `${schedule.times[0].amount} per reminder · Example schedule saved by Alex`
-    : 'Custom schedule saved';
+    ? `${schedule.times[0].amount} per reminder · Confirm against your prescription`
+    : 'No saved dose amount';
 
   return (
     <AppScreen scrollable contentContainerStyle={styles.scrollContent}>
