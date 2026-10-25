@@ -88,6 +88,8 @@ export const scheduleRepository = {
   delete(id: string): boolean {
     const db = getDatabase();
     if (!this.getById(id)) return false;
+    // Logs are not linked to schedules by a foreign key, so remove them explicitly.
+    db.runSync('DELETE FROM adherence_logs WHERE schedule_id = ?;', [id]);
     const result = db.runSync('DELETE FROM schedules WHERE id = ?;', [id]);
     return result.changes > 0;
   },
