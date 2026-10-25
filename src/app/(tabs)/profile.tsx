@@ -21,13 +21,12 @@ import { AppButton } from '../../components/ui/AppButton';
 import { SectionHeader } from '../../components/ui/SectionHeader';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useAppStore } from '../../store/appStore';
-import { resetDatabase } from '../../database/client';
 import { notificationService } from '../../services/notificationService';
 import { GenderOption, UnitSystem } from '../../types';
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { profile, preferences, updateProfile, togglePreference, resetAllData } =
+  const { profile, preferences, updateProfile, togglePreference, resetAllData, clearAllData } =
     useAppStore();
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -116,19 +115,19 @@ export default function ProfileScreen() {
   };
 
   const handleClearAllData = async () => {
-    await notificationService.cancelAll();
-    resetDatabase();
-    setShowClearConfirm(false);
-    Alert.alert(
-      'Data Cleared',
-      'All local personal records, medicines, and notifications have been cleared.',
-      [
-        {
-          text: 'OK',
-          onPress: () => router.replace('/onboarding'),
-        },
-      ]
-    );
+    try {
+      await notificationService.cancelAll();
+      clearAllData();
+      setShowClearConfirm(false);
+      Alert.alert(
+        'Data Cleared',
+        'All local profile data, medicines, schedules, adherence logs, scan history, and preferences have been cleared.',
+        [{ text: 'OK', onPress: () => router.replace('/onboarding') }]
+      );
+    } catch (error) {
+      console.error('Could not clear local data:', error);
+      Alert.alert('Clear failed', 'Your data could not be cleared. Please try again.');
+    }
   };
 
   return (
