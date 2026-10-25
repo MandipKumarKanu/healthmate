@@ -342,8 +342,7 @@ export default function MedicineDetailsScreen() {
             </TouchableOpacity>
             {expandedSection === 'effects' ? (
               <Text style={styles.accordionBody}>
-                Consult your doctor or pharmacist immediately if you experience
-                any unexpected adverse effects or allergic reactions.
+                No reviewed product-specific side-effect list is linked to this record. Check the patient leaflet for your exact product or ask a pharmacist about concerns.
               </Text>
             ) : null}
           </View>
