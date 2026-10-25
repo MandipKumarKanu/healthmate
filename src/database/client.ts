@@ -172,6 +172,18 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return { changes: 1, lastInsertRowId: 1 };
     }
 
+    if (clean.startsWith('DELETE FROM ADHERENCE_LOGS WHERE SCHEDULE_ID')) {
+      const [scheduleId] = params;
+      let changes = 0;
+      for (const [id, log] of this.adherenceLogs.entries()) {
+        if (log.schedule_id === String(scheduleId)) {
+          this.adherenceLogs.delete(id);
+          changes++;
+        }
+      }
+      return { changes, lastInsertRowId: 0 };
+    }
+
     if (clean.startsWith('INSERT OR REPLACE INTO SCAN_HISTORY')) {
       const [
         id, imageUri, rawOcrText, extractedMedicineName,
