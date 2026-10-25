@@ -101,7 +101,7 @@ export default function AIAssistantScreen() {
   return (
     <AppScreen contentContainerStyle={styles.container}>
       <AppHeader
-        title="AI Assistant"
+        title="Medication Guide"
         subtitle="Offline medication terminology guide"
         brandText="HealthMate AI"
         onBackPress={() => router.back()}
