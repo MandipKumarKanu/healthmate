@@ -61,7 +61,7 @@ export default function AIAssistantScreen() {
         'HealthMate AI provides general package terminology and medication literacy. For diagnosis, dosages, or personal symptoms, please consult your prescribing physician or pharmacist.';
 
       const lower = text.toLowerCase();
-      const asksForPersonalMedicalAdvice = /\\b(dose|dosage|take|taking|safe for me|side effect|interaction|pregnan|symptom|diagnos|overdose|missed dose|stop taking)\\b/.test(lower);
+      const asksForPersonalMedicalAdvice = /\b(dose|dosage|take|taking|safe for me|side effect|interaction|pregnan|symptom|diagnos|overdose|missed dose|stop taking)\b/.test(lower);
       if (asksForPersonalMedicalAdvice) {
         reply = 'I can’t assess your personal treatment, symptoms, dose, or medicine interactions. Do not start, stop, or change a medicine based on this offline guide. Check the leaflet for your exact product and contact your pharmacist or prescriber. If you may have taken too much medicine or have severe symptoms, seek urgent local medical help.';
       } else if (lower.includes('mg') || lower.includes('ml')) {
