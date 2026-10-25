@@ -104,8 +104,32 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
 
     if (clean.startsWith('DELETE FROM MEDICINES WHERE ID')) {
       const [id] = params;
-      this.medicines.delete(String(id));
-      return { changes: 1, lastInsertRowId: 1 };
+      const existed = this.medicines.delete(String(id));
+      return { changes: existed ? 1 : 0, lastInsertRowId: 0 };
+    }
+
+    if (clean.startsWith('DELETE FROM SCHEDULES WHERE MEDICINE_ID')) {
+      const [medicineId] = params;
+      let changes = 0;
+      for (const [id, schedule] of this.schedules.entries()) {
+        if (schedule.medicine_id === String(medicineId)) {
+          this.schedules.delete(id);
+          changes++;
+        }
+      }
+      return { changes, lastInsertRowId: 0 };
+    }
+
+    if (clean.startsWith('DELETE FROM ADHERENCE_LOGS WHERE MEDICINE_ID')) {
+      const [medicineId] = params;
+      let changes = 0;
+      for (const [id, log] of this.adherenceLogs.entries()) {
+        if (log.medicine_id === String(medicineId)) {
+          this.adherenceLogs.delete(id);
+          changes++;
+        }
+      }
+      return { changes, lastInsertRowId: 0 };
     }
 
     if (clean.startsWith('INSERT OR REPLACE INTO SCHEDULES')) {
@@ -130,8 +154,8 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
 
     if (clean.startsWith('DELETE FROM SCHEDULES WHERE ID')) {
       const [id] = params;
-      this.schedules.delete(String(id));
-      return { changes: 1, lastInsertRowId: 1 };
+      const existed = this.schedules.delete(String(id));
+      return { changes: existed ? 1 : 0, lastInsertRowId: 0 };
     }
 
     if (clean.startsWith('INSERT OR REPLACE INTO ADHERENCE_LOGS')) {
@@ -146,6 +170,18 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
         logged_at: String(loggedAt),
       });
       return { changes: 1, lastInsertRowId: 1 };
+    }
+
+    if (clean.startsWith('DELETE FROM ADHERENCE_LOGS WHERE SCHEDULE_ID')) {
+      const [scheduleId] = params;
+      let changes = 0;
+      for (const [id, log] of this.adherenceLogs.entries()) {
+        if (log.schedule_id === String(scheduleId)) {
+          this.adherenceLogs.delete(id);
+          changes++;
+        }
+      }
+      return { changes, lastInsertRowId: 0 };
     }
 
     if (clean.startsWith('INSERT OR REPLACE INTO SCAN_HISTORY')) {
@@ -170,8 +206,8 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
 
     if (clean.startsWith('DELETE FROM SCAN_HISTORY WHERE ID')) {
       const [id] = params;
-      this.scanHistory.delete(String(id));
-      return { changes: 1, lastInsertRowId: 1 };
+      const existed = this.scanHistory.delete(String(id));
+      return { changes: existed ? 1 : 0, lastInsertRowId: 0 };
     }
 
     return { changes: 0, lastInsertRowId: 0 };
@@ -205,6 +241,11 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
     }
 
     if (clean.includes('FROM SCHEDULES')) {
+      if (clean.includes('WHERE ID =')) {
+        const [id] = params;
+        const item = this.schedules.get(String(id));
+        return item ? ([item] as unknown as T[]) : [];
+      }
       if (clean.includes('WHERE MEDICINE_ID =')) {
         const [medId] = params;
         return Array.from(this.schedules.values()).filter(
@@ -230,6 +271,11 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
     }
 
     if (clean.includes('FROM SCAN_HISTORY')) {
+      if (clean.includes('WHERE ID =')) {
+        const [id] = params;
+        const item = this.scanHistory.get(String(id));
+        return item ? ([item] as unknown as T[]) : [];
+      }
       return Array.from(this.scanHistory.values()).sort((a, b) =>
         String(b.scanned_at).localeCompare(String(a.scanned_at))
       ) as unknown as T[];

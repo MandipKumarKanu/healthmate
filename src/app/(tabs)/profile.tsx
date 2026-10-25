@@ -21,13 +21,12 @@ import { AppButton } from '../../components/ui/AppButton';
 import { SectionHeader } from '../../components/ui/SectionHeader';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useAppStore } from '../../store/appStore';
-import { resetDatabase } from '../../database/client';
 import { notificationService } from '../../services/notificationService';
 import { GenderOption, UnitSystem } from '../../types';
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { profile, preferences, updateProfile, togglePreference, resetAllData } =
+  const { profile, preferences, updateProfile, togglePreference, resetAllData, clearAllData } =
     useAppStore();
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -103,26 +102,32 @@ export default function ProfileScreen() {
     setIsEditingProfile(false);
   };
 
-  const handleResetData = () => {
-    resetAllData();
-    setShowResetConfirm(false);
-    Alert.alert('Reset Complete', 'Fictional sample data has been reloaded.');
+  const handleResetData = async () => {
+    try {
+      await notificationService.cancelAll();
+      resetAllData();
+      setShowResetConfirm(false);
+      Alert.alert('Reset Complete', 'All local records were replaced with fictional demonstration data.');
+    } catch (error) {
+      console.error('Could not reset demonstration data:', error);
+      Alert.alert('Reset failed', 'Your data could not be reset. Please try again.');
+    }
   };
 
   const handleClearAllData = async () => {
-    await notificationService.cancelAll();
-    resetDatabase();
-    setShowClearConfirm(false);
-    Alert.alert(
-      'Data Cleared',
-      'All local personal records, medicines, and notifications have been cleared.',
-      [
-        {
-          text: 'OK',
-          onPress: () => router.replace('/onboarding'),
-        },
-      ]
-    );
+    try {
+      await notificationService.cancelAll();
+      clearAllData();
+      setShowClearConfirm(false);
+      Alert.alert(
+        'Data Cleared',
+        'All local profile data, medicines, schedules, adherence logs, scan history, and preferences have been cleared.',
+        [{ text: 'OK', onPress: () => router.replace('/onboarding') }]
+      );
+    } catch (error) {
+      console.error('Could not clear local data:', error);
+      Alert.alert('Clear failed', 'Your data could not be cleared. Please try again.');
+    }
   };
 
   return (
@@ -635,7 +640,7 @@ export default function ProfileScreen() {
       <ConfirmDialog
         visible={showResetConfirm}
         title="Reset Sample Records"
-        message="This will reload the demonstration medicines, schedules, and adherence records matching the reference design."
+        message="This permanently replaces all current local profile data, medicines, schedules, adherence logs, scan history, and preferences with fictional demonstration records."
         confirmText="Reset"
         onConfirm={handleResetData}
         onCancel={() => setShowResetConfirm(false)}
@@ -645,7 +650,7 @@ export default function ProfileScreen() {
       <ConfirmDialog
         visible={showClearConfirm}
         title="Clear Personal Data"
-        message="This will permanently delete all stored medicines, reminder schedules, adherence logs, and scan history from your device."
+        message="This permanently deletes the local profile, preferences, medicines, reminder schedules, adherence logs, scan history, and pending notifications from this device."
         confirmText="Clear All Data"
         destructive
         onConfirm={handleClearAllData}

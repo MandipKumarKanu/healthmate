@@ -77,10 +77,19 @@ export default function MedicineDetailsScreen() {
     );
   };
 
-  const confirmDelete = () => {
-    deleteMedicine(medicine.id);
-    setShowDeleteModal(false);
-    router.back();
+  const confirmDelete = async () => {
+    try {
+      const deleted = await deleteMedicine(medicine.id);
+      if (!deleted) {
+        Alert.alert('Could not delete medicine', 'This medicine may already have been removed.');
+        return;
+      }
+      setShowDeleteModal(false);
+      router.back();
+    } catch (error) {
+      console.error('Could not delete medicine:', error);
+      Alert.alert('Could not delete medicine', 'Please try again. Your record has not been confirmed as deleted.');
+    }
   };
 
   const formatScheduleText = () => {
@@ -96,8 +105,8 @@ export default function MedicineDetailsScreen() {
   };
 
   const scheduleDoseNote = schedule?.times[0]?.amount
-    ? `${schedule.times[0].amount} per reminder · Example schedule saved by Alex`
-    : 'Custom schedule saved';
+    ? `${schedule.times[0].amount} per reminder · Confirm against your prescription`
+    : 'No saved dose amount';
 
   return (
     <AppScreen scrollable contentContainerStyle={styles.scrollContent}>
@@ -126,15 +135,20 @@ export default function MedicineDetailsScreen() {
             </View>
           </View>
 
-          {/* Example package tag */}
           <View style={styles.exampleTag}>
             <Text style={styles.exampleTagText}>
-              Example package - Review details
+              {medicine.isSample
+                ? 'Fictional demonstration data · Not real medication data'
+                : medicine.packageDetails.originalPackageChecked
+                ? 'Marked as reviewed by you · Not independently verified'
+                : medicine.informationSource?.toLowerCase().includes('scan')
+                ? 'OCR-extracted draft · Verify every field against the package'
+                : 'User-entered details · Not independently verified'}
             </Text>
           </View>
 
           <Text style={styles.addedDateText}>
-            Added April 22, 2026 · Not clinically verified
+            Added {Number.isNaN(Date.parse(medicine.createdAt)) ? 'date unavailable' : new Date(medicine.createdAt).toLocaleDateString()} · HealthMate has not clinically verified this record
           </Text>
         </AppCard>
 
@@ -202,9 +216,7 @@ export default function MedicineDetailsScreen() {
         <AppCard style={styles.educationCard}>
           <Text style={styles.eduQuestion}>What is it used for?</Text>
           <Text style={styles.eduBody}>
-            No reviewed medicine leaflet is attached to this example. Ask a
-            pharmacist about general uses, or check the patient information leaflet
-            that came with your medicine.
+            No reviewed patient leaflet is linked to this record. This screen does not establish why you take this medicine or whether it is appropriate for you. Check the leaflet for your exact product or ask a pharmacist.
           </Text>
 
           {/* Action pills: Explain simply / Why prescribed? */}
@@ -254,8 +266,7 @@ export default function MedicineDetailsScreen() {
             </TouchableOpacity>
             {expandedSection === 'how' ? (
               <Text style={styles.accordionBody}>
-                {medicine.name} works according to standard pharmacological
-                guidelines. Refer to your prescription label for personal details.
+                No medicine-specific mechanism information has been verified for this record. Check the official patient leaflet for your exact product or ask a pharmacist.
               </Text>
             ) : null}
 
@@ -277,8 +288,7 @@ export default function MedicineDetailsScreen() {
             </TouchableOpacity>
             {expandedSection === 'uses' ? (
               <Text style={styles.accordionBody}>
-                Commonly prescribed for indications identified on your original
-                package or doctor instructions.
+                Uses depend on the active ingredient, formulation, and your clinical circumstances. This record does not contain a reviewed list of approved uses.
               </Text>
             ) : null}
 
@@ -310,8 +320,7 @@ export default function MedicineDetailsScreen() {
             </TouchableOpacity>
             {expandedSection === 'safety' ? (
               <Text style={styles.accordionBody}>
-                Keep stored in a cool, dry place. Keep out of reach of children.
-                Never share prescription medications.
+                Storage and precautions vary by product. Follow the instructions on the original package and patient leaflet, and ask a pharmacist if they are unclear.
               </Text>
             ) : null}
 
@@ -333,8 +342,7 @@ export default function MedicineDetailsScreen() {
             </TouchableOpacity>
             {expandedSection === 'effects' ? (
               <Text style={styles.accordionBody}>
-                Consult your doctor or pharmacist immediately if you experience
-                any unexpected adverse effects or allergic reactions.
+                No reviewed product-specific side-effect list is linked to this record. Check the patient leaflet for your exact product or ask a pharmacist about concerns.
               </Text>
             ) : null}
           </View>

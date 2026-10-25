@@ -25,13 +25,13 @@ const INITIAL_SUGGESTIONS = [
 ];
 
 const KNOWLEDGE_RESPONSES: Record<string, string> = {
-  mg: 'Milligrams (mg) measure the weight or mass of a solid active ingredient (such as in a tablet or capsule), while milliliters (mL) measure the volume of a liquid medicine. Always use an oral dosing syringe or measured cup rather than household spoons for liquids.',
+  mg: 'Milligrams (mg) describe mass, while milliliters (mL) describe volume. For liquid medicines, use the measuring device supplied or recommended for that product, not a household spoon.',
   ingredient:
-    'An active ingredient is the actual chemical substance in a medicine that creates the therapeutic effect. Brand names and generic versions of a medicine usually share the exact same active ingredient at the same strength.',
+    'An active ingredient is the actual chemical substance in a medicine that creates the therapeutic effect. Generic medicines generally contain the same active ingredient, but products can differ in formulation or inactive ingredients. Confirm the exact product with its leaflet or a pharmacist.',
   batch:
     'A batch number (or lot number) is a unique alphanumeric code assigned by the manufacturer during production. It allows pharmacies and health authorities to track specific production runs and identify medications in case of quality checks or recalls.',
   store:
-    'Most medications should be stored in a cool, dry place away from direct sunlight, moisture, and heat. Bathrooms and windowsills are usually poor storage locations due to humidity. Always check your specific package for refrigeration requirements.',
+    'Storage instructions vary by product. Follow the storage conditions printed on the original package or patient leaflet, including any refrigeration instructions.',
 };
 
 export default function AIAssistantScreen() {
@@ -58,10 +58,13 @@ export default function AIAssistantScreen() {
 
     setTimeout(() => {
       let reply =
-        'HealthMate AI provides general package terminology and medication literacy. For diagnosis, dosages, or personal symptoms, please consult your prescribing physician or pharmacist.';
+        'This offline guide covers a few general medication terms only; it is not a verified drug reference. For diagnosis, doses, symptoms, or treatment decisions, contact your pharmacist or prescriber.';
 
       const lower = text.toLowerCase();
-      if (lower.includes('mg') || lower.includes('ml')) {
+      const asksForPersonalMedicalAdvice = /\b(dose|dosage|take|taking|safe for me|side effects?|interaction\w*|pregnan\w*|symptom\w*|diagnos\w*|overdose|missed dose|stop taking)\b/.test(lower);
+      if (asksForPersonalMedicalAdvice) {
+        reply = 'I can’t assess your personal treatment, symptoms, dose, or medicine interactions. Do not start, stop, or change a medicine based on this offline guide. Check the leaflet for your exact product and contact your pharmacist or prescriber. If you may have taken too much medicine or have severe symptoms, seek urgent local medical help.';
+      } else if (lower.includes('mg') || lower.includes('ml')) {
         reply = KNOWLEDGE_RESPONSES.mg;
       } else if (lower.includes('ingredient')) {
         reply = KNOWLEDGE_RESPONSES.ingredient;
@@ -70,8 +73,7 @@ export default function AIAssistantScreen() {
       } else if (lower.includes('store') || lower.includes('storage')) {
         reply = KNOWLEDGE_RESPONSES.store;
       } else if (lower.includes('metformin')) {
-        reply =
-          'Metformin is an oral biguanide medicine often prescribed for glycemic management in type 2 diabetes. It works by reducing glucose production in the liver. Always take with meals as directed on your prescription label.';
+        reply = 'I can provide only general terminology here, not confirm a medicine’s use or how you should take it. Check the patient leaflet for your exact product or ask your pharmacist or prescriber.';
       }
 
       const assistantMsg: AIMessage = {
@@ -99,8 +101,8 @@ export default function AIAssistantScreen() {
   return (
     <AppScreen contentContainerStyle={styles.container}>
       <AppHeader
-        title="AI Assistant"
-        subtitle="Medication label & terminology guide"
+        title="Medication Guide"
+        subtitle="Offline medication terminology guide"
         brandText="HealthMate AI"
         onBackPress={() => router.back()}
         rightAction={
@@ -119,8 +121,7 @@ export default function AIAssistantScreen() {
       <View style={styles.disclaimerBanner}>
         <Ionicons name="information-circle" size={18} color="#0788F5" />
         <Text style={styles.disclaimerText}>
-          Educational guide only. Never replace advice from your doctor or
-          pharmacist.
+          Fixed offline responses, not a live AI or verified drug database. General education only; never replace advice from your doctor or pharmacist.
         </Text>
       </View>
 

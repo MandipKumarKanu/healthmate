@@ -20,6 +20,7 @@ import { MedicineIcon } from '../../components/ui/MedicineIcon';
 import { SectionHeader } from '../../components/ui/SectionHeader';
 import { medicineRepository } from '../../database/repositories/medicineRepository';
 import { scheduleRepository } from '../../database/repositories/scheduleRepository';
+import { getTodayDateString } from '../../database/seed';
 import { useReminderStore } from '../../store/reminderStore';
 import { Medicine, RecurrenceType, ReminderTime } from '../../types';
 
@@ -82,19 +83,22 @@ export default function SetReminderScreen() {
       return;
     }
 
-    const todayStr = new Date().toISOString().split('T')[0];
-    const scheduleId = `sched_${selectedMed.id}`;
+    // Use local calendar date (not UTC) and preserve the recurrence anchor when editing.
+    const existingSchedule = scheduleRepository.getByMedicineId(selectedMed.id);
+    const scheduleId = existingSchedule?.id ?? `sched_${selectedMed.id}`;
+    const now = new Date().toISOString();
 
     await saveSchedule({
       id: scheduleId,
       medicineId: selectedMed.id,
       recurrence,
-      startDate: todayStr,
+      startDate: existingSchedule?.startDate ?? getTodayDateString(),
+      endDate: existingSchedule?.endDate,
       times,
       enabled: true,
       notificationsEnabled,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: existingSchedule?.createdAt ?? now,
+      updatedAt: now,
     });
 
     Alert.alert('Success', 'Medication schedule saved successfully!', [

@@ -167,8 +167,14 @@ export const medicineRepository = {
 
   delete(id: string): boolean {
     const db = getDatabase();
-    db.runSync('DELETE FROM medicines WHERE id = ?;', [id]);
-    return true;
+    if (!this.getById(id)) return false;
+
+    // Remove dependent rows explicitly as well as relying on SQLite foreign keys.
+    // This keeps cleanup consistent with the demonstration database adapter.
+    db.runSync('DELETE FROM schedules WHERE medicine_id = ?;', [id]);
+    db.runSync('DELETE FROM adherence_logs WHERE medicine_id = ?;', [id]);
+    const result = db.runSync('DELETE FROM medicines WHERE id = ?;', [id]);
+    return result.changes > 0;
   },
 
   search(
