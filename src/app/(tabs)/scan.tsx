@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import {
   StyleSheet,
   View,
+  ActivityIndicator,
   Text,
   TouchableOpacity,
   TextInput,
@@ -10,6 +11,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import TextRecognition from '@react-native-ml-kit/text-recognition';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
@@ -26,6 +28,7 @@ import { DosageForm } from '../../types';
 export default function ScanScreen() {
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
+  const cameraRef = useRef<CameraView | null>(null);
   const { addMedicine } = useMedicineStore();
 
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
@@ -42,10 +45,18 @@ export default function ScanScreen() {
   const [medBatch, setMedBatch] = useState('');
   const [medMfg, setMedMfg] = useState('');
 
-  const processTextSample = (textToProcess: string, imageUri?: string) => {
+  const processImage = async (imageUri: string) => {
     setIsScanning(true);
-    setTimeout(() => {
-      const extracted = ocrService.extractMedicineData(textToProcess);
+    setExtractedData(null);
+    try {
+      // ML Kit performs on-device OCR. Treat extracted values as unverified drafts.
+      const recognition = await TextRecognition.recognize(imageUri);
+      const rawText = recognition.text?.trim() ?? '';
+      if (!rawText) {
+        Alert.alert('No text detected', 'Try a clearer, well-lit photo with the medicine label filling the frame.');
+        return;
+      }
+      const extracted = ocrService.extractMedicineData(rawText);
       setExtractedData(extracted);
       setMedName(extracted.medicineName || '');
       setMedStrength(extracted.detectedStrength || '');
@@ -53,47 +64,63 @@ export default function ScanScreen() {
       setMedExpiry(extracted.expiryDate || '');
       setMedBatch(extracted.batchNumber || '');
       setMedMfg(extracted.manufacturer || '');
+    } catch (error) {
+      console.warn('Medicine label text recognition failed:', error);
+      Alert.alert('Could not read label', 'Please try another image or enter the medicine details manually.');
+    } finally {
       setIsScanning(false);
-    }, 600);
+    }
   };
 
-  const handleCapture = () => {
-    // Simulated realistic OCR capture from medicine package
-    const samplePackageText = `
-Metformin Hydrochloride Tablets USP
-500 mg
-Each film coated tablet contains:
-Metformin HCl 500mg
-Batch No: DEMO-MF0426
-Mfg Date: 01/2025
-Exp Date: 12/2027
-Manufactured by: Example Pharma Ltd.
-Dosage: As directed by the physician.
-Store below 25°C in a dry place.
-    `;
-    setCapturedImage('sample-camera-capture');
-    processTextSample(samplePackageText);
+  const handleCapture = async () => {
+    if (!permission?.granted) {
+      const result = await requestPermission();
+      if (!result.granted) {
+        Alert.alert('Camera permission needed', 'Allow camera access to scan a medicine label.');
+        return;
+      }
+    }
+    try {
+      const photo = await cameraRef.current?.takePictureAsync({ quality: 0.8 });
+      if (!photo?.uri) {
+        Alert.alert('Camera unavailable', 'Please try again or choose a photo from your gallery.');
+        return;
+      }
+      setCapturedImage(photo.uri);
+      await processImage(photo.uri);
+    } catch (error) {
+      console.warn('Medicine label capture failed:', error);
+      Alert.alert('Capture failed', 'Please try again or choose a photo from your gallery.');
+    }
   };
 
   const handlePickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setCapturedImage(result.assets[0].uri);
-      processTextSample(
-        'Amoxicillin Capsules 250mg Exp: 06/2027 Batch: LOT-9912 Mfg by: HealthMed',
-        result.assets[0].uri
-      );
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const imageUri = result.assets[0].uri;
+        setCapturedImage(imageUri);
+        await processImage(imageUri);
+      }
+    } catch (error) {
+      console.warn('Unable to select medicine image:', error);
+      Alert.alert('Image selection failed', 'Please try another image.');
     }
   };
 
   const handleReset = () => {
     setCapturedImage(null);
     setExtractedData(null);
+    setMedName('');
+    setMedStrength('');
+    setMedForm('tablet');
+    setMedExpiry('');
+    setMedBatch('');
+    setMedMfg('');
   };
 
   const handleSaveToHistory = () => {
@@ -190,7 +217,7 @@ Store below 25°C in a dry place.
           // Camera Viewport & Capture Controls
           <View style={styles.cameraContainer}>
             {permission?.granted ? (
-              <CameraView style={styles.cameraView} facing="back">
+              <CameraView ref={cameraRef} style={styles.cameraView} facing="back">
                 <View style={styles.overlayFrame}>
                   <View style={styles.targetCornerTL} />
                   <View style={styles.targetCornerTR} />
@@ -266,6 +293,13 @@ Store below 25°C in a dry place.
                 physical prescription label before saving.
               </Text>
             </View>
+
+            {isScanning ? (
+              <View style={styles.ocrAlertBanner}>
+                <ActivityIndicator size="small" color={Colors.primary} />
+                <Text style={styles.ocrAlertText}>Reading text from the medicine label…</Text>
+              </View>
+            ) : null}
 
             {/* Editable Fields */}
             <AppCard style={styles.fieldsCard}>
