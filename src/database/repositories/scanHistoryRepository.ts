@@ -73,8 +73,10 @@ export const scanHistoryRepository = {
 
   delete(id: string): boolean {
     const db = getDatabase();
-    db.runSync('DELETE FROM scan_history WHERE id = ?;', [id]);
-    return true;
+    const existing = db.getFirstSync<ScanRow>('SELECT * FROM scan_history WHERE id = ?;', [id]);
+    if (!existing) return false;
+    const result = db.runSync('DELETE FROM scan_history WHERE id = ?;', [id]);
+    return result.changes > 0;
   },
 
   clearAll(): void {
