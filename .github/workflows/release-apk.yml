@@ -1,0 +1,138 @@
+name: Build & Release Android APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release Tag (e.g. v1.0.0). Leave blank to use version from package.json'
+        required: false
+        type: string
+        default: ''
+      release_name:
+        description: 'Custom Release title (e.g. HealthMate Release v1.0.0). Leave blank for default'
+        required: false
+        type: string
+        default: ''
+      create_release:
+        description: 'Publish a GitHub Release with the APK attached'
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: 📱 Build & Publish APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: ⬇️ Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: ☕ Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 17
+
+      - name: 🐘 Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: 📦 Install Dependencies
+        run: npm ci || npm install
+
+      - name: 🛠️ Ensure Native Android Project Exists (Expo Prebuild)
+        run: |
+          if [ ! -d "android" ]; then
+            echo "Native Android directory not found in repository. Generating using Expo prebuild..."
+            npx expo prebuild --platform android --no-install
+          else
+            echo "Native Android directory already present."
+          fi
+
+      - name: 🔑 Set Gradle wrapper executable
+        run: chmod +x android/gradlew
+
+      - name: 🚀 Build Release APK
+        run: |
+          cd android
+          ./gradlew assembleRelease --no-daemon
+
+      - name: 🔍 Locate and Package Release APK
+        id: prepare_apk
+        run: |
+          APK_FILE=$(find android/app/build/outputs/apk/release -type f -name "*.apk" | head -n 1)
+          if [ -z "$APK_FILE" ] || [ ! -f "$APK_FILE" ]; then
+            echo "❌ Error: Release APK not found in android/app/build/outputs/apk/release"
+            exit 1
+          fi
+
+          VERSION=$(node -p "require('./package.json').version || '1.0.0'")
+          OUTPUT_APK="healthmate-v${VERSION}.apk"
+
+          cp "$APK_FILE" "./$OUTPUT_APK"
+          echo "Found APK at: $APK_FILE"
+          echo "Prepared APK as: $OUTPUT_APK"
+          ls -lh "./$OUTPUT_APK"
+
+          echo "apk_path=$OUTPUT_APK" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: 📤 Upload APK as Workflow Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: healthmate-apk
+          path: ${{ steps.prepare_apk.outputs.apk_path }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: 🏷️ Resolve Release Metadata
+        id: release_meta
+        if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.create_release) }}
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            RESOLVED_TAG="${GITHUB_REF#refs/tags/}"
+          elif [ -n "${{ inputs.tag_name }}" ]; then
+            RESOLVED_TAG="${{ inputs.tag_name }}"
+          else
+            RESOLVED_TAG="v${{ steps.prepare_apk.outputs.version }}"
+          fi
+
+          if [ -n "${{ inputs.release_name }}" ]; then
+            RESOLVED_NAME="${{ inputs.release_name }}"
+          else
+            RESOLVED_NAME="HealthMate Release $RESOLVED_TAG"
+          fi
+
+          echo "tag=$RESOLVED_TAG" >> "$GITHUB_OUTPUT"
+          echo "name=$RESOLVED_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: 🎉 Publish GitHub Release
+        if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.create_release) }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_meta.outputs.tag }}
+          name: ${{ steps.release_meta.outputs.name }}
+          files: ${{ steps.prepare_apk.outputs.apk_path }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

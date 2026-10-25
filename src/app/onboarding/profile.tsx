@@ -1,0 +1,808 @@
+import React, { useState } from 'react';
+import {
+  StyleSheet,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  Image,
+  Modal,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import {
+  Ionicons,
+  Feather,
+  MaterialCommunityIcons,
+} from '@expo/vector-icons';
+import { AppScreen } from '../../components/ui/AppScreen';
+import { Radius, Spacing } from '../../theme/tokens';
+import { useAppStore } from '../../store/appStore';
+import { GenderOption, UnitSystem } from '../../types';
+
+const GENDER_OPTIONS: { label: string; value: GenderOption }[] = [
+  { label: 'Male', value: 'Male' },
+  { label: 'Female', value: 'Female' },
+  { label: 'Other', value: 'Other' },
+  { label: 'Prefer not to say', value: 'Prefer not to say' },
+];
+
+export default function OnboardingProfileScreen() {
+  const router = useRouter();
+  const { updateProfile } = useAppStore();
+
+  const [name, setName] = useState('');
+  const [age, setAge] = useState('');
+  const [gender, setGender] = useState<GenderOption | null>(null);
+  const [height, setHeight] = useState('');
+  const [weight, setWeight] = useState('');
+  const [unitSystem, setUnitSystem] = useState<UnitSystem>('metric');
+
+  const [errors, setErrors] = useState<{
+    name?: string;
+    age?: string;
+    height?: string;
+    weight?: string;
+  }>({});
+
+  const [genderModalVisible, setGenderModalVisible] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const validateForm = () => {
+    const newErrors: {
+      name?: string;
+      age?: string;
+      height?: string;
+      weight?: string;
+    } = {};
+
+    // 1. Required Name
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      newErrors.name = 'Please enter your full name';
+    }
+
+    // 2. Optional Age validation (only validate if provided)
+    if (age.trim()) {
+      const parsedAge = Number(age.trim());
+      if (isNaN(parsedAge) || parsedAge < 1 || parsedAge > 120 || !Number.isInteger(parsedAge)) {
+        newErrors.age = 'Enter a valid age (1-120)';
+      }
+    }
+
+    // 3. Optional Height validation (only validate if provided)
+    if (height.trim()) {
+      const parsedHeight = Number(height.trim());
+      if (isNaN(parsedHeight) || parsedHeight <= 0) {
+        newErrors.height = 'Enter a positive number';
+      } else if (unitSystem === 'metric' && (parsedHeight < 30 || parsedHeight > 300)) {
+        newErrors.height = 'Height should be 30–300 cm';
+      } else if (unitSystem === 'imperial' && (parsedHeight < 1 || parsedHeight > 9)) {
+        newErrors.height = 'Height should be 1–9 ft';
+      }
+    }
+
+    // 4. Optional Weight validation (only validate if provided)
+    if (weight.trim()) {
+      const parsedWeight = Number(weight.trim());
+      if (isNaN(parsedWeight) || parsedWeight <= 0) {
+        newErrors.weight = 'Enter a positive number';
+      } else if (unitSystem === 'metric' && (parsedWeight < 1 || parsedWeight > 500)) {
+        newErrors.weight = 'Weight should be 1–500 kg';
+      } else if (unitSystem === 'imperial' && (parsedWeight < 2 || parsedWeight > 1000)) {
+        newErrors.weight = 'Weight should be 2–1000 lb';
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleGetStarted = async () => {
+    if (!validateForm()) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const trimmedName = name.trim();
+      const parsedAge = age.trim() ? Number(age.trim()) : undefined;
+      const parsedHeight = height.trim() ? Number(height.trim()) : undefined;
+      const parsedWeight = weight.trim() ? Number(weight.trim()) : undefined;
+
+      updateProfile(
+        trimmedName,
+        {
+          age: parsedAge,
+          gender: gender || undefined,
+          height: parsedHeight,
+          weight: parsedWeight,
+          unitSystem,
+        },
+        true
+      );
+
+      // Navigate to Home dashboard
+      router.replace('/(tabs)/home');
+    } catch (err) {
+      Alert.alert(
+        'Save Error',
+        'Could not save your profile. Please check your details and try again.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <AppScreen scrollable={false} contentContainerStyle={styles.container}>
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Top Bar: Back Button */}
+          <View style={styles.topNavRow}>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={styles.backButton}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Go back to welcome screen"
+            >
+              <Ionicons name="chevron-back" size={24} color="#0F172A" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Header Title with 3D Clipboard Asset */}
+          <View style={styles.headerRow}>
+            <View style={styles.headerTextGroup}>
+              <Text style={styles.stepIndicator}>STEP 2 OF 2</Text>
+              <Text style={styles.screenTitle}>Tell us about yourself</Text>
+              <Text style={styles.screenSubtitle}>
+                This helps personalize your HealthMate experience. You can always edit this later.
+              </Text>
+            </View>
+
+            <Image
+              source={require('../../../assets/images/profile_clipboard.png')}
+              style={styles.clipboardImage}
+              resizeMode="contain"
+              accessibilityLabel="Profile illustration"
+            />
+          </View>
+
+          {/* White Card Form Container */}
+          <View style={styles.formCard}>
+            {/* Full name (Required) */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>
+                Full name <Text style={styles.requiredStar}>*</Text>
+              </Text>
+              <View
+                style={[
+                  styles.inputContainer,
+                  errors.name ? styles.inputErrorBorder : null,
+                ]}
+              >
+                <Feather
+                  name="user"
+                  size={18}
+                  color="#94A3B8"
+                  style={styles.fieldIcon}
+                />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Enter your name"
+                  placeholderTextColor="#94A3B8"
+                  value={name}
+                  onChangeText={(val) => {
+                    setName(val);
+                    if (errors.name) {
+                      setErrors((prev) => ({ ...prev, name: undefined }));
+                    }
+                  }}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                  accessibilityLabel="Full name"
+                />
+              </View>
+              {errors.name ? (
+                <Text style={styles.errorText}>{errors.name}</Text>
+              ) : null}
+            </View>
+
+            {/* Age & Gender Side-by-Side Row */}
+            <View style={styles.rowTwoCols}>
+              {/* Age (Optional) */}
+              <View style={[styles.fieldGroup, { flex: 1, marginRight: 8 }]}>
+                <Text style={styles.fieldLabel}>Age (optional)</Text>
+                <View
+                  style={[
+                    styles.inputContainer,
+                    errors.age ? styles.inputErrorBorder : null,
+                  ]}
+                >
+                  <Feather
+                    name="calendar"
+                    size={17}
+                    color="#94A3B8"
+                    style={styles.fieldIcon}
+                  />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="e.g. 25"
+                    placeholderTextColor="#94A3B8"
+                    value={age}
+                    onChangeText={(val) => {
+                      setAge(val.replace(/[^0-9]/g, ''));
+                      if (errors.age) {
+                        setErrors((prev) => ({ ...prev, age: undefined }));
+                      }
+                    }}
+                    keyboardType="number-pad"
+                    maxLength={3}
+                    accessibilityLabel="Age"
+                  />
+                </View>
+                {errors.age ? (
+                  <Text style={styles.errorText}>{errors.age}</Text>
+                ) : null}
+              </View>
+
+              {/* Gender (Optional) */}
+              <View style={[styles.fieldGroup, { flex: 1, marginLeft: 8 }]}>
+                <Text style={styles.fieldLabel}>Gender (optional)</Text>
+                <TouchableOpacity
+                  style={styles.inputContainer}
+                  onPress={() => setGenderModalVisible(true)}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel="Select gender"
+                >
+                  <Feather
+                    name="user"
+                    size={17}
+                    color="#94A3B8"
+                    style={styles.fieldIcon}
+                  />
+                  <Text
+                    style={[
+                      styles.selectText,
+                      !gender && styles.selectPlaceholderText,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {gender || 'Select gender'}
+                  </Text>
+                  <Ionicons
+                    name="chevron-down"
+                    size={16}
+                    color="#94A3B8"
+                    style={styles.chevronIcon}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Height (Optional) */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Height (optional)</Text>
+              <View
+                style={[
+                  styles.inputContainer,
+                  errors.height ? styles.inputErrorBorder : null,
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name="human-male-height"
+                  size={19}
+                  color="#94A3B8"
+                  style={styles.fieldIcon}
+                />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder={unitSystem === 'metric' ? 'e.g. 170' : 'e.g. 5.8'}
+                  placeholderTextColor="#94A3B8"
+                  value={height}
+                  onChangeText={(val) => {
+                    setHeight(val);
+                    if (errors.height) {
+                      setErrors((prev) => ({ ...prev, height: undefined }));
+                    }
+                  }}
+                  keyboardType="numeric"
+                  accessibilityLabel="Height"
+                />
+                <View style={styles.unitBadge}>
+                  <Text style={styles.unitBadgeText}>
+                    {unitSystem === 'metric' ? 'cm' : 'ft'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={14} color="#64748B" />
+                </View>
+              </View>
+              {errors.height ? (
+                <Text style={styles.errorText}>{errors.height}</Text>
+              ) : null}
+            </View>
+
+            {/* Weight (Optional) */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Weight (optional)</Text>
+              <View
+                style={[
+                  styles.inputContainer,
+                  errors.weight ? styles.inputErrorBorder : null,
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name="scale-bathroom"
+                  size={19}
+                  color="#94A3B8"
+                  style={styles.fieldIcon}
+                />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder={unitSystem === 'metric' ? 'e.g. 65' : 'e.g. 145'}
+                  placeholderTextColor="#94A3B8"
+                  value={weight}
+                  onChangeText={(val) => {
+                    setWeight(val);
+                    if (errors.weight) {
+                      setErrors((prev) => ({ ...prev, weight: undefined }));
+                    }
+                  }}
+                  keyboardType="numeric"
+                  accessibilityLabel="Weight"
+                />
+                <View style={styles.unitBadge}>
+                  <Text style={styles.unitBadgeText}>
+                    {unitSystem === 'metric' ? 'kg' : 'lb'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={14} color="#64748B" />
+                </View>
+              </View>
+              {errors.weight ? (
+                <Text style={styles.errorText}>{errors.weight}</Text>
+              ) : null}
+            </View>
+
+            {/* Units Segmented Pill */}
+            <View style={styles.unitsSection}>
+              <Text style={styles.unitsLabel}>Units</Text>
+              <View style={styles.segmentedControl}>
+                <TouchableOpacity
+                  style={[
+                    styles.segmentOption,
+                    unitSystem === 'metric' && styles.segmentOptionSelected,
+                  ]}
+                  onPress={() => setUnitSystem('metric')}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: unitSystem === 'metric' }}
+                >
+                  <Text
+                    style={[
+                      styles.segmentText,
+                      unitSystem === 'metric' && styles.segmentTextSelected,
+                    ]}
+                  >
+                    Metric (cm, kg)
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.segmentOption,
+                    unitSystem === 'imperial' && styles.segmentOptionSelected,
+                  ]}
+                  onPress={() => setUnitSystem('imperial')}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: unitSystem === 'imperial' }}
+                >
+                  <Text
+                    style={[
+                      styles.segmentText,
+                      unitSystem === 'imperial' && styles.segmentTextSelected,
+                    ]}
+                  >
+                    Imperial (ft, lb)
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+
+          {/* Bottom Action Section: Get Started Button & Privacy Note */}
+          <View style={styles.actionSection}>
+            <TouchableOpacity
+              style={styles.getStartedButton}
+              onPress={handleGetStarted}
+              disabled={isSubmitting}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Get Started, complete setup"
+            >
+              {isSubmitting ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <View style={styles.buttonInner}>
+                  <Text style={styles.getStartedButtonText}>Get Started</Text>
+                  <Feather
+                    name="arrow-right"
+                    size={18}
+                    color="#FFFFFF"
+                    style={styles.arrowIcon}
+                  />
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <View style={styles.privacyNote}>
+              <Feather
+                name="lock"
+                size={14}
+                color="#64748B"
+                style={styles.privacyLock}
+              />
+              <Text style={styles.privacyText}>
+                Your information stays on your device.{'\n'}Age, gender, height, and weight are optional.
+              </Text>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      {/* Gender Selection Modal */}
+      <Modal
+        visible={genderModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setGenderModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setGenderModalVisible(false)}
+        >
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Gender</Text>
+              <TouchableOpacity
+                onPress={() => setGenderModalVisible(false)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="close" size={22} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            {GENDER_OPTIONS.map((item) => {
+              const isSelected = gender === item.value;
+              return (
+                <TouchableOpacity
+                  key={item.value}
+                  style={[
+                    styles.genderOptionRow,
+                    isSelected && styles.genderOptionRowSelected,
+                  ]}
+                  onPress={() => {
+                    setGender(item.value);
+                    setGenderModalVisible(false);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.genderOptionText,
+                      isSelected && styles.genderOptionTextSelected,
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                  {isSelected && (
+                    <Ionicons
+                      name="checkmark"
+                      size={20}
+                      color="#0788F5"
+                    />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </AppScreen>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F8F9FD',
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingTop: Spacing.xs,
+    paddingBottom: Spacing.xl,
+  },
+  topNavRow: {
+    paddingVertical: 4,
+    marginBottom: 4,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  headerTextGroup: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  stepIndicator: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0788F5',
+    letterSpacing: 0.6,
+    marginBottom: 6,
+  },
+  screenTitle: {
+    fontSize: 27,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.4,
+    lineHeight: 32,
+    marginBottom: 6,
+  },
+  screenSubtitle: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#64748B',
+    fontWeight: '400',
+  },
+  clipboardImage: {
+    width: 78,
+    height: 78,
+    borderRadius: 16,
+    marginTop: 2,
+  },
+  formCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 20,
+    borderWidth: 1,
+    borderColor: '#ECECF2',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 14,
+    elevation: 3,
+    marginBottom: 22,
+  },
+  fieldGroup: {
+    marginBottom: 14,
+  },
+  rowTwoCols: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#334155',
+    marginBottom: 6,
+  },
+  requiredStar: {
+    color: '#EF4444',
+  },
+  inputContainer: {
+    height: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+  },
+  inputErrorBorder: {
+    borderColor: '#EF4444',
+  },
+  fieldIcon: {
+    marginRight: 8,
+  },
+  textInput: {
+    flex: 1,
+    height: '100%',
+    fontSize: 14,
+    color: '#0F172A',
+    paddingVertical: 0,
+  },
+  selectText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#0F172A',
+  },
+  selectPlaceholderText: {
+    color: '#94A3B8',
+  },
+  chevronIcon: {
+    marginLeft: 6,
+  },
+  unitBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 6,
+  },
+  unitBadgeText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#334155',
+    marginRight: 3,
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#EF4444',
+    marginTop: 4,
+    marginLeft: 2,
+  },
+  unitsSection: {
+    marginTop: 4,
+  },
+  unitsLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#334155',
+    marginBottom: 8,
+  },
+  segmentedControl: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    padding: 3,
+  },
+  segmentOption: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 9,
+  },
+  segmentOptionSelected: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#0788F5',
+    shadowColor: '#0788F5',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  segmentText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#64748B',
+  },
+  segmentTextSelected: {
+    color: '#0788F5',
+    fontWeight: '700',
+  },
+  actionSection: {
+    alignItems: 'center',
+  },
+  getStartedButton: {
+    width: '100%',
+    height: 54,
+    borderRadius: Radius.pill,
+    backgroundColor: '#0788F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#0788F5',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  buttonInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  getStartedButtonText: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  arrowIcon: {
+    marginLeft: 8,
+  },
+  privacyNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    marginTop: 16,
+    paddingHorizontal: 8,
+  },
+  privacyLock: {
+    marginRight: 6,
+    marginTop: 2,
+  },
+  privacyText: {
+    fontSize: 12,
+    color: '#64748B',
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  genderOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 13,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    marginBottom: 4,
+  },
+  genderOptionRowSelected: {
+    backgroundColor: '#EFF6FF',
+  },
+  genderOptionText: {
+    fontSize: 15,
+    color: '#334155',
+    fontWeight: '500',
+  },
+  genderOptionTextSelected: {
+    color: '#0788F5',
+    fontWeight: '700',
+  },
+});
