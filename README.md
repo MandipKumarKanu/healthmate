@@ -132,7 +132,8 @@ healthmate/
 │   │   └── reminderStore.ts
 │   │
 │   └── theme/
-│       └── colors.ts                  # Shared application color palette
+│       ├── colors.ts                  # Shared application color palette
+│       └── tokens.ts                  # Spacing, radius, typography, shadows
 │   │
 │   └── types/                         # Shared TypeScript Interfaces
 │       └── index.ts
