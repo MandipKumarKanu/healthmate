@@ -442,7 +442,23 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 2,
   },
-  timeActions: {\n    flexDirection: 'row',\n    alignItems: 'center',\n    gap: 8,\n  },\n  timePill: {\n    backgroundColor: '#F0EFF3',\n    borderRadius: Radius.pill,\n    paddingHorizontal: 12,\n    paddingVertical: 8,\n    minWidth: 96,\n    textAlign: 'center',\n    fontSize: 16,\n    color: Colors.textPrimary,\n    fontWeight: '600',\n  },\n  deleteTimeButton: {
+  timeActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  timePill: {
+    backgroundColor: '#F0EFF3',
+    borderRadius: Radius.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minWidth: 96,
+    textAlign: 'center',
+    fontSize: 16,
+    color: Colors.textPrimary,
+    fontWeight: '600',
+  },
+  deleteTimeButton: {
     padding: 8,
   },
   presetsLabel: {
