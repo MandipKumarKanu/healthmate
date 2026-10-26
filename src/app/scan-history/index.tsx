@@ -190,13 +190,12 @@ export default function ScanHistoryScreen() {
       <Modal
         visible={selectedScan !== null}
         transparent
-        animationType="slide"
+        animationType="fade"
+        statusBarTranslucent
         onRequestClose={closeSheet}
       >
         <View style={styles.sheetBackdrop}>
           <View style={styles.sheetContainer}>
-            <View style={styles.sheetGrabber} />
-
             {selectedScan ? (
               <ScrollView
                 style={styles.sheetScroll}
@@ -375,14 +374,25 @@ const styles = StyleSheet.create({
   },
   sheetBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(17, 17, 22, 0.55)',
-    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.60)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.lg,
   },
   sheetContainer: {
-    backgroundColor: Colors.cardBackground,
-    borderTopLeftRadius: Radius.xxl,
-    borderTopRightRadius: Radius.xxl,
+    width: '100%',
+    maxWidth: 420,
     maxHeight: '85%',
+    backgroundColor: Colors.cardBackground,
+    borderRadius: Radius.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingTop: Spacing.md,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 12,
   },
   sheetGrabber: {
     alignSelf: 'center',
