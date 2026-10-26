@@ -27,7 +27,7 @@ import { Medicine, RecurrenceType, ReminderTime } from '../../types';
 
 export default function SetReminderScreen() {
   const router = useRouter();
-  const { medicineId } = useLocalSearchParams<{ medicineId?: string }>();
+  const { medicineId, date } = useLocalSearchParams<{ medicineId?: string; date?: string }>();
   const { saveSchedule } = useReminderStore();
 
   const [medicines, setMedicines] = useState<Medicine[]>([]);
@@ -108,7 +108,7 @@ export default function SetReminderScreen() {
       id: scheduleId,
       medicineId: selectedMed.id,
       recurrence,
-      startDate: existingSchedule?.startDate ?? getTodayDateString(),
+      startDate: existingSchedule?.startDate ?? (date && /^\\d{4}-\\d{2}-\\d{2}$/.test(date) ? date : getTodayDateString()),
       endDate: existingSchedule?.endDate,
       times,
       enabled: true,
