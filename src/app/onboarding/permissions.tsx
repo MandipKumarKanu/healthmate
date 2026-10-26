@@ -16,6 +16,7 @@ export default function OnboardingPermissionsScreen() {
   const [exactAlarmState, setExactAlarmState] = useState<PermissionState>('idle');
   const [cameraState, setCameraState] = useState<PermissionState>('idle');
   const [photosState, setPhotosState] = useState<PermissionState>('idle');
+  const [, requestCameraPermission] = Camera.useCameraPermissions();
 
   const finishSetup = () => router.replace('/(tabs)/home');
 
@@ -41,7 +42,7 @@ export default function OnboardingPermissionsScreen() {
       // Camera and photo access are optional. Request them here only because the
       // user tapped the setup action; declining does not block app access.
       try {
-        const camera = await Camera.requestCameraPermissionsAsync();
+        const camera = await requestCameraPermission();
         setCameraState(camera.granted ? 'granted' : 'denied');
       } catch {
         setCameraState('unavailable');
