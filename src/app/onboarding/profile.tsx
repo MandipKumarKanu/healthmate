@@ -23,6 +23,7 @@ import { AppScreen } from '../../components/ui/AppScreen';
 import { Radius, Spacing } from '../../theme/tokens';
 import { useAppStore } from '../../store/appStore';
 import { GenderOption, UnitSystem } from '../../types';
+import { notificationService } from '../../services/notificationService';
 
 const GENDER_OPTIONS: { label: string; value: GenderOption }[] = [
   { label: 'Male', value: 'Male' },
@@ -109,6 +110,10 @@ export default function OnboardingProfileScreen() {
 
     setIsSubmitting(true);
     try {
+      await notificationService.init();
+      // Request the native notification permission during setup. Profile creation
+      // continues even if the user declines; reminders can be enabled later.
+      await notificationService.requestPermissions();
       const trimmedName = name.trim();
       const parsedAge = age.trim() ? Number(age.trim()) : undefined;
       const parsedHeight = height.trim() ? Number(height.trim()) : undefined;
