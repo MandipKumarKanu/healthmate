@@ -48,5 +48,14 @@
     "lint": "expo lint",
     "test": "jest"
   },
-  "private": true
+  "private": true,
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": [
+          "@react-native-ml-kit/text-recognition"
+        ]
+      }
+    }
+  }
 }
