@@ -85,10 +85,8 @@ jobs:
       - name: Generate native Android project
         run: npx expo prebuild --platform android --clean
 
-      - name: 🗜️ Enforce Single-ABI Packaging & Library Compression
+      - name: 🗜️ Enforce Single-ABI Packaging
         run: |
-          sed -i 's/expo.useLegacyPackaging=false/expo.useLegacyPackaging=true/g' android/gradle.properties
-          echo "android.enableShrinkResourcesInReleaseBuilds=true" >> android/gradle.properties
           node -e "
             const fs = require('fs');
             let content = fs.readFileSync('android/app/build.gradle', 'utf8');
@@ -104,14 +102,24 @@ jobs:
       - name: Build arm64-v8a Release APK
         working-directory: android
         run: |
-          ./gradlew assembleRelease -PversionCode=${{ steps.build_number.outputs.build_num }} -PreactNativeArchitectures=arm64-v8a --no-daemon
+          ./gradlew assembleRelease \
+            -PversionCode=${{ steps.build_number.outputs.build_num }} \
+            -PreactNativeArchitectures=arm64-v8a \
+            -Pexpo.useLegacyPackaging=true \
+            -Pandroid.enableShrinkResourcesInReleaseBuilds=true \
+            --no-daemon
           APK_FILE=$(find app/build/outputs/apk/release -type f -name "*.apk" | head -n 1)
           cp "$APK_FILE" "../healthmate-v${{ steps.build_number.outputs.version }}-arm64-v8a.apk"
 
       - name: Build armeabi-v7a Release APK
         working-directory: android
         run: |
-          ./gradlew assembleRelease -PversionCode=${{ steps.build_number.outputs.build_num }} -PreactNativeArchitectures=armeabi-v7a --no-daemon
+          ./gradlew assembleRelease \
+            -PversionCode=${{ steps.build_number.outputs.build_num }} \
+            -PreactNativeArchitectures=armeabi-v7a \
+            -Pexpo.useLegacyPackaging=true \
+            -Pandroid.enableShrinkResourcesInReleaseBuilds=true \
+            --no-daemon
           APK_FILE=$(find app/build/outputs/apk/release -type f -name "*.apk" | head -n 1)
           cp "$APK_FILE" "../healthmate-v${{ steps.build_number.outputs.version }}-armeabi-v7a.apk"
 
