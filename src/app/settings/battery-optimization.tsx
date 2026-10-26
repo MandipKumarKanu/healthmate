@@ -9,7 +9,7 @@ import {
   AppState,
   AppStateStatus,
   ActivityIndicator,
-  } from "react-native";
+} from "react-native";
 import { AppAlert as Alert } from "../../services/appAlert";
 import { useRouter } from "expo-router";
 import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
