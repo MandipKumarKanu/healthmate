@@ -4,6 +4,7 @@ import { Stack } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useAppStore } from "../store/appStore";
 import { notificationService } from "../services/notificationService";
+import { AppAlertProvider } from "../services/appAlert";
 
 export default function RootLayout() {
   const initApp = useAppStore((state) => state.initApp);
@@ -28,7 +29,8 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <Stack
+      <AppAlertProvider>
+        <Stack
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: "#F2F1F7" },
@@ -57,7 +59,8 @@ export default function RootLayout() {
             gestureEnabled: false,
           }}
         />
-      </Stack>
+        </Stack>
+      </AppAlertProvider>
     </SafeAreaProvider>
   );
 }
