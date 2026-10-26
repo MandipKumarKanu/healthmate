@@ -91,6 +91,7 @@ export function AppAlertProvider({ children }: PropsWithChildren) {
       {children}
       {activeAlert && (
         <AppDialog
+          key={activeAlert.id}
           visible
           title={activeAlert.title}
           message={activeAlert.message}
