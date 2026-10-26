@@ -22,6 +22,8 @@
       "predictiveBackGestureEnabled": false,
       "versionCode": 6,
       "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
         "android.permission.SCHEDULE_EXACT_ALARM",
         "android.permission.USE_FULL_SCREEN_INTENT",
         "android.permission.FOREGROUND_SERVICE",

@@ -224,13 +224,25 @@ export async function recognizePackagingImage(
       throw new Error(`OCR server responded with status ${response.status}.`);
     }
   } catch (err: any) {
+    if (
+      err?.message?.toLowerCase().includes("cleartext") ||
+      lastNetworkError?.message?.toLowerCase().includes("cleartext")
+    ) {
+      throw new Error(
+        "Cleartext HTTP communication to OCR server is blocked by Android security policy. Ensure usesCleartextTraffic is enabled."
+      );
+    }
+
     const isOfflineOrAborted =
       err?.name === "AbortError" ||
       err?.message?.toLowerCase().includes("network request failed") ||
       err?.message?.toLowerCase().includes("failed to fetch") ||
+      err?.message?.toLowerCase().includes("fetch failed") ||
       err?.message?.toLowerCase().includes("networkerror") ||
       err?.message?.toLowerCase().includes("timeout") ||
-      lastNetworkError?.message?.toLowerCase().includes("network request failed");
+      lastNetworkError?.message?.toLowerCase().includes("network request failed") ||
+      lastNetworkError?.message?.toLowerCase().includes("failed to fetch") ||
+      lastNetworkError?.message?.toLowerCase().includes("fetch failed");
 
     if (isOfflineOrAborted) {
       throw new OcrConnectionError(

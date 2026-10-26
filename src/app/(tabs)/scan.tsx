@@ -102,6 +102,8 @@ export default function ScanScreen() {
         error?.message?.toLowerCase().includes("connect to internet") ||
         error?.message?.toLowerCase().includes("network request failed") ||
         error?.message?.toLowerCase().includes("failed to fetch") ||
+        error?.message?.toLowerCase().includes("fetch failed") ||
+        error?.message?.toLowerCase().includes("cleartext") ||
         error?.message?.toLowerCase().includes("timeout");
 
       if (isConnectionIssue) {
@@ -329,12 +331,12 @@ export default function ScanScreen() {
       />
 
       <View style={styles.body}>
-        {/* Notice banner: Connect to internet to use feature or add manually */}
+        {/* Notice banner: Cloud OCR requires internet to scan labels */}
         <View style={styles.internetNoticeBanner}>
           <View style={styles.internetNoticeLeft}>
-            <Ionicons name="wifi-outline" size={17} color="#B45309" />
+            <Ionicons name="cloud-outline" size={17} color={Colors.primary} />
             <Text style={styles.internetNoticeText}>
-              Please connect to internet to use this feature or add manually
+              Cloud OCR requires internet to scan labels
             </Text>
           </View>
           <TouchableOpacity
@@ -1185,8 +1187,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#FFFBEB",
-    borderColor: "#FDE68A",
+    backgroundColor: "#F0F7FF",
+    borderColor: "#D0E7FC",
     borderWidth: 1,
     borderRadius: Radius.md,
     paddingVertical: 9,
@@ -1203,7 +1205,7 @@ const styles = StyleSheet.create({
   internetNoticeText: {
     fontSize: 12,
     lineHeight: 16,
-    color: "#92400E",
+    color: "#1E40AF",
     fontWeight: "500",
     flex: 1,
   },
