@@ -29,6 +29,13 @@
     "plugins": [
       "expo-router",
       [
+        "expo-notifications",
+        {
+          "defaultChannel": "medication-reminders",
+          "enableBackgroundRemoteNotifications": false
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#208AEF",
