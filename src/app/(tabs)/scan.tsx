@@ -245,7 +245,7 @@ export default function ScanScreen() {
         manufacturer: medMfg || undefined,
         expiryDate: medExpiry || undefined,
         batchNumber: medBatch || undefined,
-        packageDetailsText: `Scanned from medicine ${packageType} packaging. OCR fields were user-reviewed.`,
+        packageDetailsText: `Captured from ${packageType} packaging with on-device OCR. Details are not independently verified.`,
         // OCR extraction is not verification; keep this false until the user explicitly checks the original package.
         originalPackageChecked: false,
       },
