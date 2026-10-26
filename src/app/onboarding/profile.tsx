@@ -29,21 +29,29 @@ const GENDER_OPTIONS: { label: string; value: GenderOption }[] = [
 
 export default function OnboardingProfileScreen() {
   const router = useRouter();
-  const { updateProfile, profile, setOnboardingStep } = useAppStore();
+  const {
+    updateProfile,
+    profile,
+    setOnboardingStep,
+    onboardingDraft,
+    setOnboardingDraft,
+  } = useAppStore();
 
-  const [name, setName] = useState(profile?.name || "");
-  const [age, setAge] = useState(profile?.age ? String(profile.age) : "");
+  const [name, setName] = useState(onboardingDraft.name || profile?.name || "");
+  const [age, setAge] = useState(
+    onboardingDraft.age || (profile?.age ? String(profile.age) : ""),
+  );
   const [gender, setGender] = useState<GenderOption | null>(
-    (profile?.gender as GenderOption) || null,
+    onboardingDraft.gender ?? ((profile?.gender as GenderOption) || null),
   );
   const [height, setHeight] = useState(
-    profile?.height ? String(profile.height) : "",
+    onboardingDraft.height || (profile?.height ? String(profile.height) : ""),
   );
   const [weight, setWeight] = useState(
-    profile?.weight ? String(profile.weight) : "",
+    onboardingDraft.weight || (profile?.weight ? String(profile.weight) : ""),
   );
   const [unitSystem, setUnitSystem] = useState<UnitSystem>(
-    profile?.unitSystem || "metric",
+    onboardingDraft.unitSystem || profile?.unitSystem || "metric",
   );
 
   const [errors, setErrors] = useState<{
@@ -150,7 +158,7 @@ export default function OnboardingProfileScreen() {
       setOnboardingStep("permissions");
 
       // Step 3: explain and request device permissions after profile details.
-      router.replace("/onboarding/permissions" as any);
+      router.push("/onboarding/permissions" as any);
     } catch (err) {
       Alert.alert(
         "Save Error",
@@ -188,7 +196,7 @@ export default function OnboardingProfileScreen() {
           {/* Header Title with 3D Clipboard Asset */}
           <View style={styles.headerRow}>
             <View style={styles.headerTextGroup}>
-              <Text style={styles.stepIndicator}>STEP 2 OF 2</Text>
+              <Text style={styles.stepIndicator}>STEP 2 OF 3</Text>
               <Text style={styles.screenTitle}>Tell us about yourself</Text>
               <Text style={styles.screenSubtitle}>
                 This helps personalize your HealthMate experience. You can
@@ -230,6 +238,7 @@ export default function OnboardingProfileScreen() {
                   value={name}
                   onChangeText={(val) => {
                     setName(val);
+                    setOnboardingDraft({ name: val });
                     if (errors.name) {
                       setErrors((prev) => ({ ...prev, name: undefined }));
                     }
@@ -267,7 +276,9 @@ export default function OnboardingProfileScreen() {
                     placeholderTextColor="#94A3B8"
                     value={age}
                     onChangeText={(val) => {
-                      setAge(val.replace(/[^0-9]/g, ""));
+                      const clean = val.replace(/[^0-9]/g, "");
+                      setAge(clean);
+                      setOnboardingDraft({ age: clean });
                       if (errors.age) {
                         setErrors((prev) => ({ ...prev, age: undefined }));
                       }
@@ -341,6 +352,7 @@ export default function OnboardingProfileScreen() {
                   value={height}
                   onChangeText={(val) => {
                     setHeight(val);
+                    setOnboardingDraft({ height: val });
                     if (errors.height) {
                       setErrors((prev) => ({ ...prev, height: undefined }));
                     }
@@ -382,6 +394,7 @@ export default function OnboardingProfileScreen() {
                   value={weight}
                   onChangeText={(val) => {
                     setWeight(val);
+                    setOnboardingDraft({ weight: val });
                     if (errors.weight) {
                       setErrors((prev) => ({ ...prev, weight: undefined }));
                     }
@@ -410,7 +423,10 @@ export default function OnboardingProfileScreen() {
                     styles.segmentOption,
                     unitSystem === "metric" && styles.segmentOptionSelected,
                   ]}
-                  onPress={() => setUnitSystem("metric")}
+                  onPress={() => {
+                    setUnitSystem("metric");
+                    setOnboardingDraft({ unitSystem: "metric" });
+                  }}
                   activeOpacity={0.8}
                   accessibilityRole="button"
                   accessibilityState={{ selected: unitSystem === "metric" }}
@@ -430,7 +446,10 @@ export default function OnboardingProfileScreen() {
                     styles.segmentOption,
                     unitSystem === "imperial" && styles.segmentOptionSelected,
                   ]}
-                  onPress={() => setUnitSystem("imperial")}
+                  onPress={() => {
+                    setUnitSystem("imperial");
+                    setOnboardingDraft({ unitSystem: "imperial" });
+                  }}
                   activeOpacity={0.8}
                   accessibilityRole="button"
                   accessibilityState={{ selected: unitSystem === "imperial" }}
@@ -472,19 +491,6 @@ export default function OnboardingProfileScreen() {
                 </View>
               )}
             </TouchableOpacity>
-
-            <View style={styles.privacyNote}>
-              <Feather
-                name="lock"
-                size={14}
-                color="#64748B"
-                style={styles.privacyLock}
-              />
-              <Text style={styles.privacyText}>
-                Your information stays on your device.{"\n"}Age, gender, height,
-                and weight are optional.
-              </Text>
-            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -523,6 +529,7 @@ export default function OnboardingProfileScreen() {
                   ]}
                   onPress={() => {
                     setGender(item.value);
+                    setOnboardingDraft({ gender: item.value });
                     setGenderModalVisible(false);
                   }}
                   activeOpacity={0.7}

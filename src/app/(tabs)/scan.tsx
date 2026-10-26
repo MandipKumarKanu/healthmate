@@ -364,6 +364,39 @@ export default function ScanScreen() {
                 placeholder="Detected medicine name"
               />
 
+              {extractedData?.candidates && extractedData.candidates.length > 1 && (
+                <View style={styles.candidatesSection}>
+                  <Text style={styles.candidatesLabel}>
+                    Suggested matches ({Math.round((extractedData.confidenceScore ?? 0) * 100)}% match):
+                  </Text>
+                  <View style={styles.candidatesRow}>
+                    {extractedData.candidates.map((cand) => (
+                      <TouchableOpacity
+                        key={cand.name}
+                        style={[
+                          styles.candidateChip,
+                          medName.toLowerCase() === cand.name.toLowerCase() &&
+                            styles.candidateChipActive,
+                        ]}
+                        onPress={() => setMedName(cand.name)}
+                        activeOpacity={0.7}
+                      >
+                        <Text
+                          style={[
+                            styles.candidateChipText,
+                            medName.toLowerCase() === cand.name.toLowerCase() &&
+                              styles.candidateChipTextActive,
+                          ]}
+                        >
+                          {cand.name}
+                          {cand.genericName && cand.isBrand ? ` (${cand.genericName})` : ''}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+
               <View style={styles.divider} />
 
               <Text style={styles.fieldLabel}>Strength</Text>
@@ -647,5 +680,41 @@ const styles = StyleSheet.create({
   },
   actionButtonsContainer: {
     marginTop: Spacing.sm,
+  },
+  candidatesSection: {
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  candidatesLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#64748B",
+    marginBottom: 6,
+  },
+  candidatesRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  candidateChip: {
+    backgroundColor: "#F1F5F9",
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  candidateChipActive: {
+    backgroundColor: Colors.primaryLight,
+    borderColor: Colors.primary,
+  },
+  candidateChipText: {
+    fontSize: 12,
+    color: "#475569",
+    fontWeight: "500",
+  },
+  candidateChipTextActive: {
+    color: Colors.primary,
+    fontWeight: "700",
   },
 });

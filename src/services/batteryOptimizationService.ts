@@ -20,6 +20,7 @@ export interface ReliabilityStatus {
   canScheduleExactAlarms: boolean;
   manufacturer: string;
   detectedOemId: string;
+  androidVersion?: number;
   isOptimal: boolean;
 }
 
@@ -199,12 +200,17 @@ export const batteryOptimizationService = {
 
       const detectedOemId = mapManufacturerToOemId(mfr);
       const isOptimal = isIgnoring && canExact;
+      const androidVersion =
+        typeof Platform.Version === "number"
+          ? Platform.Version
+          : parseInt(String(Platform.Version), 10) || 0;
 
       return {
         isIgnoringBatteryOptimizations: isIgnoring,
         canScheduleExactAlarms: canExact,
         manufacturer: mfr,
         detectedOemId,
+        androidVersion,
         isOptimal,
       };
     } catch (e) {

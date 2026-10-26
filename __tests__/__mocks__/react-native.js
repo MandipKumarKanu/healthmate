@@ -1,5 +1,6 @@
 const Platform = {
   OS: "android",
+  Version: 34,
   select: (obj) =>
     obj && obj.android !== undefined ? obj.android : obj?.default,
 };

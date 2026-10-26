@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   StyleSheet,
   View,
@@ -10,7 +10,7 @@ import {
   Platform,
   Modal,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import DateTimePicker, {
   DateTimePickerAndroid,
@@ -45,6 +45,8 @@ export default function SetReminderScreen() {
 
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [selectedMed, setSelectedMed] = useState<Medicine | null>(null);
+  const [isMedModalVisible, setIsMedModalVisible] = useState(false);
+  const [modalSearch, setModalSearch] = useState('');
   const [recurrence, setRecurrence] = useState<RecurrenceType>('daily');
   const [times, setTimes] = useState<ReminderTime[]>([
     { id: 't_1', time: '08:00', amount: '1 tablet', label: 'Morning' },
@@ -52,20 +54,37 @@ export default function SetReminderScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [amount, setAmount] = useState('1 tablet');
   const [amountError, setAmountError] = useState<string | null>(null);
-  const [medicineSearch, setMedicineSearch] = useState('');
   const [editingTimes, setEditingTimes] = useState(true);
 
   // Time picker state for modal display (iOS, Web, or fallback)
   const [pickerTarget, setPickerTarget] = useState<{ id: string | 'new'; date: Date } | null>(null);
   const [tempPickerDate, setTempPickerDate] = useState<Date>(new Date());
 
-  useEffect(() => {
-    const list = medicineRepository.getAll();
-    setMedicines(list);
+  const loadMedicines = useCallback(() => {
+    try {
+      const list = medicineRepository.getAll();
+      setMedicines(list);
+      return list;
+    } catch (e) {
+      console.warn("Failed to load medicines:", e);
+      return [];
+    }
+  }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      const list = loadMedicines();
+      if (medicineId) {
+        const match = list.find((m) => m.id === medicineId);
+        if (match) setSelectedMed(match);
+      } else if (!selectedMed && list.length > 0) {
+        setSelectedMed(list[0]);
+      }
+    }, [loadMedicines, medicineId, selectedMed])
+  );
+
+  useEffect(() => {
     if (medicineId) {
-      const match = list.find((m) => m.id === medicineId);
-      if (match) setSelectedMed(match);
       const existingSched = scheduleRepository.getByMedicineId(medicineId);
       if (existingSched) {
         setRecurrence(existingSched.recurrence);
@@ -80,8 +99,6 @@ export default function SetReminderScreen() {
         }
         setNotificationsEnabled(existingSched.notificationsEnabled);
       }
-    } else if (list.length > 0) {
-      setSelectedMed(list[0]);
     }
   }, [medicineId]);
 
@@ -298,6 +315,12 @@ export default function SetReminderScreen() {
     { type: 'once', label: 'Once' },
   ];
 
+  const filteredMedicines = medicines.filter((m) =>
+    `${m.name} ${m.strength} ${m.category || ''}`
+      .toLowerCase()
+      .includes(modalSearch.trim().toLowerCase())
+  );
+
   return (
     <AppScreen scrollable contentContainerStyle={styles.scrollContent}>
       <AppHeader
@@ -312,63 +335,48 @@ export default function SetReminderScreen() {
         <SectionHeader title="Selected Medicine" />
         <AppCard style={styles.card}>
           {selectedMed ? (
-            <View style={styles.medRow}>
-              <MedicineIcon
-                form={selectedMed.dosageForm}
-                name={selectedMed.name}
-                size={46}
-              />
-              <View style={styles.medInfo}>
-                <Text style={styles.medName}>{selectedMed.name}</Text>
-                <Text style={styles.medSub}>
-                  {selectedMed.strength} · {selectedMed.dosageForm}
-                </Text>
+            <View style={styles.selectedMedContainer}>
+              <View style={styles.medRow}>
+                <MedicineIcon
+                  form={selectedMed.dosageForm}
+                  name={selectedMed.name}
+                  size={46}
+                />
+                <View style={styles.medInfo}>
+                  <Text style={styles.medName}>{selectedMed.name}</Text>
+                  <Text style={styles.medSub}>
+                    {selectedMed.strength} · {selectedMed.dosageForm}
+                    {selectedMed.category ? ` · ${selectedMed.category}` : ''}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.changeMedButton}
+                  onPress={() => setIsMedModalVisible(true)}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel="Change selected medicine"
+                >
+                  <Feather name="edit-2" size={14} color={Colors.primary} />
+                  <Text style={styles.changeMedText}>Change</Text>
+                </TouchableOpacity>
               </View>
             </View>
           ) : (
-            <Text style={styles.noMedText}>No medicine selected</Text>
+            <View style={styles.emptySelectedMed}>
+              <Ionicons name="medkit-outline" size={32} color="#94A3B8" />
+              <Text style={styles.noMedText}>No medicine selected</Text>
+              <TouchableOpacity
+                style={styles.selectMedButton}
+                onPress={() => setIsMedModalVisible(true)}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="Select a medicine from list"
+              >
+                <Ionicons name="add" size={18} color="#FFFFFF" />
+                <Text style={styles.selectMedButtonText}>Select Medicine</Text>
+              </TouchableOpacity>
+            </View>
           )}
-
-          <TextInput
-            style={styles.medicineSearchInput}
-            value={medicineSearch}
-            onChangeText={setMedicineSearch}
-            placeholder="Search medicines..."
-            placeholderTextColor={Colors.textTertiary}
-            accessibilityLabel="Search medicines"
-          />
-          {/* Searchable medicine switcher */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.medChipsScroll}
-          >
-            {medicines
-              .filter((m) =>
-                `${m.name} ${m.strength}`
-                  .toLowerCase()
-                  .includes(medicineSearch.trim().toLowerCase())
-              )
-              .map((m) => (
-                <TouchableOpacity
-                  key={m.id}
-                  style={[
-                    styles.medChip,
-                    selectedMed?.id === m.id && styles.medChipActive,
-                  ]}
-                  onPress={() => setSelectedMed(m)}
-                >
-                  <Text
-                    style={[
-                      styles.medChipText,
-                      selectedMed?.id === m.id && styles.medChipTextActive,
-                    ]}
-                  >
-                    {m.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-          </ScrollView>
         </AppCard>
 
         {/* Recurrence Option */}
@@ -612,6 +620,137 @@ export default function SetReminderScreen() {
           </TouchableOpacity>
         </Modal>
       )}
+
+      {/* Medicine Selection Modal */}
+      <Modal
+        visible={isMedModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setIsMedModalVisible(false)}
+      >
+        <View style={styles.medModalOverlay}>
+          <View style={styles.medModalContainer}>
+            {/* Modal Header */}
+            <View style={styles.medModalHeader}>
+              <View>
+                <Text style={styles.medModalTitle}>Select Medicine</Text>
+                <Text style={styles.medModalSubtitle}>
+                  Choose which medication to schedule
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setIsMedModalVisible(false)}
+                style={styles.medModalCloseBtn}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityRole="button"
+                accessibilityLabel="Close selection dialog"
+              >
+                <Ionicons name="close" size={22} color="#475569" />
+              </TouchableOpacity>
+            </View>
+
+            {/* In-Dialog Search (if medicines exist) */}
+            {medicines.length > 0 && (
+              <View style={styles.medModalSearchBox}>
+                <Ionicons name="search" size={18} color="#94A3B8" style={{ marginRight: 8 }} />
+                <TextInput
+                  style={styles.medModalSearchInput}
+                  value={modalSearch}
+                  onChangeText={setModalSearch}
+                  placeholder="Search medicines..."
+                  placeholderTextColor="#94A3B8"
+                  accessibilityLabel="Search medicines in dialog"
+                />
+                {modalSearch.length > 0 && (
+                  <TouchableOpacity onPress={() => setModalSearch("")}>
+                    <Ionicons name="close-circle" size={16} color="#94A3B8" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
+            {/* Medicines List or Empty State */}
+            {medicines.length === 0 ? (
+              <View style={styles.medModalEmptyBox}>
+                <View style={styles.medModalEmptyIconWrap}>
+                  <Ionicons name="medkit-outline" size={40} color="#94A3B8" />
+                </View>
+                <Text style={styles.medModalEmptyTitle}>No Medicines Added</Text>
+                <Text style={styles.medModalEmptySub}>
+                  You must add a medicine to your cabinet before scheduling a reminder.
+                </Text>
+                <TouchableOpacity
+                  style={styles.medModalAddBtn}
+                  onPress={() => {
+                    setIsMedModalVisible(false);
+                    router.push("/medicines/create");
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="add" size={18} color="#FFFFFF" />
+                  <Text style={styles.medModalAddBtnText}>Add Medicine</Text>
+                </TouchableOpacity>
+              </View>
+            ) : filteredMedicines.length === 0 ? (
+              <View style={styles.medModalNoResults}>
+                <Text style={styles.medModalNoResultsText}>
+                  No medicines match "{modalSearch}"
+                </Text>
+              </View>
+            ) : (
+              <ScrollView
+                style={styles.medModalList}
+                contentContainerStyle={{ paddingBottom: 24 }}
+                showsVerticalScrollIndicator={false}
+              >
+                {filteredMedicines.map((med) => {
+                  const isSelected = selectedMed?.id === med.id;
+                  return (
+                    <TouchableOpacity
+                      key={med.id}
+                      style={[
+                        styles.medModalItem,
+                        isSelected && styles.medModalItemActive,
+                      ]}
+                      onPress={() => {
+                        setSelectedMed(med);
+                        setIsMedModalVisible(false);
+                        setModalSearch("");
+                      }}
+                      activeOpacity={0.7}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: isSelected }}
+                      accessibilityLabel={`${med.name}, ${med.strength}, ${med.dosageForm}`}
+                    >
+                      <MedicineIcon
+                        form={med.dosageForm}
+                        name={med.name}
+                        size={42}
+                      />
+                      <View style={styles.medModalItemInfo}>
+                        <Text style={styles.medModalItemName}>{med.name}</Text>
+                        <Text style={styles.medModalItemSub}>
+                          {med.strength} · {med.dosageForm}
+                          {med.category ? ` · ${med.category}` : ""}
+                        </Text>
+                      </View>
+                      {isSelected ? (
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={22}
+                          color={Colors.primary}
+                        />
+                      ) : (
+                        <View style={styles.medModalRadioUnchecked} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
     </AppScreen>
   );
 }
@@ -629,14 +768,16 @@ const styles = StyleSheet.create({
   medRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+  },
+  selectedMedContainer: {
+    paddingVertical: 2,
   },
   medInfo: {
     marginLeft: 12,
     flex: 1,
   },
   medName: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
     color: Colors.textPrimary,
   },
@@ -645,43 +786,44 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 2,
   },
+  changeMedButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: Radius.pill,
+    gap: 4,
+  },
+  changeMedText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
+  emptySelectedMed: {
+    alignItems: 'center',
+    paddingVertical: 18,
+    gap: 8,
+  },
   noMedText: {
     fontSize: 14,
     color: Colors.textSecondary,
-  },
-  medicineSearchInput: {
-    fontSize: 14,
-    color: Colors.textPrimary,
-    backgroundColor: '#F8F8F9',
-    borderRadius: Radius.md,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginTop: 4,
-    marginBottom: 8,
-  },
-  medChipsScroll: {
-    marginTop: 4,
-  },
-  medChip: {
-    backgroundColor: '#F0EFEF',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: Radius.pill,
-    marginRight: 8,
-  },
-  medChipActive: {
-    backgroundColor: Colors.primaryLight,
-    borderWidth: 1,
-    borderColor: Colors.primary,
-  },
-  medChipText: {
-    fontSize: 13,
     fontWeight: '500',
-    color: Colors.textPrimary,
   },
-  medChipTextActive: {
-    color: Colors.primary,
-    fontWeight: '700',
+  selectMedButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: Radius.pill,
+    gap: 6,
+    marginTop: 4,
+  },
+  selectMedButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   recurrenceContainer: {
     flexDirection: 'row',
@@ -925,5 +1067,149 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
+  },
+  medModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'flex-end',
+  },
+  medModalContainer: {
+    backgroundColor: Colors.cardBackground,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '80%',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 34,
+  },
+  medModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  medModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  medModalSubtitle: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  medModalCloseBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  medModalSearchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: Radius.lg,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 14,
+  },
+  medModalSearchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: Colors.textPrimary,
+    padding: 0,
+  },
+  medModalEmptyBox: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    paddingHorizontal: 16,
+  },
+  medModalEmptyIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  medModalEmptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    marginBottom: 6,
+  },
+  medModalEmptySub: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 18,
+  },
+  medModalAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: Radius.pill,
+    gap: 6,
+  },
+  medModalAddBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  medModalNoResults: {
+    paddingVertical: 24,
+    alignItems: 'center',
+  },
+  medModalNoResultsText: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+  },
+  medModalList: {
+    maxHeight: 380,
+  },
+  medModalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    marginBottom: 8,
+    backgroundColor: '#FAFAFC',
+  },
+  medModalItemActive: {
+    borderColor: Colors.primary,
+    backgroundColor: '#EFF6FF',
+  },
+  medModalItemInfo: {
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 8,
+  },
+  medModalItemName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  medModalItemSub: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  medModalRadioUnchecked: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#CBD5E1',
   },
 });

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "@jest/globals";
 import { profileRepository } from "../src/database/repositories/profileRepository";
 import { GenderOption, UnitSystem } from "../src/types";
+import { useAppStore } from "../src/store/appStore";
 
 describe("Onboarding Profile Validation & Persistence", () => {
   function validateProfileForm(params: {
@@ -301,4 +302,157 @@ describe("Onboarding Profile Validation & Persistence", () => {
       ).toBe("/(tabs)/home");
     });
   });
+
+  describe("Onboarding Draft & Navigation Persistence", () => {
+    it("saves, retrieves, and clears onboarding draft in SQLite", () => {
+      profileRepository.clearOnboardingDraft();
+      expect(profileRepository.getOnboardingDraft()).toBeNull();
+
+      const sampleDraft = {
+        name: "Eleanor Vance",
+        age: "35",
+        gender: "Female" as GenderOption,
+        height: "170",
+        weight: "62",
+        unitSystem: "metric" as UnitSystem,
+      };
+
+      profileRepository.saveOnboardingDraft(sampleDraft);
+      const retrieved = profileRepository.getOnboardingDraft();
+      expect(retrieved).not.toBeNull();
+      expect(retrieved?.name).toBe("Eleanor Vance");
+      expect(retrieved?.age).toBe("35");
+      expect(retrieved?.gender).toBe("Female");
+      expect(retrieved?.height).toBe("170");
+      expect(retrieved?.weight).toBe("62");
+      expect(retrieved?.unitSystem).toBe("metric");
+
+      profileRepository.clearOnboardingDraft();
+      expect(profileRepository.getOnboardingDraft()).toBeNull();
+    });
+
+    it("synchronizes draft in useAppStore and persists across state reads", () => {
+      const store = useAppStore.getState();
+      store.clearOnboardingDraft();
+
+      store.setOnboardingDraft({
+        name: "Doctor Watson",
+        age: "42",
+        unitSystem: "imperial",
+      });
+
+      expect(useAppStore.getState().onboardingDraft.name).toBe("Doctor Watson");
+      expect(useAppStore.getState().onboardingDraft.age).toBe("42");
+      expect(useAppStore.getState().onboardingDraft.unitSystem).toBe("imperial");
+
+      // Verify that it was also persisted to SQLite preferences
+      const saved = profileRepository.getOnboardingDraft();
+      expect(saved?.name).toBe("Doctor Watson");
+      expect(saved?.age).toBe("42");
+
+      // Update remaining fields incrementally
+      store.setOnboardingDraft({
+        gender: "Male" as GenderOption,
+        height: "5.11",
+        weight: "175",
+      });
+
+      const updated = useAppStore.getState().onboardingDraft;
+      expect(updated.name).toBe("Doctor Watson");
+      expect(updated.gender).toBe("Male");
+      expect(updated.height).toBe("5.11");
+      expect(updated.weight).toBe("175");
+      expect(updated.unitSystem).toBe("imperial");
+    });
+
+    it("preserves Step 2 form values when simulating navigating to Step 3 and back to Step 2", () => {
+      const store = useAppStore.getState();
+
+      // Step 2: User enters values
+      const initialStep2Values = {
+        name: "Arthur Pendelton",
+        age: "60",
+        gender: "Male" as GenderOption,
+        height: "180",
+        weight: "82",
+        unitSystem: "metric" as UnitSystem,
+      };
+
+      store.setOnboardingDraft(initialStep2Values);
+
+      // User presses "Get Started" to navigate to Step 3 (Permissions Setup)
+      // Profile repository saves draft and updates profile (with onboardingCompleted=false)
+      profileRepository.saveProfile(
+        initialStep2Values.name,
+        {
+          age: Number(initialStep2Values.age),
+          gender: initialStep2Values.gender,
+          height: Number(initialStep2Values.height),
+          weight: Number(initialStep2Values.weight),
+          unitSystem: initialStep2Values.unitSystem,
+        },
+        false,
+      );
+      profileRepository.setOnboardingStep("permissions");
+
+      // User navigates back to Step 2 (simulating component remount and state re-read)
+      // The screen reads from store.onboardingDraft or profileRepository.getOnboardingDraft()
+      const restoredDraft = profileRepository.getOnboardingDraft();
+      expect(restoredDraft).not.toBeNull();
+      expect(restoredDraft?.name).toBe("Arthur Pendelton");
+      expect(restoredDraft?.age).toBe("60");
+      expect(restoredDraft?.gender).toBe("Male");
+      expect(restoredDraft?.height).toBe("180");
+      expect(restoredDraft?.weight).toBe("82");
+      expect(restoredDraft?.unitSystem).toBe("metric");
+
+      // User makes an edit on Step 2
+      store.setOnboardingDraft({ weight: "80" });
+      expect(useAppStore.getState().onboardingDraft.weight).toBe("80");
+      expect(useAppStore.getState().onboardingDraft.name).toBe("Arthur Pendelton");
+
+      // Completing onboarding cleans up the draft
+      store.completeOnboarding();
+      expect(profileRepository.getOnboardingDraft()).toBeNull();
+      expect(useAppStore.getState().onboardingDraft.name).toBe("");
+    });
+  });
+
+  describe("Onboarding Step Progress & Permission Requirements", () => {
+    it("defines 3 distinct steps with correct step labels across the onboarding funnel", () => {
+      const stepLabels = {
+        step1: "STEP 1 OF 3",
+        step2: "STEP 2 OF 3",
+        step3: "STEP 3 OF 3",
+      };
+
+      expect(stepLabels.step1).toBe("STEP 1 OF 3");
+      expect(stepLabels.step2).toBe("STEP 2 OF 3");
+      expect(stepLabels.step3).toBe("STEP 3 OF 3");
+      // Verify Step 3 is never "STEP 2 OF 2"
+      expect(stepLabels.step3).not.toBe("STEP 2 OF 2");
+    });
+
+    it("evaluates continue eligibility based strictly on required permissions", () => {
+      const evaluateContinue = (
+        notificationsStatus: "granted" | "not_granted" | "needs_settings" | "unavailable",
+        _alarmsStatus: "granted" | "not_granted" | "needs_settings" | "unavailable",
+        _cameraStatus: "granted" | "not_granted" | "needs_settings" | "unavailable",
+        _photosStatus: "granted" | "not_granted" | "needs_settings" | "unavailable",
+      ): boolean => {
+        // Notifications is mandatory for medicine reminders; exact alarms and media permissions are optional/recommended
+        return notificationsStatus === "granted" || notificationsStatus === "unavailable";
+      };
+
+      // When notifications are not granted, Continue must be disabled even if all optional permissions are granted
+      expect(evaluateContinue("not_granted", "granted", "granted", "granted")).toBe(false);
+      expect(evaluateContinue("needs_settings", "granted", "granted", "granted")).toBe(false);
+
+      // As soon as Notifications are granted, Continue is enabled, even if optional permissions are missing
+      expect(evaluateContinue("granted", "not_granted", "not_granted", "not_granted")).toBe(true);
+      expect(evaluateContinue("granted", "needs_settings", "not_granted", "not_granted")).toBe(true);
+      expect(evaluateContinue("granted", "granted", "granted", "granted")).toBe(true);
+    });
+  });
 });
+

@@ -1,4 +1,5 @@
 import { NativeModules, Platform } from "react-native";
+import { profileRepository } from "../database/repositories/profileRepository";
 
 interface NativeAlarmModuleInterface {
   stopAlarm(): Promise<boolean>;
@@ -58,13 +59,26 @@ export const nativeAlarmService = {
   }): Promise<number | null> {
     if (!AlarmModule) return null;
     try {
+      let snoozeMinutes = params.minutes;
+      if (!snoozeMinutes || ![5, 10, 15, 20].includes(snoozeMinutes)) {
+        try {
+          const prefs = profileRepository.getPreferences();
+          snoozeMinutes = prefs.snoozeIntervalMinutes;
+        } catch {
+          snoozeMinutes = 10;
+        }
+      }
+      if (!snoozeMinutes || ![5, 10, 15, 20].includes(snoozeMinutes)) {
+        snoozeMinutes = 10;
+      }
+
       return await AlarmModule.snoozeAlarm(
         params.scheduleId,
         params.medicineName,
         params.amount,
         params.time,
         params.label ?? "",
-        params.minutes ?? 10,
+        snoozeMinutes,
       );
     } catch (e) {
       console.warn("nativeAlarmService.snoozeAlarm failed:", e);

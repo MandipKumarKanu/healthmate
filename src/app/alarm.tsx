@@ -17,6 +17,7 @@ import { nativeAlarmService } from "../services/nativeAlarmService";
 import { adherenceRepository } from "../database/repositories/adherenceRepository";
 import { scheduleRepository } from "../database/repositories/scheduleRepository";
 import { medicineRepository } from "../database/repositories/medicineRepository";
+import { useAppStore } from "../store/appStore";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const SLIDER_WIDTH = Math.min(SCREEN_WIDTH - 48, 340);
@@ -33,6 +34,9 @@ export default function FullScreenAlarmScreen() {
     time?: string;
     label?: string;
   }>();
+
+  const { preferences } = useAppStore();
+  const snoozeMinutes = preferences?.snoozeIntervalMinutes || 10;
 
   const [currentTime, setCurrentTime] = useState<string>("");
   const [currentDate, setCurrentDate] = useState<string>("");
@@ -219,7 +223,7 @@ export default function FullScreenAlarmScreen() {
         amount,
         time: doseTime,
         label: doseLabel,
-        minutes: 10,
+        minutes: snoozeMinutes,
       });
 
       setTimeout(() => {
@@ -229,7 +233,7 @@ export default function FullScreenAlarmScreen() {
       console.warn("Failed to snooze alarm:", e);
       router.replace("/(tabs)/home");
     }
-  }, [scheduleId, medicineName, amount, doseTime, doseLabel, router]);
+  }, [scheduleId, medicineName, amount, doseTime, doseLabel, snoozeMinutes, router]);
 
   const handleSkipDose = useCallback(async () => {
     try {
@@ -380,7 +384,7 @@ export default function FullScreenAlarmScreen() {
               {completedAction === "taken"
                 ? "Dose Logged as Taken!"
                 : completedAction === "snooze"
-                  ? "Snoozed for 10 minutes"
+                  ? `Snoozed for ${snoozeMinutes} minutes`
                   : "Dose Skipped"}
             </Text>
           </View>
@@ -401,7 +405,7 @@ export default function FullScreenAlarmScreen() {
             <View style={styles.sliderLabelsRow}>
               <View style={styles.sliderLabelCol}>
                 <Ionicons name="alarm-outline" size={16} color="#F59E0B" />
-                <Text style={styles.sliderHintLeft}>Snooze 10m</Text>
+                <Text style={styles.sliderHintLeft}>Snooze {snoozeMinutes}m</Text>
               </View>
               <View style={styles.sliderLabelCol}>
                 <Text style={styles.sliderHintRight}>Take Dose</Text>
@@ -444,7 +448,7 @@ export default function FullScreenAlarmScreen() {
             onPress={handleSnooze}
           >
             <Ionicons name="time" size={20} color="#FFFFFF" />
-            <Text style={styles.btnSnoozeText}>Snooze 10m</Text>
+            <Text style={styles.btnSnoozeText}>Snooze {snoozeMinutes}m</Text>
           </TouchableOpacity>
         </View>
 

@@ -49,6 +49,7 @@ export default function OnboardingWelcomeScreen() {
 
         {/* Headline & Supporting Text */}
         <View style={styles.textContainer}>
+          <Text style={styles.stepIndicator}>STEP 1 OF 3</Text>
           <Text style={styles.headline}>
             Your medication,{'\n'}organized beautifully.
           </Text>
@@ -138,6 +139,13 @@ const styles = StyleSheet.create({
   textContainer: {
     marginBottom: 16,
     paddingHorizontal: 4,
+  },
+  stepIndicator: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0788F5',
+    letterSpacing: 0.6,
+    marginBottom: 6,
   },
   headline: {
     fontSize: 32,

@@ -185,5 +185,28 @@ describe("Battery Optimization & Alarm Reliability", () => {
       const mfr = await nativeAlarmService.getDeviceManufacturer();
       expect(mfr).toBe("oneplus");
     });
+
+    it("catches intent failures and falls back gracefully without throwing unhandled exceptions", async () => {
+      (
+        NativeModules.AlarmModule.requestIgnoreBatteryOptimizations as any
+      ).mockRejectedValueOnce(new Error("Activity not found"));
+
+      const res = await batteryOptimizationService.requestIgnoreBatteryOptimizations();
+      expect(res).toBe(false);
+    });
+
+    it("detects androidVersion from Platform.Version in reliability status", async () => {
+      const status = await batteryOptimizationService.getReliabilityStatus();
+      expect(status.androidVersion).toBe(34);
+    });
+
+    it("OEM guide and disclaimer emphasize best-effort and do not guarantee delivery", () => {
+      for (const guide of OEM_GUIDES) {
+        expect(guide.description.toLowerCase()).not.toContain("guaranteed");
+        // Each guide contains helpful actionable instructions
+        expect(guide.steps.length).toBeGreaterThanOrEqual(2);
+      }
+    });
   });
 });
+

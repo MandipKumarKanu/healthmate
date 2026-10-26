@@ -24,6 +24,15 @@ export type DoseStatus =
 export type GenderOption = 'Male' | 'Female' | 'Other' | 'Prefer not to say';
 export type UnitSystem = 'metric' | 'imperial';
 
+export interface OnboardingDraft {
+  name: string;
+  age?: string;
+  gender?: GenderOption | null;
+  height?: string;
+  weight?: string;
+  unitSystem?: UnitSystem;
+}
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -140,11 +149,14 @@ export interface AIConversation {
   messages: AIMessage[];
 }
 
+export type SnoozeIntervalMinutes = 5 | 10 | 15 | 20;
+
 export interface UserPreferences {
   inAppReminders: boolean;
   aiAssistantEnabled: boolean;
   cameraPermissionsGranted: boolean;
   notificationsEnabled: boolean;
+  snoozeIntervalMinutes: SnoozeIntervalMinutes;
   streakCount: number;
   lastActiveDate: string;
 }

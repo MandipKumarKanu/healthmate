@@ -23,14 +23,21 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useAppStore } from '../../store/appStore';
 import { notificationService } from '../../services/notificationService';
 import Constants from 'expo-constants';
-import { GenderOption, UnitSystem } from '../../types';
+import { GenderOption, UnitSystem, SnoozeIntervalMinutes } from '../../types';
 import { AlarmReliabilityCard } from '../../components/profile/AlarmReliabilityCard';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const appVersion = Constants.expoConfig?.version ?? '1.3.2';
-  const { profile, preferences, updateProfile, togglePreference, resetAllData, clearAllData } =
-    useAppStore();
+  const {
+    profile,
+    preferences,
+    updateProfile,
+    togglePreference,
+    setSnoozeInterval,
+    resetAllData,
+    clearAllData,
+  } = useAppStore();
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [nameInput, setNameInput] = useState(profile?.name || 'Alex');
@@ -307,6 +314,52 @@ export default function ProfileScreen() {
               onValueChange={() => togglePreference('inAppReminders')}
               trackColor={{ false: '#D0D0D8', true: Colors.primary }}
             />
+          </View>
+
+          <View style={styles.rowDivider} />
+
+          <View style={[styles.settingRow, { alignItems: 'flex-start', flexDirection: 'column' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 10 }}>
+              <View style={styles.settingIconContainer}>
+                <Ionicons name="alarm-outline" size={18} color={Colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.settingLabel}>Alarm Snooze Interval</Text>
+                <Text style={styles.settingSub}>Duration to defer when snoozed</Text>
+              </View>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.primary }}>
+                {preferences.snoozeIntervalMinutes ?? 10} min
+              </Text>
+            </View>
+
+            <View style={styles.snoozeSelectorRow}>
+              {([5, 10, 15, 20] as SnoozeIntervalMinutes[]).map((mins) => {
+                const isSelected = (preferences.snoozeIntervalMinutes ?? 10) === mins;
+                return (
+                  <TouchableOpacity
+                    key={mins}
+                    style={[
+                      styles.snoozePill,
+                      isSelected && styles.snoozePillActive,
+                    ]}
+                    onPress={() => setSnoozeInterval(mins)}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isSelected }}
+                    accessibilityLabel={`${mins} minutes snooze`}
+                  >
+                    <Text
+                      style={[
+                        styles.snoozePillText,
+                        isSelected && styles.snoozePillTextActive,
+                      ]}
+                    >
+                      {mins}m
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
 
           <View style={styles.rowDivider} />
@@ -905,5 +958,36 @@ const styles = StyleSheet.create({
   },
   modalButtons: {
     flexDirection: 'row',
+  },
+  snoozeSelectorRow: {
+    flexDirection: 'row',
+    width: '100%',
+    gap: 8,
+    paddingLeft: 42,
+    marginTop: 2,
+    marginBottom: 4,
+  },
+  snoozePill: {
+    flex: 1,
+    paddingVertical: 7,
+    borderRadius: Radius.pill,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  snoozePillActive: {
+    backgroundColor: Colors.primaryLight,
+    borderColor: Colors.primary,
+  },
+  snoozePillText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  snoozePillTextActive: {
+    color: Colors.primary,
+    fontWeight: '700',
   },
 });

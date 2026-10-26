@@ -1,7 +1,17 @@
 import { DosageForm } from '../types';
+import {
+  extractAndMatchMedicineName,
+  MedicineMatchCandidate,
+} from './pharmaceuticalDictionary';
 
 export interface ExtractedMedicineData {
   medicineName?: string;
+  genericName?: string;
+  isBrand?: boolean;
+  confidenceScore?: number;
+  isHighConfidence?: boolean;
+  candidates?: MedicineMatchCandidate[];
+  originalMatchText?: string;
   detectedStrength?: string;
   dosageForm?: DosageForm;
   manufacturer?: string;
@@ -10,44 +20,31 @@ export interface ExtractedMedicineData {
   rawText: string;
 }
 
-const COMMON_DRUGS = [
-  'Metformin',
-  'Amoxicillin',
-  'Cetirizine',
-  'Vitamin D3',
-  'Ibuprofen',
-  'Paracetamol',
-  'Acetaminophen',
-  'Atorvastatin',
-  'Omeprazole',
-  'Lisinopril',
-  'Amlodipine',
-  'Lubricating eye drops',
-  'Salbutamol',
-  'Levothyroxine',
-  'Losartan',
-  'Gabapentin',
-];
-
 export const ocrService = {
   extractMedicineData(rawText: string): ExtractedMedicineData {
     const text = rawText.trim();
     const result: ExtractedMedicineData = { rawText: text };
 
-    // 1. Identify Medicine Name from common drugs or first capitalized keyword
-    for (const drug of COMMON_DRUGS) {
-      const regex = new RegExp(`\\b${drug}\\b`, 'i');
-      if (regex.test(text)) {
-        result.medicineName = drug;
-        break;
-      }
-    }
+    // 1. Identify Medicine Name using Pharmaceutical Dictionary & Fuzzy Matching
+    const match = extractAndMatchMedicineName(text);
 
-    if (!result.medicineName) {
+    if (match.matchedName) {
+      result.medicineName = match.matchedName;
+      result.genericName = match.genericName;
+      result.isBrand = match.isBrand;
+      result.confidenceScore = match.confidenceScore;
+      result.isHighConfidence = match.isHighConfidence;
+      result.candidates = match.candidates;
+      result.originalMatchText = match.rawMatchText;
+    } else {
+      // Fallback for unlisted/experimental medicines: first capitalized keyword from top lines
       const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
       if (lines.length > 0) {
         const firstLineWords = lines[0].split(/\s+/);
         result.medicineName = firstLineWords.slice(0, 2).join(' ');
+        result.confidenceScore = 0.5;
+        result.isHighConfidence = false;
+        result.candidates = [];
       }
     }
 

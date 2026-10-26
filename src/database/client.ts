@@ -1,5 +1,6 @@
 import * as SQLite from "expo-sqlite";
 import { CREATE_TABLES_SQL } from "./schema";
+import { migrationManager } from "./migrationManager";
 
 export interface ISQLiteDatabase {
   execSync(sql: string): void;
@@ -12,6 +13,7 @@ export interface ISQLiteDatabase {
 }
 
 class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
+  private schemaMigrations = new Map<number, { version: number; name: string; applied_at: string }>();
   private profiles = new Map<string, Record<string, unknown>>();
   private preferences = new Map<string, { key: string; value: string }>();
   private medicines = new Map<string, Record<string, unknown>>();
@@ -24,6 +26,9 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
 
   execSync(sql: string): void {
     if (sql.includes("DROP TABLE")) {
+      if (sql.includes("schema_migrations")) {
+        this.schemaMigrations.clear();
+      }
       this.profiles.clear();
       this.preferences.clear();
       this.medicines.clear();
@@ -109,6 +114,16 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
         value: String(value),
       });
       return { changes: 1, lastInsertRowId: 1 };
+    }
+
+    if (clean.startsWith("INSERT INTO SCHEMA_MIGRATIONS")) {
+      const [version, name, applied_at] = params;
+      this.schemaMigrations.set(Number(version), {
+        version: Number(version),
+        name: String(name),
+        applied_at: String(applied_at),
+      });
+      return { changes: 1, lastInsertRowId: Number(version) };
     }
 
     if (
@@ -359,6 +374,25 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return { changes, lastInsertRowId: 0 };
     }
 
+    if (clean.startsWith("DELETE FROM PREFERENCES WHERE KEY")) {
+      const match = clean.match(/KEY\s*=\s*'([^']+)'/i);
+      const key = params.length > 0 ? String(params[0]) : match ? match[1] : null;
+      if (key) {
+        const existed = this.preferences.delete(key);
+        return { changes: existed ? 1 : 0, lastInsertRowId: 0 };
+      }
+      return { changes: 0, lastInsertRowId: 0 };
+    }
+
+    if (
+      clean === "DELETE FROM PREFERENCES;" ||
+      clean === "DELETE FROM PREFERENCES"
+    ) {
+      const changes = this.preferences.size;
+      this.preferences.clear();
+      return { changes, lastInsertRowId: 0 };
+    }
+
     return { changes: 0, lastInsertRowId: 0 };
   }
 
@@ -369,6 +403,12 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
 
   getAllSync<T>(query: string, params: unknown[] = []): T[] {
     const clean = query.trim().toUpperCase();
+
+    if (clean.includes("FROM SCHEMA_MIGRATIONS")) {
+      return Array.from(this.schemaMigrations.values()).sort(
+        (a, b) => a.version - b.version,
+      ) as unknown as T[];
+    }
 
     if (clean.includes("FROM PROFILES")) {
       return Array.from(this.profiles.values()) as unknown as T[];
@@ -481,13 +521,12 @@ export function getDatabase(): ISQLiteDatabase {
     try {
       const realDb = SQLite.openDatabaseSync("healthmate.db");
       realDb.execSync("PRAGMA foreign_keys = ON;");
-      realDb.execSync(CREATE_TABLES_SQL);
       dbInstance = realDb as unknown as ISQLiteDatabase;
     } catch {
       // In Expo Go or client runtimes without native ExpoSQLite, fall back smoothly
       dbInstance = new InMemoryDemonstrationDatabase();
-      dbInstance.execSync(CREATE_TABLES_SQL);
     }
+    migrationManager.runMigrations(dbInstance);
   }
   return dbInstance!;
 }
@@ -495,6 +534,8 @@ export function getDatabase(): ISQLiteDatabase {
 export function resetDatabase(): void {
   const db = getDatabase();
   db.execSync(`
+    DROP TABLE IF EXISTS schema_migrations;
+    DROP TABLE IF EXISTS refill_reminders;
     DROP TABLE IF EXISTS ai_messages;
     DROP TABLE IF EXISTS ai_conversations;
     DROP TABLE IF EXISTS scan_history;
@@ -505,5 +546,5 @@ export function resetDatabase(): void {
     DROP TABLE IF EXISTS profiles;
     DROP TABLE IF EXISTS preferences;
   `);
-  db.execSync(CREATE_TABLES_SQL);
+  migrationManager.runMigrations(db);
 }

@@ -1,5 +1,5 @@
 import { getDatabase } from "../client";
-import { UserProfile, UserPreferences } from "../../types";
+import { UserProfile, UserPreferences, OnboardingDraft, SnoozeIntervalMinutes } from "../../types";
 
 interface ProfileRow {
   id: string;
@@ -134,6 +134,33 @@ export const profileRepository = {
     this.updatePreference("onboarding_step", step);
   },
 
+  getOnboardingDraft(): OnboardingDraft | null {
+    const raw = this.getPreference("onboarding_draft");
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as OnboardingDraft;
+    } catch {
+      return null;
+    }
+  },
+
+  saveOnboardingDraft(draft: OnboardingDraft): void {
+    this.updatePreference("onboarding_draft", JSON.stringify(draft));
+  },
+
+  clearOnboardingDraft(): void {
+    const db = getDatabase();
+    db.runSync("DELETE FROM preferences WHERE key = ?;", ["onboarding_draft"]);
+  },
+
+  validateSnoozeInterval(val: any): SnoozeIntervalMinutes {
+    if (typeof val !== "number") return 10;
+    if (val === 5 || val === 10 || val === 15 || val === 20) {
+      return val;
+    }
+    return 10;
+  },
+
   getPreferences(): UserPreferences {
     const db = getDatabase();
     const rows = db.getAllSync<{ key: string; value: string }>(
@@ -141,12 +168,16 @@ export const profileRepository = {
     );
     const map = new Map(rows.map((r) => [r.key, r.value]));
 
+    const rawSnooze = parseInt(map.get("snooze_interval_minutes") || "10", 10);
+    const snoozeIntervalMinutes = this.validateSnoozeInterval(rawSnooze);
+
     return {
       inAppReminders: map.get("in_app_reminders") !== "false",
       aiAssistantEnabled: map.get("ai_assistant_enabled") !== "false",
       cameraPermissionsGranted:
         map.get("camera_permissions_granted") === "true",
       notificationsEnabled: map.get("notifications_enabled") !== "false",
+      snoozeIntervalMinutes,
       streakCount: parseInt(map.get("streak_count") || "0", 10),
       lastActiveDate:
         map.get("last_active_date") || new Date().toISOString().split("T")[0],
