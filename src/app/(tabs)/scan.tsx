@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
-  } from "react-native";
+} from "react-native";
 import { AppAlert as Alert } from "../../services/appAlert";
 import { useRouter, useFocusEffect } from "expo-router";
 import { CameraView, useCameraPermissions } from "expo-camera";
