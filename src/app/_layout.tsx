@@ -1,15 +1,29 @@
-import React, { useEffect } from 'react';
-import { Stack } from 'expo-router';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { useAppStore } from '../store/appStore';
-import { notificationService } from '../services/notificationService';
+import React, { useEffect } from "react";
+import { AppState } from "react-native";
+import { Stack } from "expo-router";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { useAppStore } from "../store/appStore";
+import { notificationService } from "../services/notificationService";
 
 export default function RootLayout() {
   const initApp = useAppStore((state) => state.initApp);
 
   useEffect(() => {
     initApp();
-    notificationService.init();
+    notificationService.init().then(() => {
+      notificationService.reconcileScheduledReminders();
+    });
+
+    // Recover alarms on launch, reboot, or when permissions return from system settings
+    const subscription = AppState.addEventListener("change", (nextAppState) => {
+      if (nextAppState === "active") {
+        notificationService.reconcileScheduledReminders();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
   }, [initApp]);
 
   return (
@@ -17,8 +31,8 @@ export default function RootLayout() {
       <Stack
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: '#F2F1F7' },
-          animation: 'slide_from_right',
+          contentStyle: { backgroundColor: "#F2F1F7" },
+          animation: "slide_from_right",
         }}
       >
         <Stack.Screen name="index" />
@@ -35,6 +49,14 @@ export default function RootLayout() {
         <Stack.Screen name="settings/privacy" />
         <Stack.Screen name="settings/disclaimer" />
         <Stack.Screen name="settings/about" />
+        <Stack.Screen
+          name="alarm"
+          options={{
+            presentation: "fullScreenModal",
+            animation: "fade",
+            gestureEnabled: false,
+          }}
+        />
       </Stack>
     </SafeAreaProvider>
   );

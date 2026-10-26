@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   StyleSheet,
   View,
@@ -12,35 +12,39 @@ import {
   Modal,
   Alert,
   ActivityIndicator,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import {
-  Ionicons,
-  Feather,
-  MaterialCommunityIcons,
-} from '@expo/vector-icons';
-import { AppScreen } from '../../components/ui/AppScreen';
-import { Radius, Spacing } from '../../theme/tokens';
-import { useAppStore } from '../../store/appStore';
-import { GenderOption, UnitSystem } from '../../types';
+} from "react-native";
+import { useRouter } from "expo-router";
+import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { AppScreen } from "../../components/ui/AppScreen";
+import { Radius, Spacing } from "../../theme/tokens";
+import { useAppStore } from "../../store/appStore";
+import { GenderOption, UnitSystem } from "../../types";
 
 const GENDER_OPTIONS: { label: string; value: GenderOption }[] = [
-  { label: 'Male', value: 'Male' },
-  { label: 'Female', value: 'Female' },
-  { label: 'Other', value: 'Other' },
-  { label: 'Prefer not to say', value: 'Prefer not to say' },
+  { label: "Male", value: "Male" },
+  { label: "Female", value: "Female" },
+  { label: "Other", value: "Other" },
+  { label: "Prefer not to say", value: "Prefer not to say" },
 ];
 
 export default function OnboardingProfileScreen() {
   const router = useRouter();
-  const { updateProfile } = useAppStore();
+  const { updateProfile, profile, setOnboardingStep } = useAppStore();
 
-  const [name, setName] = useState('');
-  const [age, setAge] = useState('');
-  const [gender, setGender] = useState<GenderOption | null>(null);
-  const [height, setHeight] = useState('');
-  const [weight, setWeight] = useState('');
-  const [unitSystem, setUnitSystem] = useState<UnitSystem>('metric');
+  const [name, setName] = useState(profile?.name || "");
+  const [age, setAge] = useState(profile?.age ? String(profile.age) : "");
+  const [gender, setGender] = useState<GenderOption | null>(
+    (profile?.gender as GenderOption) || null,
+  );
+  const [height, setHeight] = useState(
+    profile?.height ? String(profile.height) : "",
+  );
+  const [weight, setWeight] = useState(
+    profile?.weight ? String(profile.weight) : "",
+  );
+  const [unitSystem, setUnitSystem] = useState<UnitSystem>(
+    profile?.unitSystem || "metric",
+  );
 
   const [errors, setErrors] = useState<{
     name?: string;
@@ -63,14 +67,19 @@ export default function OnboardingProfileScreen() {
     // 1. Required Name
     const trimmedName = name.trim();
     if (!trimmedName) {
-      newErrors.name = 'Please enter your full name';
+      newErrors.name = "Please enter your full name";
     }
 
     // 2. Optional Age validation (only validate if provided)
     if (age.trim()) {
       const parsedAge = Number(age.trim());
-      if (isNaN(parsedAge) || parsedAge < 1 || parsedAge > 120 || !Number.isInteger(parsedAge)) {
-        newErrors.age = 'Enter a valid age (1-120)';
+      if (
+        isNaN(parsedAge) ||
+        parsedAge < 1 ||
+        parsedAge > 120 ||
+        !Number.isInteger(parsedAge)
+      ) {
+        newErrors.age = "Enter a valid age (1-120)";
       }
     }
 
@@ -78,11 +87,17 @@ export default function OnboardingProfileScreen() {
     if (height.trim()) {
       const parsedHeight = Number(height.trim());
       if (isNaN(parsedHeight) || parsedHeight <= 0) {
-        newErrors.height = 'Enter a positive number';
-      } else if (unitSystem === 'metric' && (parsedHeight < 30 || parsedHeight > 300)) {
-        newErrors.height = 'Height should be 30–300 cm';
-      } else if (unitSystem === 'imperial' && (parsedHeight < 1 || parsedHeight > 9)) {
-        newErrors.height = 'Height should be 1–9 ft';
+        newErrors.height = "Enter a positive number";
+      } else if (
+        unitSystem === "metric" &&
+        (parsedHeight < 30 || parsedHeight > 300)
+      ) {
+        newErrors.height = "Height should be 30–300 cm";
+      } else if (
+        unitSystem === "imperial" &&
+        (parsedHeight < 1 || parsedHeight > 9)
+      ) {
+        newErrors.height = "Height should be 1–9 ft";
       }
     }
 
@@ -90,11 +105,17 @@ export default function OnboardingProfileScreen() {
     if (weight.trim()) {
       const parsedWeight = Number(weight.trim());
       if (isNaN(parsedWeight) || parsedWeight <= 0) {
-        newErrors.weight = 'Enter a positive number';
-      } else if (unitSystem === 'metric' && (parsedWeight < 1 || parsedWeight > 500)) {
-        newErrors.weight = 'Weight should be 1–500 kg';
-      } else if (unitSystem === 'imperial' && (parsedWeight < 2 || parsedWeight > 1000)) {
-        newErrors.weight = 'Weight should be 2–1000 lb';
+        newErrors.weight = "Enter a positive number";
+      } else if (
+        unitSystem === "metric" &&
+        (parsedWeight < 1 || parsedWeight > 500)
+      ) {
+        newErrors.weight = "Weight should be 1–500 kg";
+      } else if (
+        unitSystem === "imperial" &&
+        (parsedWeight < 2 || parsedWeight > 1000)
+      ) {
+        newErrors.weight = "Weight should be 2–1000 lb";
       }
     }
 
@@ -123,15 +144,17 @@ export default function OnboardingProfileScreen() {
           weight: parsedWeight,
           unitSystem,
         },
-        true
+        false,
       );
 
+      setOnboardingStep("permissions");
+
       // Step 3: explain and request device permissions after profile details.
-      router.replace('/onboarding/permissions' as any);
+      router.replace("/onboarding/permissions" as any);
     } catch (err) {
       Alert.alert(
-        'Save Error',
-        'Could not save your profile. Please check your details and try again.'
+        "Save Error",
+        "Could not save your profile. Please check your details and try again.",
       );
     } finally {
       setIsSubmitting(false);
@@ -142,7 +165,7 @@ export default function OnboardingProfileScreen() {
     <AppScreen scrollable={false} contentContainerStyle={styles.container}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
@@ -168,12 +191,13 @@ export default function OnboardingProfileScreen() {
               <Text style={styles.stepIndicator}>STEP 2 OF 2</Text>
               <Text style={styles.screenTitle}>Tell us about yourself</Text>
               <Text style={styles.screenSubtitle}>
-                This helps personalize your HealthMate experience. You can always edit this later.
+                This helps personalize your HealthMate experience. You can
+                always edit this later.
               </Text>
             </View>
 
             <Image
-              source={require('../../../assets/images/profile_clipboard.png')}
+              source={require("../../../assets/images/profile_clipboard.png")}
               style={styles.clipboardImage}
               resizeMode="contain"
               accessibilityLabel="Profile illustration"
@@ -243,7 +267,7 @@ export default function OnboardingProfileScreen() {
                     placeholderTextColor="#94A3B8"
                     value={age}
                     onChangeText={(val) => {
-                      setAge(val.replace(/[^0-9]/g, ''));
+                      setAge(val.replace(/[^0-9]/g, ""));
                       if (errors.age) {
                         setErrors((prev) => ({ ...prev, age: undefined }));
                       }
@@ -281,7 +305,7 @@ export default function OnboardingProfileScreen() {
                     ]}
                     numberOfLines={1}
                   >
-                    {gender || 'Select gender'}
+                    {gender || "Select gender"}
                   </Text>
                   <Ionicons
                     name="chevron-down"
@@ -310,7 +334,9 @@ export default function OnboardingProfileScreen() {
                 />
                 <TextInput
                   style={styles.textInput}
-                  placeholder={unitSystem === 'metric' ? 'e.g. 170' : 'e.g. 5.8'}
+                  placeholder={
+                    unitSystem === "metric" ? "e.g. 170" : "e.g. 5.8"
+                  }
                   placeholderTextColor="#94A3B8"
                   value={height}
                   onChangeText={(val) => {
@@ -324,7 +350,7 @@ export default function OnboardingProfileScreen() {
                 />
                 <View style={styles.unitBadge}>
                   <Text style={styles.unitBadgeText}>
-                    {unitSystem === 'metric' ? 'cm' : 'ft'}
+                    {unitSystem === "metric" ? "cm" : "ft"}
                   </Text>
                   <Ionicons name="chevron-down" size={14} color="#64748B" />
                 </View>
@@ -351,7 +377,7 @@ export default function OnboardingProfileScreen() {
                 />
                 <TextInput
                   style={styles.textInput}
-                  placeholder={unitSystem === 'metric' ? 'e.g. 65' : 'e.g. 145'}
+                  placeholder={unitSystem === "metric" ? "e.g. 65" : "e.g. 145"}
                   placeholderTextColor="#94A3B8"
                   value={weight}
                   onChangeText={(val) => {
@@ -365,7 +391,7 @@ export default function OnboardingProfileScreen() {
                 />
                 <View style={styles.unitBadge}>
                   <Text style={styles.unitBadgeText}>
-                    {unitSystem === 'metric' ? 'kg' : 'lb'}
+                    {unitSystem === "metric" ? "kg" : "lb"}
                   </Text>
                   <Ionicons name="chevron-down" size={14} color="#64748B" />
                 </View>
@@ -382,17 +408,17 @@ export default function OnboardingProfileScreen() {
                 <TouchableOpacity
                   style={[
                     styles.segmentOption,
-                    unitSystem === 'metric' && styles.segmentOptionSelected,
+                    unitSystem === "metric" && styles.segmentOptionSelected,
                   ]}
-                  onPress={() => setUnitSystem('metric')}
+                  onPress={() => setUnitSystem("metric")}
                   activeOpacity={0.8}
                   accessibilityRole="button"
-                  accessibilityState={{ selected: unitSystem === 'metric' }}
+                  accessibilityState={{ selected: unitSystem === "metric" }}
                 >
                   <Text
                     style={[
                       styles.segmentText,
-                      unitSystem === 'metric' && styles.segmentTextSelected,
+                      unitSystem === "metric" && styles.segmentTextSelected,
                     ]}
                   >
                     Metric (cm, kg)
@@ -402,17 +428,17 @@ export default function OnboardingProfileScreen() {
                 <TouchableOpacity
                   style={[
                     styles.segmentOption,
-                    unitSystem === 'imperial' && styles.segmentOptionSelected,
+                    unitSystem === "imperial" && styles.segmentOptionSelected,
                   ]}
-                  onPress={() => setUnitSystem('imperial')}
+                  onPress={() => setUnitSystem("imperial")}
                   activeOpacity={0.8}
                   accessibilityRole="button"
-                  accessibilityState={{ selected: unitSystem === 'imperial' }}
+                  accessibilityState={{ selected: unitSystem === "imperial" }}
                 >
                   <Text
                     style={[
                       styles.segmentText,
-                      unitSystem === 'imperial' && styles.segmentTextSelected,
+                      unitSystem === "imperial" && styles.segmentTextSelected,
                     ]}
                   >
                     Imperial (ft, lb)
@@ -455,7 +481,8 @@ export default function OnboardingProfileScreen() {
                 style={styles.privacyLock}
               />
               <Text style={styles.privacyText}>
-                Your information stays on your device.{'\n'}Age, gender, height, and weight are optional.
+                Your information stays on your device.{"\n"}Age, gender, height,
+                and weight are optional.
               </Text>
             </View>
           </View>
@@ -509,11 +536,7 @@ export default function OnboardingProfileScreen() {
                     {item.label}
                   </Text>
                   {isSelected && (
-                    <Ionicons
-                      name="checkmark"
-                      size={20}
-                      color="#0788F5"
-                    />
+                    <Ionicons name="checkmark" size={20} color="#0788F5" />
                   )}
                 </TouchableOpacity>
               );
@@ -528,7 +551,7 @@ export default function OnboardingProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FD',
+    backgroundColor: "#F8F9FD",
   },
   keyboardView: {
     flex: 1,
@@ -546,13 +569,13 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
+    justifyContent: "center",
+    alignItems: "flex-start",
   },
   headerRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
     marginBottom: 20,
   },
   headerTextGroup: {
@@ -561,15 +584,15 @@ const styles = StyleSheet.create({
   },
   stepIndicator: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#0788F5',
+    fontWeight: "700",
+    color: "#0788F5",
     letterSpacing: 0.6,
     marginBottom: 6,
   },
   screenTitle: {
     fontSize: 27,
-    fontWeight: '800',
-    color: '#0F172A',
+    fontWeight: "800",
+    color: "#0F172A",
     letterSpacing: -0.4,
     lineHeight: 32,
     marginBottom: 6,
@@ -577,8 +600,8 @@ const styles = StyleSheet.create({
   screenSubtitle: {
     fontSize: 14,
     lineHeight: 20,
-    color: '#64748B',
-    fontWeight: '400',
+    color: "#64748B",
+    fontWeight: "400",
   },
   clipboardImage: {
     width: 78,
@@ -587,14 +610,14 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   formCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 22,
     paddingHorizontal: 16,
     paddingTop: 18,
     paddingBottom: 20,
     borderWidth: 1,
-    borderColor: '#ECECF2',
-    shadowColor: '#000000',
+    borderColor: "#ECECF2",
+    shadowColor: "#000000",
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.05,
     shadowRadius: 14,
@@ -605,66 +628,66 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   rowTwoCols: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
   },
   fieldLabel: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#334155',
+    fontWeight: "600",
+    color: "#334155",
     marginBottom: 6,
   },
   requiredStar: {
-    color: '#EF4444',
+    color: "#EF4444",
   },
   inputContainer: {
     height: 48,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: "#E2E8F0",
     borderRadius: 12,
     paddingHorizontal: 12,
   },
   inputErrorBorder: {
-    borderColor: '#EF4444',
+    borderColor: "#EF4444",
   },
   fieldIcon: {
     marginRight: 8,
   },
   textInput: {
     flex: 1,
-    height: '100%',
+    height: "100%",
     fontSize: 14,
-    color: '#0F172A',
+    color: "#0F172A",
     paddingVertical: 0,
   },
   selectText: {
     flex: 1,
     fontSize: 14,
-    color: '#0F172A',
+    color: "#0F172A",
   },
   selectPlaceholderText: {
-    color: '#94A3B8',
+    color: "#94A3B8",
   },
   chevronIcon: {
     marginLeft: 6,
   },
   unitBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingLeft: 6,
   },
   unitBadgeText: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#334155',
+    fontWeight: "600",
+    color: "#334155",
     marginRight: 3,
   },
   errorText: {
     fontSize: 12,
-    color: '#EF4444',
+    color: "#EF4444",
     marginTop: 4,
     marginLeft: 2,
   },
@@ -673,28 +696,28 @@ const styles = StyleSheet.create({
   },
   unitsLabel: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#334155',
+    fontWeight: "600",
+    color: "#334155",
     marginBottom: 8,
   },
   segmentedControl: {
-    flexDirection: 'row',
-    backgroundColor: '#F1F5F9',
+    flexDirection: "row",
+    backgroundColor: "#F1F5F9",
     borderRadius: 12,
     padding: 3,
   },
   segmentOption: {
     flex: 1,
     paddingVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderRadius: 9,
   },
   segmentOptionSelected: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: '#0788F5',
-    shadowColor: '#0788F5',
+    borderColor: "#0788F5",
+    shadowColor: "#0788F5",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12,
     shadowRadius: 4,
@@ -702,45 +725,45 @@ const styles = StyleSheet.create({
   },
   segmentText: {
     fontSize: 13,
-    fontWeight: '500',
-    color: '#64748B',
+    fontWeight: "500",
+    color: "#64748B",
   },
   segmentTextSelected: {
-    color: '#0788F5',
-    fontWeight: '700',
+    color: "#0788F5",
+    fontWeight: "700",
   },
   actionSection: {
-    alignItems: 'center',
+    alignItems: "center",
   },
   getStartedButton: {
-    width: '100%',
+    width: "100%",
     height: 54,
     borderRadius: Radius.pill,
-    backgroundColor: '#0788F5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#0788F5',
+    backgroundColor: "#0788F5",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#0788F5",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 4,
   },
   buttonInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   getStartedButtonText: {
     fontSize: 17,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
   arrowIcon: {
     marginLeft: 8,
   },
   privacyNote: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "center",
     marginTop: 16,
     paddingHorizontal: 8,
   },
@@ -750,59 +773,59 @@ const styles = StyleSheet.create({
   },
   privacyText: {
     fontSize: 12,
-    color: '#64748B',
+    color: "#64748B",
     lineHeight: 18,
-    textAlign: 'center',
+    textAlign: "center",
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
-    justifyContent: 'center',
+    backgroundColor: "rgba(15, 23, 42, 0.45)",
+    justifyContent: "center",
     paddingHorizontal: 28,
   },
   modalCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 20,
     padding: 20,
-    shadowColor: '#000000',
+    shadowColor: "#000000",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.15,
     shadowRadius: 20,
     elevation: 8,
   },
   modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 16,
     paddingBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: "#F1F5F9",
   },
   modalTitle: {
     fontSize: 17,
-    fontWeight: '700',
-    color: '#0F172A',
+    fontWeight: "700",
+    color: "#0F172A",
   },
   genderOptionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: 13,
     paddingHorizontal: 12,
     borderRadius: 10,
     marginBottom: 4,
   },
   genderOptionRowSelected: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: "#EFF6FF",
   },
   genderOptionText: {
     fontSize: 15,
-    color: '#334155',
-    fontWeight: '500',
+    color: "#334155",
+    fontWeight: "500",
   },
   genderOptionTextSelected: {
-    color: '#0788F5',
-    fontWeight: '700',
+    color: "#0788F5",
+    fontWeight: "700",
   },
 });

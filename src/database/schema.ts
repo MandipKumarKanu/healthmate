@@ -43,6 +43,19 @@ CREATE TABLE IF NOT EXISTS schedules (
   FOREIGN KEY (medicine_id) REFERENCES medicines(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS schedule_history (
+  id TEXT PRIMARY KEY,
+  schedule_id TEXT NOT NULL,
+  medicine_id TEXT NOT NULL,
+  recurrence TEXT NOT NULL,
+  start_date TEXT NOT NULL,
+  end_date TEXT NOT NULL,
+  times_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (medicine_id) REFERENCES medicines(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS adherence_logs (
   id TEXT PRIMARY KEY,
   schedule_id TEXT NOT NULL,

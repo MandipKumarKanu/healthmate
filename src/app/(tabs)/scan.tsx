@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef } from "react";
 import {
   StyleSheet,
   View,
@@ -8,29 +8,32 @@ import {
   TextInput,
   ScrollView,
   Alert,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { CameraView, useCameraPermissions } from 'expo-camera';
-let TextRecognitionModule: { recognize: (uri: string) => Promise<{ text?: string }> } | null = null;
+} from "react-native";
+import { useRouter } from "expo-router";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import * as ImagePicker from "expo-image-picker";
+import { Ionicons, Feather } from "@expo/vector-icons";
+import { Colors } from "../../theme/colors";
+import { Radius, Spacing, Typography } from "../../theme/tokens";
+import { AppScreen } from "../../components/ui/AppScreen";
+import { AppHeader } from "../../components/ui/AppHeader";
+import { AppCard } from "../../components/ui/AppCard";
+import { AppButton } from "../../components/ui/AppButton";
+import { ocrService, ExtractedMedicineData } from "../../services/ocrService";
+import { scanHistoryRepository } from "../../database/repositories/scanHistoryRepository";
+import { useMedicineStore } from "../../store/medicineStore";
+import { DosageForm } from "../../types";
+
+let TextRecognitionModule: {
+  recognize: (uri: string) => Promise<{ text?: string }>;
+} | null = null;
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const mod = require('@react-native-ml-kit/text-recognition');
+  const mod = require("@react-native-ml-kit/text-recognition");
   TextRecognitionModule = mod.default || mod;
 } catch {
   // Native ML Kit not installed; fallback gracefully
 }
-import * as ImagePicker from 'expo-image-picker';
-import { Ionicons, Feather } from '@expo/vector-icons';
-import { Colors } from '../../theme/colors';
-import { Radius, Spacing, Typography } from '../../theme/tokens';
-import { AppScreen } from '../../components/ui/AppScreen';
-import { AppHeader } from '../../components/ui/AppHeader';
-import { AppCard } from '../../components/ui/AppCard';
-import { AppButton } from '../../components/ui/AppButton';
-import { ocrService, ExtractedMedicineData } from '../../services/ocrService';
-import { scanHistoryRepository } from '../../database/repositories/scanHistoryRepository';
-import { useMedicineStore } from '../../store/medicineStore';
-import { DosageForm } from '../../types';
 
 export default function ScanScreen() {
   const router = useRouter();
@@ -40,45 +43,54 @@ export default function ScanScreen() {
 
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
-  const [extractedData, setExtractedData] = useState<ExtractedMedicineData | null>(
-    null
-  );
+  const [extractedData, setExtractedData] =
+    useState<ExtractedMedicineData | null>(null);
 
   // Editable fields for review
-  const [medName, setMedName] = useState('');
-  const [medStrength, setMedStrength] = useState('');
-  const [medForm, setMedForm] = useState<DosageForm>('tablet');
-  const [medExpiry, setMedExpiry] = useState('');
-  const [medBatch, setMedBatch] = useState('');
-  const [medMfg, setMedMfg] = useState('');
+  const [medName, setMedName] = useState("");
+  const [medStrength, setMedStrength] = useState("");
+  const [medForm, setMedForm] = useState<DosageForm>("tablet");
+  const [medExpiry, setMedExpiry] = useState("");
+  const [medBatch, setMedBatch] = useState("");
+  const [medMfg, setMedMfg] = useState("");
 
   const processImage = async (imageUri: string) => {
     setIsScanning(true);
     setExtractedData(null);
     try {
-      let rawText = '';
-      if (TextRecognitionModule && typeof TextRecognitionModule.recognize === 'function') {
+      let rawText = "";
+      if (
+        TextRecognitionModule &&
+        typeof TextRecognitionModule.recognize === "function"
+      ) {
         const recognition = await TextRecognitionModule.recognize(imageUri);
-        rawText = recognition.text?.trim() ?? '';
+        rawText = recognition.text?.trim() ?? "";
       } else {
         // Fallback for demonstration when ML Kit module is not bundled
-        rawText = 'Metformin 500mg Tablets BP\nBatch: DEMO-MF0426\nExp: 12/2027\nMfg: Example Pharma';
+        rawText =
+          "Metformin 500mg Tablets BP\nBatch: DEMO-MF0426\nExp: 12/2027\nMfg: Example Pharma";
       }
       if (!rawText) {
-        Alert.alert('No text detected', 'Try a clearer, well-lit photo with the medicine label filling the frame.');
+        Alert.alert(
+          "No text detected",
+          "Try a clearer, well-lit photo with the medicine label filling the frame.",
+        );
         return;
       }
       const extracted = ocrService.extractMedicineData(rawText);
       setExtractedData(extracted);
-      setMedName(extracted.medicineName || '');
-      setMedStrength(extracted.detectedStrength || '');
-      setMedForm(extracted.dosageForm || 'tablet');
-      setMedExpiry(extracted.expiryDate || '');
-      setMedBatch(extracted.batchNumber || '');
-      setMedMfg(extracted.manufacturer || '');
+      setMedName(extracted.medicineName || "");
+      setMedStrength(extracted.detectedStrength || "");
+      setMedForm(extracted.dosageForm || "tablet");
+      setMedExpiry(extracted.expiryDate || "");
+      setMedBatch(extracted.batchNumber || "");
+      setMedMfg(extracted.manufacturer || "");
     } catch (error) {
-      console.warn('Medicine label text recognition failed:', error);
-      Alert.alert('Could not read label', 'Please try another image or enter the medicine details manually.');
+      console.warn("Medicine label text recognition failed:", error);
+      Alert.alert(
+        "Could not read label",
+        "Please try another image or enter the medicine details manually.",
+      );
     } finally {
       setIsScanning(false);
     }
@@ -88,28 +100,37 @@ export default function ScanScreen() {
     if (!permission?.granted) {
       const result = await requestPermission();
       if (!result.granted) {
-        Alert.alert('Camera permission needed', 'Allow camera access to scan a medicine label.');
+        Alert.alert(
+          "Camera permission needed",
+          "Allow camera access to scan a medicine label.",
+        );
         return;
       }
     }
     try {
       const photo = await cameraRef.current?.takePictureAsync({ quality: 0.8 });
       if (!photo?.uri) {
-        Alert.alert('Camera unavailable', 'Please try again or choose a photo from your gallery.');
+        Alert.alert(
+          "Camera unavailable",
+          "Please try again or choose a photo from your gallery.",
+        );
         return;
       }
       setCapturedImage(photo.uri);
       await processImage(photo.uri);
     } catch (error) {
-      console.warn('Medicine label capture failed:', error);
-      Alert.alert('Capture failed', 'Please try again or choose a photo from your gallery.');
+      console.warn("Medicine label capture failed:", error);
+      Alert.alert(
+        "Capture failed",
+        "Please try again or choose a photo from your gallery.",
+      );
     }
   };
 
   const handlePickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ["images"],
         allowsEditing: true,
         quality: 0.8,
       });
@@ -119,25 +140,25 @@ export default function ScanScreen() {
         await processImage(imageUri);
       }
     } catch (error) {
-      console.warn('Unable to select medicine image:', error);
-      Alert.alert('Image selection failed', 'Please try another image.');
+      console.warn("Unable to select medicine image:", error);
+      Alert.alert("Image selection failed", "Please try another image.");
     }
   };
 
   const handleReset = () => {
     setCapturedImage(null);
     setExtractedData(null);
-    setMedName('');
-    setMedStrength('');
-    setMedForm('tablet');
-    setMedExpiry('');
-    setMedBatch('');
-    setMedMfg('');
+    setMedName("");
+    setMedStrength("");
+    setMedForm("tablet");
+    setMedExpiry("");
+    setMedBatch("");
+    setMedMfg("");
   };
 
   const handleSaveToHistory = () => {
     if (!medName.trim()) {
-      Alert.alert('Notice', 'Please provide a medicine name.');
+      Alert.alert("Notice", "Please provide a medicine name.");
       return;
     }
 
@@ -152,15 +173,15 @@ export default function ScanScreen() {
       imageUri: capturedImage || undefined,
     });
 
-    Alert.alert('Saved to Scan History', 'Scan record has been saved.', [
-      { text: 'View History', onPress: () => router.push('/scan-history') },
-      { text: 'Done', onPress: handleReset },
+    Alert.alert("Saved to Scan History", "Scan record has been saved.", [
+      { text: "View History", onPress: () => router.push("/scan-history") },
+      { text: "Done", onPress: handleReset },
     ]);
   };
 
   const handleAddToCabinet = () => {
     if (!medName.trim()) {
-      Alert.alert('Notice', 'Please provide a medicine name.');
+      Alert.alert("Notice", "Please provide a medicine name.");
       return;
     }
 
@@ -180,31 +201,32 @@ export default function ScanScreen() {
     const newMed = addMedicine({
       id: `med_${Date.now()}`,
       name: medName.trim(),
-      strength: medStrength.trim() || 'Standard dose',
+      strength: medStrength.trim() || "Standard dose",
       dosageForm: medForm,
-      category: 'Prescription',
+      category: "Prescription",
       packageDetails: {
         manufacturer: medMfg || undefined,
         expiryDate: medExpiry || undefined,
         batchNumber: medBatch || undefined,
-        packageDetailsText: 'Captured via camera label scan',
+        packageDetailsText: "Captured via camera label scan",
         // OCR extraction is not verification; keep this false until the user explicitly checks the original package.
         originalPackageChecked: false,
       },
-      informationSource: 'Extracted from medication label scan.',
+      informationSource: "Extracted from medication label scan.",
       isSample: false,
     });
 
     Alert.alert(
-      'Added to Cabinet',
+      "Added to Cabinet",
       `${newMed.name} was successfully added to your medicine cabinet!`,
       [
         {
-          text: 'Set Reminder',
-          onPress: () => router.push(`/reminders/create?medicineId=${newMed.id}`),
+          text: "Set Reminder",
+          onPress: () =>
+            router.push(`/reminders/create?medicineId=${newMed.id}`),
         },
-        { text: 'Done', onPress: () => router.push('/(tabs)/medicines') },
-      ]
+        { text: "Done", onPress: () => router.push("/(tabs)/medicines") },
+      ],
     );
   };
 
@@ -217,7 +239,7 @@ export default function ScanScreen() {
         rightAction={
           <TouchableOpacity
             style={styles.historyHeaderButton}
-            onPress={() => router.push('/scan-history')}
+            onPress={() => router.push("/scan-history")}
           >
             <Feather name="clock" size={16} color={Colors.primary} />
             <Text style={styles.historyHeaderText}>History</Text>
@@ -230,7 +252,11 @@ export default function ScanScreen() {
           // Camera Viewport & Capture Controls
           <View style={styles.cameraContainer}>
             {permission?.granted ? (
-              <CameraView ref={cameraRef} style={styles.cameraView} facing="back">
+              <CameraView
+                ref={cameraRef}
+                style={styles.cameraView}
+                facing="back"
+              >
                 <View style={styles.overlayFrame}>
                   <View style={styles.targetCornerTL} />
                   <View style={styles.targetCornerTR} />
@@ -244,7 +270,11 @@ export default function ScanScreen() {
             ) : (
               // Permission or simulated viewport fallback
               <View style={styles.cameraPlaceholder}>
-                <Ionicons name="camera-outline" size={48} color={Colors.primary} />
+                <Ionicons
+                  name="camera-outline"
+                  size={48}
+                  color={Colors.primary}
+                />
                 <Text style={styles.cameraTitle}>Camera Label Scanner</Text>
                 <Text style={styles.cameraSub}>
                   Point at medicine box, bottle, or prescription blister pack to
@@ -270,7 +300,11 @@ export default function ScanScreen() {
                 style={styles.galleryButton}
                 onPress={handlePickImage}
               >
-                <Ionicons name="images-outline" size={24} color={Colors.primary} />
+                <Ionicons
+                  name="images-outline"
+                  size={24}
+                  color={Colors.primary}
+                />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -283,7 +317,7 @@ export default function ScanScreen() {
 
               <TouchableOpacity
                 style={styles.galleryButton}
-                onPress={() => router.push('/scan-history')}
+                onPress={() => router.push("/scan-history")}
               >
                 <Feather name="clock" size={22} color={Colors.textSecondary} />
               </TouchableOpacity>
@@ -300,7 +334,11 @@ export default function ScanScreen() {
             </View>
 
             <View style={styles.ocrAlertBanner}>
-              <Ionicons name="information-circle-outline" size={18} color="#0788F5" />
+              <Ionicons
+                name="information-circle-outline"
+                size={18}
+                color="#0788F5"
+              />
               <Text style={styles.ocrAlertText}>
                 OCR results are automated. Review and correct text against your
                 physical prescription label before saving.
@@ -310,7 +348,9 @@ export default function ScanScreen() {
             {isScanning ? (
               <View style={styles.ocrAlertBanner}>
                 <ActivityIndicator size="small" color={Colors.primary} />
-                <Text style={styles.ocrAlertText}>Reading text from the medicine label…</Text>
+                <Text style={styles.ocrAlertText}>
+                  Reading text from the medicine label…
+                </Text>
               </View>
             ) : null}
 
@@ -397,8 +437,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.screenPaddingHorizontal,
   },
   historyHeaderButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: Colors.primaryLight,
     paddingVertical: 5,
     paddingHorizontal: 10,
@@ -406,44 +446,44 @@ const styles = StyleSheet.create({
   },
   historyHeaderText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.primary,
     marginLeft: 4,
   },
   cameraContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: Spacing.sm,
   },
   cameraView: {
-    width: '100%',
+    width: "100%",
     height: 380,
     borderRadius: Radius.card,
-    overflow: 'hidden',
-    justifyContent: 'center',
-    alignItems: 'center',
+    overflow: "hidden",
+    justifyContent: "center",
+    alignItems: "center",
   },
   cameraPlaceholder: {
-    width: '100%',
+    width: "100%",
     height: 340,
     borderRadius: Radius.card,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderWidth: 2,
-    borderStyle: 'dashed',
-    borderColor: '#D0D0DC',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderStyle: "dashed",
+    borderColor: "#D0D0DC",
+    justifyContent: "center",
+    alignItems: "center",
     padding: Spacing.xl,
   },
   cameraTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: "700",
     color: Colors.textPrimary,
     marginTop: 12,
   },
   cameraSub: {
     fontSize: 13,
     color: Colors.textSecondary,
-    textAlign: 'center',
+    textAlign: "center",
     marginTop: 6,
     lineHeight: 18,
   },
@@ -456,20 +496,20 @@ const styles = StyleSheet.create({
   },
   permissionButtonText: {
     color: Colors.textInverse,
-    fontWeight: '600',
+    fontWeight: "600",
     fontSize: 14,
   },
   overlayFrame: {
-    width: '80%',
-    height: '65%',
+    width: "80%",
+    height: "65%",
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
+    borderColor: "rgba(255, 255, 255, 0.4)",
     borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   targetCornerTL: {
-    position: 'absolute',
+    position: "absolute",
     top: -2,
     left: -2,
     width: 24,
@@ -479,7 +519,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary,
   },
   targetCornerTR: {
-    position: 'absolute',
+    position: "absolute",
     top: -2,
     right: -2,
     width: 24,
@@ -489,7 +529,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary,
   },
   targetCornerBL: {
-    position: 'absolute',
+    position: "absolute",
     bottom: -2,
     left: -2,
     width: 24,
@@ -499,7 +539,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary,
   },
   targetCornerBR: {
-    position: 'absolute',
+    position: "absolute",
     bottom: -2,
     right: -2,
     width: 24,
@@ -509,19 +549,19 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary,
   },
   overlayHint: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 13,
-    fontWeight: '600',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    fontWeight: "600",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
     paddingVertical: 4,
     paddingHorizontal: 10,
     borderRadius: Radius.pill,
   },
   controlsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    width: '100%',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    width: "100%",
     marginTop: Spacing.xl,
     paddingHorizontal: 20,
   },
@@ -529,11 +569,11 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: Colors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   shutterButton: {
     width: 72,
@@ -541,9 +581,9 @@ const styles = StyleSheet.create({
     borderRadius: 36,
     borderWidth: 4,
     borderColor: Colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
   },
   shutterInner: {
     width: 54,
@@ -555,25 +595,25 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xs,
   },
   reviewHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: Spacing.sm,
   },
   reviewTitle: {
     fontSize: 17,
-    fontWeight: '700',
+    fontWeight: "700",
     color: Colors.textPrimary,
   },
   retakeText: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.primary,
   },
   ocrAlertBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: '#E8F4FF',
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#E8F4FF",
     borderRadius: Radius.md,
     padding: 12,
     marginBottom: Spacing.md,
@@ -581,7 +621,7 @@ const styles = StyleSheet.create({
   ocrAlertText: {
     flex: 1,
     fontSize: 12,
-    color: '#0369A1',
+    color: "#0369A1",
     lineHeight: 17,
     marginLeft: 8,
   },
@@ -591,7 +631,7 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.textSecondary,
     marginBottom: 4,
   },

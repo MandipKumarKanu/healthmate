@@ -1,10 +1,11 @@
-import { create } from 'zustand';
-import { UserProfile, UserPreferences } from '../types';
-import { profileRepository } from '../database/repositories/profileRepository';
-import { seedInitialDataIfNeeded, getTodayDateString } from '../database/seed';
-import { resetDatabase } from '../database/client';
-import { useMedicineStore } from './medicineStore';
-import { useReminderStore } from './reminderStore';
+import { create } from "zustand";
+import { UserProfile, UserPreferences } from "../types";
+import { profileRepository } from "../database/repositories/profileRepository";
+import { seedInitialDataIfNeeded, getTodayDateString } from "../database/seed";
+import { resetDatabase } from "../database/client";
+import { notificationService } from "../services/notificationService";
+import { useMedicineStore } from "./medicineStore";
+import { useReminderStore } from "./reminderStore";
 
 interface AppState {
   profile: UserProfile | null;
@@ -21,14 +22,16 @@ interface AppState {
       gender?: string;
       height?: number;
       weight?: number;
-      unitSystem?: 'metric' | 'imperial';
+      unitSystem?: "metric" | "imperial";
     },
-    onboardingCompleted?: boolean
+    onboardingCompleted?: boolean,
   ) => void;
+  completeOnboarding: () => void;
+  setOnboardingStep: (step: string) => void;
   setSelectedDate: (date: string) => void;
   togglePreference: (key: keyof UserPreferences) => void;
-  resetAllData: () => void;
-  clearAllData: () => void;
+  resetAllData: () => Promise<void>;
+  clearAllData: () => Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -56,14 +59,39 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
-  setProfileName: (name: string, onboardingCompleted = true) => {
-    const updated = profileRepository.saveProfile(name, undefined, onboardingCompleted);
+  setProfileName: (name: string, onboardingCompleted?: boolean) => {
+    const existing = get().profile;
+    const isCompleted =
+      onboardingCompleted !== undefined
+        ? onboardingCompleted
+        : existing
+          ? existing.onboardingCompleted
+          : false;
+    const updated = profileRepository.saveProfile(name, undefined, isCompleted);
     set({ profile: updated });
   },
 
-  updateProfile: (name, details, onboardingCompleted = true) => {
-    const updated = profileRepository.saveProfile(name, details, onboardingCompleted);
+  updateProfile: (name, details, onboardingCompleted) => {
+    const existing = get().profile;
+    const isCompleted =
+      onboardingCompleted !== undefined
+        ? onboardingCompleted
+        : existing
+          ? existing.onboardingCompleted
+          : false;
+    const updated = profileRepository.saveProfile(name, details, isCompleted);
     set({ profile: updated });
+  },
+
+  completeOnboarding: () => {
+    profileRepository.setOnboardingCompleted(true);
+    profileRepository.setOnboardingStep("completed");
+    const updated = profileRepository.getProfile();
+    set({ profile: updated });
+  },
+
+  setOnboardingStep: (step: string) => {
+    profileRepository.setOnboardingStep(step);
   },
 
   setSelectedDate: (date: string) => {
@@ -82,8 +110,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
-  resetAllData: () => {
-    // Replace the database contents rather than layering sample rows over user data.
+  resetAllData: async () => {
+    // Explicitly cancel all pending OS notifications and native alarms before clearing data
+    await notificationService.cancelAll();
     resetDatabase();
     seedInitialDataIfNeeded(true);
     const profile = profileRepository.getProfile();
@@ -92,9 +121,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ profile, preferences, selectedDate, isInitialized: true });
     useMedicineStore.getState().loadMedicines();
     useReminderStore.getState().loadDosesForDate(selectedDate);
+    // Reconcile and arm the newly seeded sample schedules
+    await notificationService.reconcileScheduledReminders();
   },
 
-  clearAllData: () => {
+  clearAllData: async () => {
+    // Explicitly cancel all pending OS notifications and native alarms before clearing data
+    await notificationService.cancelAll();
     resetDatabase();
     const selectedDate = getTodayDateString();
     set({

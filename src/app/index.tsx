@@ -1,8 +1,9 @@
-import React, { useEffect } from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useAppStore } from '../store/appStore';
-import { Colors } from '../theme/colors';
+import React, { useEffect } from "react";
+import { View, ActivityIndicator, StyleSheet } from "react-native";
+import { useRouter } from "expo-router";
+import { useAppStore } from "../store/appStore";
+import { profileRepository } from "../database/repositories/profileRepository";
+import { Colors } from "../theme/colors";
 
 export default function IndexScreen() {
   const router = useRouter();
@@ -12,9 +13,18 @@ export default function IndexScreen() {
     if (!isInitialized) return;
 
     if (profile && profile.onboardingCompleted) {
-      router.replace('/(tabs)/home');
+      router.replace("/(tabs)/home");
+      return;
+    }
+
+    const step = profileRepository.getOnboardingStep();
+    if (
+      step === "permissions" ||
+      (profile && profile.name && profile.name.trim().length > 0)
+    ) {
+      router.replace("/onboarding/permissions" as any);
     } else {
-      router.replace('/onboarding');
+      router.replace("/onboarding");
     }
   }, [isInitialized, profile, router]);
 
@@ -29,7 +39,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
