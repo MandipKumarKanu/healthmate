@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -8,7 +8,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Modal,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons, Feather } from '@expo/vector-icons';
@@ -18,6 +17,9 @@ import { AppScreen } from '../../components/ui/AppScreen';
 import { AppHeader } from '../../components/ui/AppHeader';
 import { aiRepository } from '../../database/repositories/aiRepository';
 import { aiAssistantService } from '../../services/aiAssistantService';
+import { networkService } from '../../services/networkService';
+import { ConnectGeminiModal } from '../../components/ai/ConnectGeminiModal';
+import { FormattedAIMessage } from '../../components/ai/FormattedAIMessage';
 import { AIMessage } from '../../types';
 
 const INITIAL_SUGGESTIONS = [
@@ -46,9 +48,22 @@ export default function AIAssistantScreen() {
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
   const [keyModalVisible, setKeyModalVisible] = useState(false);
-  const [keyDraft, setKeyDraft] = useState('');
-  const [keyError, setKeyError] = useState<string | null>(null);
+  const scrollViewRef = useRef<React.ElementRef<typeof ScrollView>>(null);
+
+  const checkConnectivityAndKey = useCallback(async () => {
+    try {
+      const [online, key] = await Promise.all([
+        networkService.checkInternet(),
+        aiAssistantService.getApiKey(),
+      ]);
+      setIsOnline(online);
+      setHasApiKey(Boolean(key));
+    } catch {
+      setIsOnline(false);
+    }
+  }, []);
 
   // Load latest conversation from SQLite on mount
   useEffect(() => {
@@ -57,8 +72,8 @@ export default function AIAssistantScreen() {
       setConversationId(latest.id);
       setMessages(latest.messages);
     }
-    aiAssistantService.getApiKey().then((key) => setHasApiKey(Boolean(key)));
-  }, []);
+    checkConnectivityAndKey();
+  }, [checkConnectivityAndKey]);
 
   /** Offline fallback: fixed terminology guide, unchanged behavior. */
   const generateOfflineReply = useCallback((text: string): string => {
@@ -165,81 +180,53 @@ export default function AIAssistantScreen() {
 
   return (
     <AppScreen contentContainerStyle={styles.container}>
-      <Modal
+      <ConnectGeminiModal
         visible={keyModalVisible}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setKeyModalVisible(false)}
-      >
-        <View style={styles.keyModalBackdrop}>
-          <View style={styles.keyModalCard}>
-            <Text style={styles.keyModalTitle}>Connect Gemini</Text>
-            <Text style={styles.keyModalCopy}>
-              Paste a Gemini API key from aistudio.google.com to enable live AI
-              answers. Stored only on this device. Leave blank to cancel.
-            </Text>
-            <TextInput
-              style={styles.keyModalInput}
-              placeholder="Gemini API key"
-              autoCapitalize="none"
-              autoCorrect={false}
-              secureTextEntry
-              value={keyDraft}
-              onChangeText={setKeyDraft}
-            />
-            {keyError ? (
-              <Text style={styles.keyModalError}>{keyError}</Text>
-            ) : null}
-            <View style={styles.keyModalActions}>
-              <TouchableOpacity
-                style={styles.keyModalSecondary}
-                onPress={() => {
-                  setKeyModalVisible(false);
-                  setKeyError(null);
-                }}
-              >
-                <Text style={styles.keyModalSecondaryText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.keyModalPrimary}
-                onPress={async () => {
-                  setKeyError(null);
-                  try {
-                    await aiAssistantService.saveApiKey(keyDraft.trim());
-                    setHasApiKey(true);
-                    setKeyModalVisible(false);
-                    setKeyDraft('');
-                  } catch (error) {
-                    setKeyError('Could not save the key. Try again.');
-                  }
-                }}
-              >
-                <Text style={styles.keyModalPrimaryText}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setKeyModalVisible(false)}
+        onSuccess={() => {
+          setHasApiKey(true);
+        }}
+        onDisconnected={() => {
+          setHasApiKey(false);
+        }}
+      />
 
       <AppHeader
         title="Medication Guide"
-        subtitle={hasApiKey ? 'Online medication guide' : 'Offline medication terminology guide'}
+        subtitle={hasApiKey && isOnline ? 'Online medication guide' : 'Offline medication terminology guide'}
         brandText="HealthMate AI"
         onBackPress={() => router.back()}
         rightAction={
           <View style={styles.headerActionsRow}>
-            <TouchableOpacity
-              style={styles.newChatButton}
-              onPress={() => {
-                setKeyDraft('');
-                setKeyError(null);
-                setKeyModalVisible(true);
-              }}
-            >
-              <Text style={styles.newChatText}>
-                {hasApiKey ? 'AI Key ✓' : 'Connect AI'}
-              </Text>
-            </TouchableOpacity>
+            {hasApiKey && isOnline ? (
+              <TouchableOpacity
+                style={styles.onlineBadgePill}
+                onPress={() => setKeyModalVisible(true)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.onlineDot} />
+                <Text style={styles.onlineBadgeText}>Online</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.offlineBadgePill}
+                onPress={() => setKeyModalVisible(true)}
+                activeOpacity={0.8}
+              >
+                <View
+                  style={[
+                    styles.statusDot,
+                    hasApiKey
+                      ? styles.statusDotOffline
+                      : styles.statusDotDisconnected,
+                  ]}
+                />
+                <Text style={styles.offlineBadgeText}>
+                  {hasApiKey ? 'Offline' : 'Connect AI'}
+                </Text>
+              </TouchableOpacity>
+            )}
+
             {messages.length > 0 ? (
               <TouchableOpacity
                 style={styles.newChatButton}
@@ -264,11 +251,17 @@ export default function AIAssistantScreen() {
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         style={styles.keyboardContainer}
       >
         <ScrollView
+          ref={scrollViewRef}
           style={styles.scrollArea}
           contentContainerStyle={styles.scrollContent}
+          onContentSizeChange={() =>
+            scrollViewRef.current?.scrollToEnd({ animated: true })
+          }
+          keyboardShouldPersistTaps="handled"
         >
           {messages.length === 0 ? (
             // Landing state matching section 7.I
@@ -311,14 +304,13 @@ export default function AIAssistantScreen() {
                       isUser ? styles.userBubble : styles.assistantBubble,
                     ]}
                   >
-                    <Text
-                      style={[
-                        styles.messageText,
-                        isUser ? styles.userText : styles.assistantText,
-                      ]}
-                    >
-                      {m.content}
-                    </Text>
+                    {isUser ? (
+                      <Text style={[styles.messageText, styles.userText]}>
+                        {m.content}
+                      </Text>
+                    ) : (
+                      <FormattedAIMessage content={m.content} />
+                    )}
                   </View>
                 );
               })}
@@ -379,6 +371,55 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.primary,
   },
+  onlineBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    backgroundColor: Colors.successLight,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    borderColor: '#C6F6D5',
+  },
+  onlineDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: Colors.success,
+  },
+  onlineBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.successDark,
+  },
+  offlineBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    backgroundColor: '#F1F5F9',
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  statusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  statusDotOffline: {
+    backgroundColor: Colors.warning,
+  },
+  statusDotDisconnected: {
+    backgroundColor: Colors.textTertiary,
+  },
+  offlineBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
   disclaimerBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -399,74 +440,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-  },
-  keyModalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.screenPaddingHorizontal,
-  },
-  keyModalCard: {
-    width: '100%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: Radius.card,
-    padding: 20,
-  },
-  keyModalTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: Colors.textPrimary,
-    marginBottom: 8,
-  },
-  keyModalCopy: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    lineHeight: 19,
-    marginBottom: 14,
-  },
-  keyModalInput: {
-    backgroundColor: '#F0EFEF',
-    borderRadius: Radius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: Colors.textPrimary,
-    marginBottom: 6,
-  },
-  keyModalError: {
-    fontSize: 12,
-    color: Colors.error,
-    marginBottom: 6,
-  },
-  keyModalActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 8,
-    marginTop: 12,
-  },
-  keyModalSecondary: {
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: Radius.pill,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  keyModalSecondaryText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-  },
-  keyModalPrimary: {
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: Radius.pill,
-    backgroundColor: Colors.primary,
-  },
-  keyModalPrimaryText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
   },
   scrollArea: {
     flex: 1,

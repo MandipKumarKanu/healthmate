@@ -53,6 +53,58 @@ export default function OnboardingProfileScreen() {
   const [unitSystem, setUnitSystem] = useState<UnitSystem>(
     onboardingDraft.unitSystem || profile?.unitSystem || "metric",
   );
+  const [heightUnit, setHeightUnit] = useState<"cm" | "ft">(
+    (onboardingDraft.unitSystem || profile?.unitSystem) === "imperial"
+      ? "ft"
+      : "cm"
+  );
+  const [weightUnit, setWeightUnit] = useState<"kg" | "lb">(
+    (onboardingDraft.unitSystem || profile?.unitSystem) === "imperial"
+      ? "lb"
+      : "kg"
+  );
+  const [showHeightUnitDropdown, setShowHeightUnitDropdown] = useState(false);
+  const [showWeightUnitDropdown, setShowWeightUnitDropdown] = useState(false);
+
+  const handleSelectHeightUnit = (unit: "cm" | "ft") => {
+    if (unit === heightUnit) {
+      setShowHeightUnitDropdown(false);
+      return;
+    }
+    if (height.trim()) {
+      const num = parseFloat(height.trim());
+      if (!isNaN(num) && num > 0) {
+        if (unit === "ft") {
+          setHeight((num / 30.48).toFixed(1));
+        } else {
+          setHeight(Math.round(num * 30.48).toString());
+        }
+      }
+    }
+    setHeightUnit(unit);
+    setShowHeightUnitDropdown(false);
+    if (errors.height) setErrors((prev) => ({ ...prev, height: undefined }));
+  };
+
+  const handleSelectWeightUnit = (unit: "kg" | "lb") => {
+    if (unit === weightUnit) {
+      setShowWeightUnitDropdown(false);
+      return;
+    }
+    if (weight.trim()) {
+      const num = parseFloat(weight.trim());
+      if (!isNaN(num) && num > 0) {
+        if (unit === "lb") {
+          setWeight(Math.round(num * 2.20462).toString());
+        } else {
+          setWeight(Math.round(num / 2.20462).toString());
+        }
+      }
+    }
+    setWeightUnit(unit);
+    setShowWeightUnitDropdown(false);
+    if (errors.weight) setErrors((prev) => ({ ...prev, weight: undefined }));
+  };
 
   const [errors, setErrors] = useState<{
     name?: string;
@@ -97,12 +149,12 @@ export default function OnboardingProfileScreen() {
       if (isNaN(parsedHeight) || parsedHeight <= 0) {
         newErrors.height = "Enter a positive number";
       } else if (
-        unitSystem === "metric" &&
+        heightUnit === "cm" &&
         (parsedHeight < 30 || parsedHeight > 300)
       ) {
         newErrors.height = "Height should be 30–300 cm";
       } else if (
-        unitSystem === "imperial" &&
+        heightUnit === "ft" &&
         (parsedHeight < 1 || parsedHeight > 9)
       ) {
         newErrors.height = "Height should be 1–9 ft";
@@ -115,12 +167,12 @@ export default function OnboardingProfileScreen() {
       if (isNaN(parsedWeight) || parsedWeight <= 0) {
         newErrors.weight = "Enter a positive number";
       } else if (
-        unitSystem === "metric" &&
+        weightUnit === "kg" &&
         (parsedWeight < 1 || parsedWeight > 500)
       ) {
         newErrors.weight = "Weight should be 1–500 kg";
       } else if (
-        unitSystem === "imperial" &&
+        weightUnit === "lb" &&
         (parsedWeight < 2 || parsedWeight > 1000)
       ) {
         newErrors.weight = "Weight should be 2–1000 lb";
@@ -143,6 +195,9 @@ export default function OnboardingProfileScreen() {
       const parsedHeight = height.trim() ? Number(height.trim()) : undefined;
       const parsedWeight = weight.trim() ? Number(weight.trim()) : undefined;
 
+      const unitSys: UnitSystem =
+        heightUnit === "ft" || weightUnit === "lb" ? "imperial" : "metric";
+
       updateProfile(
         trimmedName,
         {
@@ -150,7 +205,7 @@ export default function OnboardingProfileScreen() {
           gender: gender || undefined,
           height: parsedHeight,
           weight: parsedWeight,
-          unitSystem,
+          unitSystem: unitSys,
         },
         false,
       );
@@ -346,7 +401,7 @@ export default function OnboardingProfileScreen() {
                 <TextInput
                   style={styles.textInput}
                   placeholder={
-                    unitSystem === "metric" ? "e.g. 170" : "e.g. 5.8"
+                    heightUnit === "cm" ? "e.g. 170" : "e.g. 5.8"
                   }
                   placeholderTextColor="#94A3B8"
                   value={height}
@@ -360,13 +415,59 @@ export default function OnboardingProfileScreen() {
                   keyboardType="numeric"
                   accessibilityLabel="Height"
                 />
-                <View style={styles.unitBadge}>
-                  <Text style={styles.unitBadgeText}>
-                    {unitSystem === "metric" ? "cm" : "ft"}
-                  </Text>
-                  <Ionicons name="chevron-down" size={14} color="#64748B" />
-                </View>
+                <TouchableOpacity
+                  style={styles.unitBadgeButton}
+                  onPress={() => {
+                    setShowHeightUnitDropdown((prev) => !prev);
+                    setShowWeightUnitDropdown(false);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.unitBadgeText}>{heightUnit}</Text>
+                  <Ionicons
+                    name={showHeightUnitDropdown ? "chevron-up" : "chevron-down"}
+                    size={14}
+                    color="#64748B"
+                  />
+                </TouchableOpacity>
               </View>
+
+              {/* Inline Height Unit Dropdown */}
+              {showHeightUnitDropdown ? (
+                <View style={styles.unitDropdownMenu}>
+                  {(["cm", "ft"] as const).map((u) => {
+                    const isSelected = heightUnit === u;
+                    return (
+                      <TouchableOpacity
+                        key={u}
+                        style={[
+                          styles.unitDropdownItem,
+                          isSelected && styles.unitDropdownItemSelected,
+                        ]}
+                        onPress={() => handleSelectHeightUnit(u)}
+                        activeOpacity={0.7}
+                      >
+                        <Text
+                          style={[
+                            styles.unitDropdownText,
+                            isSelected && styles.unitDropdownTextSelected,
+                          ]}
+                        >
+                          {u === "cm" ? "Centimeters (cm)" : "Feet (ft)"}
+                        </Text>
+                        {isSelected ? (
+                          <Ionicons
+                            name="checkmark"
+                            size={16}
+                            color="#0788F5"
+                          />
+                        ) : null}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : null}
+
               {errors.height ? (
                 <Text style={styles.errorText}>{errors.height}</Text>
               ) : null}
@@ -389,7 +490,7 @@ export default function OnboardingProfileScreen() {
                 />
                 <TextInput
                   style={styles.textInput}
-                  placeholder={unitSystem === "metric" ? "e.g. 65" : "e.g. 145"}
+                  placeholder={weightUnit === "kg" ? "e.g. 65" : "e.g. 145"}
                   placeholderTextColor="#94A3B8"
                   value={weight}
                   onChangeText={(val) => {
@@ -402,68 +503,62 @@ export default function OnboardingProfileScreen() {
                   keyboardType="numeric"
                   accessibilityLabel="Weight"
                 />
-                <View style={styles.unitBadge}>
-                  <Text style={styles.unitBadgeText}>
-                    {unitSystem === "metric" ? "kg" : "lb"}
-                  </Text>
-                  <Ionicons name="chevron-down" size={14} color="#64748B" />
-                </View>
+                <TouchableOpacity
+                  style={styles.unitBadgeButton}
+                  onPress={() => {
+                    setShowWeightUnitDropdown((prev) => !prev);
+                    setShowHeightUnitDropdown(false);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.unitBadgeText}>{weightUnit}</Text>
+                  <Ionicons
+                    name={showWeightUnitDropdown ? "chevron-up" : "chevron-down"}
+                    size={14}
+                    color="#64748B"
+                  />
+                </TouchableOpacity>
               </View>
+
+              {/* Inline Weight Unit Dropdown */}
+              {showWeightUnitDropdown ? (
+                <View style={styles.unitDropdownMenu}>
+                  {(["kg", "lb"] as const).map((u) => {
+                    const isSelected = weightUnit === u;
+                    return (
+                      <TouchableOpacity
+                        key={u}
+                        style={[
+                          styles.unitDropdownItem,
+                          isSelected && styles.unitDropdownItemSelected,
+                        ]}
+                        onPress={() => handleSelectWeightUnit(u)}
+                        activeOpacity={0.7}
+                      >
+                        <Text
+                          style={[
+                            styles.unitDropdownText,
+                            isSelected && styles.unitDropdownTextSelected,
+                          ]}
+                        >
+                          {u === "kg" ? "Kilograms (kg)" : "Pounds (lb)"}
+                        </Text>
+                        {isSelected ? (
+                          <Ionicons
+                            name="checkmark"
+                            size={16}
+                            color="#0788F5"
+                          />
+                        ) : null}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : null}
+
               {errors.weight ? (
                 <Text style={styles.errorText}>{errors.weight}</Text>
               ) : null}
-            </View>
-
-            {/* Units Segmented Pill */}
-            <View style={styles.unitsSection}>
-              <Text style={styles.unitsLabel}>Units</Text>
-              <View style={styles.segmentedControl}>
-                <TouchableOpacity
-                  style={[
-                    styles.segmentOption,
-                    unitSystem === "metric" && styles.segmentOptionSelected,
-                  ]}
-                  onPress={() => {
-                    setUnitSystem("metric");
-                    setOnboardingDraft({ unitSystem: "metric" });
-                  }}
-                  activeOpacity={0.8}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: unitSystem === "metric" }}
-                >
-                  <Text
-                    style={[
-                      styles.segmentText,
-                      unitSystem === "metric" && styles.segmentTextSelected,
-                    ]}
-                  >
-                    Metric (cm, kg)
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.segmentOption,
-                    unitSystem === "imperial" && styles.segmentOptionSelected,
-                  ]}
-                  onPress={() => {
-                    setUnitSystem("imperial");
-                    setOnboardingDraft({ unitSystem: "imperial" });
-                  }}
-                  activeOpacity={0.8}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: unitSystem === "imperial" }}
-                >
-                  <Text
-                    style={[
-                      styles.segmentText,
-                      unitSystem === "imperial" && styles.segmentTextSelected,
-                    ]}
-                  >
-                    Imperial (ft, lb)
-                  </Text>
-                </TouchableOpacity>
-              </View>
             </View>
           </View>
 
@@ -566,7 +661,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 24,
     paddingTop: Spacing.xs,
-    paddingBottom: Spacing.xl,
+    paddingBottom: 160,
   },
   topNavRow: {
     paddingVertical: 4,
@@ -681,63 +776,57 @@ const styles = StyleSheet.create({
   chevronIcon: {
     marginLeft: 6,
   },
-  unitBadge: {
+  unitBadgeButton: {
     flexDirection: "row",
     alignItems: "center",
-    paddingLeft: 6,
+    backgroundColor: "#F1F5F9",
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: Radius.pill,
+    gap: 2,
   },
   unitBadgeText: {
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#334155",
-    marginRight: 3,
+  },
+  unitDropdownMenu: {
+    marginTop: 6,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    paddingVertical: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  unitDropdownItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  unitDropdownItemSelected: {
+    backgroundColor: "#F0F7FF",
+  },
+  unitDropdownText: {
+    fontSize: 13,
+    color: "#334155",
+    fontWeight: "500",
+  },
+  unitDropdownTextSelected: {
+    color: "#0788F5",
+    fontWeight: "700",
   },
   errorText: {
     fontSize: 12,
     color: "#EF4444",
     marginTop: 4,
     marginLeft: 2,
-  },
-  unitsSection: {
-    marginTop: 4,
-  },
-  unitsLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#334155",
-    marginBottom: 8,
-  },
-  segmentedControl: {
-    flexDirection: "row",
-    backgroundColor: "#F1F5F9",
-    borderRadius: 12,
-    padding: 3,
-  },
-  segmentOption: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 9,
-  },
-  segmentOptionSelected: {
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#0788F5",
-    shadowColor: "#0788F5",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  segmentText: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: "#64748B",
-  },
-  segmentTextSelected: {
-    color: "#0788F5",
-    fontWeight: "700",
   },
   actionSection: {
     alignItems: "center",

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import {
   StyleSheet,
   View,
@@ -9,7 +9,7 @@ import {
   ScrollView,
   Alert,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import * as Clipboard from "expo-clipboard";
@@ -29,12 +29,45 @@ import {
 import { scanHistoryRepository } from "../../database/repositories/scanHistoryRepository";
 import { useMedicineStore } from "../../store/medicineStore";
 import { DosageForm } from "../../types";
+import { aiAssistantService } from "../../services/aiAssistantService";
+import { networkService } from "../../services/networkService";
+import { ConnectGeminiModal } from "../../components/ai/ConnectGeminiModal";
 
 export default function ScanScreen() {
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView | null>(null);
   const { addMedicine } = useMedicineStore();
+
+  const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
+  const [isOnline, setIsOnline] = useState<boolean | null>(null);
+  const [isCheckingPrerequisites, setIsCheckingPrerequisites] = useState(true);
+  const [showConnectModal, setShowConnectModal] = useState(false);
+  const [scanStepMessage, setScanStepMessage] = useState(
+    "Connecting to Cloud OCR… Reading packaging text…"
+  );
+
+  const checkPrerequisites = useCallback(async () => {
+    setIsCheckingPrerequisites(true);
+    try {
+      const [online, key] = await Promise.all([
+        networkService.checkInternet(),
+        aiAssistantService.getApiKey(),
+      ]);
+      setIsOnline(online);
+      setHasApiKey(Boolean(key));
+    } catch {
+      setIsOnline(false);
+    } finally {
+      setIsCheckingPrerequisites(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      checkPrerequisites();
+    }, [checkPrerequisites])
+  );
 
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
@@ -65,6 +98,7 @@ export default function ScanScreen() {
 
   const processImage = async (imageUri: string) => {
     setIsScanning(true);
+    setScanStepMessage("Step 1/2: Reading packaging with Cloud OCR…");
     setConnectionError(null);
     setExtractedData(null);
     setUsedFallbackEngine(false);
@@ -73,6 +107,7 @@ export default function ScanScreen() {
     setExpandedDebugPass(null);
     setCopiedDebugPass(null);
     try {
+      setScanStepMessage("Step 2/2: Personal AI analyzing medicine details…");
       const { rawText, extracted, usedFallbackEngine: isDemo, debugPasses } =
         await processLabelImage(imageUri);
       if (__DEV__ && debugPasses) {
@@ -93,6 +128,22 @@ export default function ScanScreen() {
       setMedExpiry(extracted.expiryDate || "");
       setMedBatch(extracted.batchNumber || "");
       setMedMfg(extracted.manufacturer || "");
+
+      // Auto-save all scans directly to scan history
+      try {
+        scanHistoryRepository.add({
+          medicineName: extracted.medicineName || "Scanned Medicine",
+          detectedStrength: extracted.detectedStrength || undefined,
+          dosageForm: extracted.dosageForm || "tablet",
+          manufacturer: extracted.manufacturer || undefined,
+          batchNumber: extracted.batchNumber || undefined,
+          expiryDate: extracted.expiryDate || undefined,
+          rawText: rawText,
+          imageUri: imageUri,
+        });
+      } catch (historyErr) {
+        console.warn("Auto-save scan to history failed:", historyErr);
+      }
     } catch (error: any) {
       console.warn("Medicine label text recognition failed:", error);
       const isConnectionIssue =
@@ -320,34 +371,49 @@ export default function ScanScreen() {
         subtitle="Extract details from medication packaging"
         brandText="HealthMate AI"
         rightAction={
-          <TouchableOpacity
-            style={styles.historyHeaderButton}
-            onPress={() => router.push("/scan-history")}
-          >
-            <Feather name="clock" size={16} color={Colors.primary} />
-            <Text style={styles.historyHeaderText}>History</Text>
-          </TouchableOpacity>
+          <View style={styles.headerRightActions}>
+            <TouchableOpacity
+              style={styles.headerAddManuallyBtn}
+              onPress={() => router.push("/medicines/add")}
+              activeOpacity={0.8}
+            >
+              <Feather name="plus" size={13} color="#FFFFFF" />
+              <Text style={styles.headerAddManuallyBtnText}>Add Manually</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.historyHeaderButton}
+              onPress={() => router.push("/scan-history")}
+              activeOpacity={0.8}
+            >
+              <Feather name="clock" size={14} color={Colors.primary} />
+              <Text style={styles.historyHeaderText}>History</Text>
+            </TouchableOpacity>
+          </View>
         }
       />
 
       <View style={styles.body}>
-        {/* Notice banner: Cloud OCR requires internet to scan labels */}
-        <View style={styles.internetNoticeBanner}>
-          <View style={styles.internetNoticeLeft}>
-            <Ionicons name="cloud-outline" size={17} color={Colors.primary} />
-            <Text style={styles.internetNoticeText}>
-              Cloud OCR requires internet to scan labels
-            </Text>
+        {/* Notice banner: Only show when there is no internet connection */}
+        {isOnline === false ? (
+          <View style={styles.internetNoticeBanner}>
+            <View style={styles.internetNoticeLeft}>
+              <Ionicons
+                name="cloud-offline-outline"
+                size={17}
+                color={Colors.error}
+              />
+              <Text
+                style={[
+                  styles.internetNoticeText,
+                  { color: Colors.errorDark },
+                ]}
+              >
+                Cloud OCR & AI require internet connection
+              </Text>
+            </View>
           </View>
-          <TouchableOpacity
-            style={styles.addManuallyPill}
-            onPress={() => router.push("/medicines/add")}
-            activeOpacity={0.8}
-          >
-            <Feather name="plus" size={13} color="#FFFFFF" />
-            <Text style={styles.addManuallyPillText}>Add Manually</Text>
-          </TouchableOpacity>
-        </View>
+        ) : null}
 
         {/* Connection Error Card */}
         {connectionError ? (
@@ -395,94 +461,230 @@ export default function ScanScreen() {
         ) : null}
 
         {!capturedImage ? (
-          // Camera Viewport & Capture Controls
-          <View style={styles.cameraContainer}>
-            {permission?.granted ? (
-              <CameraView
-                ref={cameraRef}
-                style={styles.cameraView}
-                facing="back"
+          isCheckingPrerequisites ? (
+            <View style={styles.gatingCard}>
+              <ActivityIndicator size="large" color={Colors.primary} />
+              <Text style={styles.prerequisiteTitle}>
+                Initializing Medicine Scanner…
+              </Text>
+              <Text style={styles.prerequisiteSub}>
+                Checking network and Personal AI configuration
+              </Text>
+            </View>
+          ) : isOnline === false ? (
+            <View style={styles.gatingCard}>
+              <View
+                style={[
+                  styles.gatingIconCircle,
+                  { backgroundColor: Colors.errorLight },
+                ]}
               >
-                <View style={styles.overlayFrame}>
-                  <View style={styles.targetCornerTL} />
-                  <View style={styles.targetCornerTR} />
-                  <View style={styles.targetCornerBL} />
-                  <View style={styles.targetCornerBR} />
-                  <Text style={styles.overlayHint}>
-                    Align medicine label within frame
+                <Ionicons
+                  name="cloud-offline-outline"
+                  size={38}
+                  color={Colors.error}
+                />
+              </View>
+              <Text style={styles.gatingTitle}>Internet Connection Required</Text>
+              <Text style={styles.gatingSubtitle}>
+                Cloud OCR and Personal AI need an active internet connection to
+                scan and analyze medication packaging.
+              </Text>
+              <View style={styles.gatingActions}>
+                <TouchableOpacity
+                  style={styles.gatingPrimaryBtn}
+                  onPress={checkPrerequisites}
+                  activeOpacity={0.8}
+                >
+                  <Feather name="refresh-cw" size={16} color="#FFFFFF" />
+                  <Text style={styles.gatingPrimaryBtnText}>
+                    Retry Connection
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.gatingSecondaryBtn}
+                  onPress={() => router.push("/medicines/add")}
+                  activeOpacity={0.8}
+                >
+                  <Feather name="plus" size={16} color={Colors.primary} />
+                  <Text style={styles.gatingSecondaryBtnText}>Add Manually</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : !hasApiKey ? (
+            <View style={styles.gatingCard}>
+              <View
+                style={[
+                  styles.gatingIconCircle,
+                  { backgroundColor: Colors.primaryLight },
+                ]}
+              >
+                <Ionicons name="sparkles" size={38} color={Colors.primary} />
+              </View>
+              <Text style={styles.gatingTitle}>Unlock AI Medicine Scanner</Text>
+              <Text style={styles.gatingSubtitle}>
+                Connect your Personal AI (Google Gemini) to analyze packaging,
+                auto-detect brand & generic salts, dosage form, strength, and
+                expiry dates.
+              </Text>
+
+              <View style={styles.gatingFeatureList}>
+                <View style={styles.gatingFeatureRow}>
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={16}
+                    color={Colors.success}
+                  />
+                  <Text style={styles.gatingFeatureText}>
+                    High-precision dosage and generic salt detection
                   </Text>
                 </View>
-              </CameraView>
-            ) : (
-              // Permission or simulated viewport fallback
-              <View style={styles.cameraPlaceholder}>
-                <Ionicons
-                  name="camera-outline"
-                  size={48}
-                  color={Colors.primary}
-                />
-                <Text style={styles.cameraTitle}>Camera Label Scanner</Text>
-                <Text style={styles.cameraSub}>
-                  Point at medicine box, bottle, or prescription blister pack to
-                  detect medicine details.
-                </Text>
-
-                {!permission?.granted ? (
-                  <TouchableOpacity
-                    style={styles.permissionButton}
-                    onPress={requestPermission}
-                  >
-                    <Text style={styles.permissionButtonText}>
-                      Grant Camera Permission
-                    </Text>
-                  </TouchableOpacity>
-                ) : null}
+                <View style={styles.gatingFeatureRow}>
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={16}
+                    color={Colors.success}
+                  />
+                  <Text style={styles.gatingFeatureText}>
+                    Powered by Google Gemini 2.0 Flash Lite
+                  </Text>
+                </View>
+                <View style={styles.gatingFeatureRow}>
+                  <Ionicons
+                    name="shield-checkmark"
+                    size={16}
+                    color={Colors.primary}
+                  />
+                  <Text style={styles.gatingFeatureText}>
+                    Free API key stored securely only on your phone
+                  </Text>
+                </View>
               </View>
-            )}
 
-            {/* Controls */}
-            <View style={styles.controlsRow}>
-              <TouchableOpacity
-                style={styles.galleryButton}
-                onPress={handlePickImage}
-              >
-                <Ionicons
-                  name="images-outline"
-                  size={24}
-                  color={Colors.primary}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.shutterButton}
-                onPress={handleCapture}
-                activeOpacity={0.8}
-              >
-                <View style={styles.shutterInner} />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.galleryButton}
-                onPress={() => router.push("/scan-history")}
-              >
-                <Feather name="clock" size={22} color={Colors.textSecondary} />
-              </TouchableOpacity>
+              <View style={styles.gatingActions}>
+                <TouchableOpacity
+                  style={styles.gatingPrimaryBtn}
+                  onPress={() => setShowConnectModal(true)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="sparkles" size={16} color="#FFFFFF" />
+                  <Text style={styles.gatingPrimaryBtnText}>
+                    Connect Personal AI
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.gatingSecondaryBtn}
+                  onPress={() => router.push("/medicines/add")}
+                  activeOpacity={0.8}
+                >
+                  <Feather name="plus" size={16} color={Colors.primary} />
+                  <Text style={styles.gatingSecondaryBtnText}>Add Manually</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          ) : (
+            // Camera Viewport & Capture Controls
+            <View style={styles.cameraContainer}>
+              {permission?.granted ? (
+                <CameraView
+                  ref={cameraRef}
+                  style={styles.cameraView}
+                  facing="back"
+                >
+                  <View style={styles.overlayFrame}>
+                    <TouchableOpacity
+                      style={styles.aiConnectedPill}
+                      onPress={() => setShowConnectModal(true)}
+                      activeOpacity={0.8}
+                    >
+                      <View style={styles.aiConnectedDot} />
+                      <Text style={styles.aiConnectedPillText}>
+                        Connected to Gemini AI
+                      </Text>
+                      <Feather
+                        name="settings"
+                        size={11}
+                        color="#FFFFFF"
+                        style={{ marginLeft: 4 }}
+                      />
+                    </TouchableOpacity>
+                    <View style={styles.targetCornerTL} />
+                    <View style={styles.targetCornerTR} />
+                    <View style={styles.targetCornerBL} />
+                    <View style={styles.targetCornerBR} />
+                    <Text style={styles.overlayHint}>
+                      Align medicine label within frame
+                    </Text>
+                  </View>
+                </CameraView>
+              ) : (
+                // Permission or simulated viewport fallback
+                <View style={styles.cameraPlaceholder}>
+                  <Ionicons
+                    name="camera-outline"
+                    size={48}
+                    color={Colors.primary}
+                  />
+                  <Text style={styles.cameraTitle}>Camera Label Scanner</Text>
+                  <Text style={styles.cameraSub}>
+                    Point at medicine box, bottle, or prescription blister pack to
+                    detect medicine details.
+                  </Text>
+
+                  {!permission?.granted ? (
+                    <TouchableOpacity
+                      style={styles.permissionButton}
+                      onPress={requestPermission}
+                    >
+                      <Text style={styles.permissionButtonText}>
+                        Grant Camera Permission
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              )}
+
+              {/* Controls */}
+              <View style={styles.controlsRow}>
+                <TouchableOpacity
+                  style={styles.galleryButton}
+                  onPress={handlePickImage}
+                >
+                  <Ionicons
+                    name="images-outline"
+                    size={24}
+                    color={Colors.primary}
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.shutterButton}
+                  onPress={handleCapture}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.shutterInner} />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.galleryButton}
+                  onPress={() => router.push("/scan-history")}
+                >
+                  <Feather
+                    name="clock"
+                    size={22}
+                    color={Colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+          )
         ) : (
           // Review & OCR Edit Form
           <View style={styles.reviewContainer}>
             <View style={styles.reviewHeader}>
               <Text style={styles.reviewTitle}>Detected Label Information</Text>
               <View style={styles.reviewHeaderActions}>
-                <TouchableOpacity
-                  style={styles.manualEntryLink}
-                  onPress={() => router.push("/medicines/add")}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.manualEntryLinkText}>Add Manually</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={handleReset}>
+                <TouchableOpacity onPress={handleReset} activeOpacity={0.7}>
                   <Text style={styles.retakeText}>Retake</Text>
                 </TouchableOpacity>
               </View>
@@ -503,7 +705,7 @@ export default function ScanScreen() {
               <View style={styles.ocrAlertBanner}>
                 <ActivityIndicator size="small" color={Colors.primary} />
                 <Text style={styles.ocrAlertText}>
-                  Connecting to Cloud OCR… Reading packaging text…
+                  {scanStepMessage}
                 </Text>
               </View>
             ) : null}
@@ -548,7 +750,12 @@ export default function ScanScreen() {
 
                   {showFullText ? (
                     <>
-                      <View style={styles.fullTextBody}>
+                      <ScrollView
+                        style={styles.fullTextBody}
+                        contentContainerStyle={styles.fullTextContent}
+                        nestedScrollEnabled
+                        showsVerticalScrollIndicator
+                      >
                         {fullTextLines.length > 0 ? (
                           fullTextLines.map((line, index) => (
                             <Text
@@ -562,7 +769,7 @@ export default function ScanScreen() {
                         ) : (
                           <Text style={styles.fullTextLine}>—</Text>
                         )}
-                      </View>
+                      </ScrollView>
                       <TouchableOpacity
                         style={styles.copyButton}
                         onPress={handleCopyFullText}
@@ -768,19 +975,22 @@ export default function ScanScreen() {
                 onPress={handleAddToCabinet}
                 variant="primary"
                 size="lg"
-                style={{ marginBottom: 10 }}
-              />
-
-              <AppButton
-                title="Save Scan to History Only"
-                onPress={handleSaveToHistory}
-                variant="outline"
-                size="md"
               />
             </View>
           </View>
         )}
       </View>
+
+      <ConnectGeminiModal
+        visible={showConnectModal}
+        onClose={() => setShowConnectModal(false)}
+        onSuccess={() => {
+          setHasApiKey(true);
+        }}
+        onDisconnected={() => {
+          setHasApiKey(false);
+        }}
+      />
     </AppScreen>
   );
 }
@@ -791,6 +1001,25 @@ const styles = StyleSheet.create({
   },
   body: {
     paddingHorizontal: Spacing.screenPaddingHorizontal,
+  },
+  headerRightActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  headerAddManuallyBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.primary,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: Radius.pill,
+    gap: 4,
+  },
+  headerAddManuallyBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#FFFFFF",
   },
   historyHeaderButton: {
     flexDirection: "row",
@@ -1028,12 +1257,19 @@ const styles = StyleSheet.create({
     borderColor: "#F3F2F6",
     borderRadius: Radius.sm,
     padding: 10,
-    maxHeight: 200,
+    maxHeight: 180,
+    width: "100%",
+  },
+  fullTextContent: {
+    paddingBottom: 4,
   },
   fullTextLine: {
     fontSize: 13,
     color: Colors.textPrimary,
     lineHeight: 20,
+    width: "100%",
+    flexWrap: "wrap",
+    flexShrink: 1,
   },
   copyButton: {
     flexDirection: "row",
@@ -1302,5 +1538,128 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     color: Colors.primary,
+  },
+  gatingCard: {
+    backgroundColor: Colors.cardBackground,
+    borderRadius: Radius.card,
+    padding: Spacing.xl,
+    alignItems: "center",
+    marginTop: Spacing.sm,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  gatingIconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.md,
+  },
+  gatingTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: Colors.textPrimary,
+    textAlign: "center",
+    marginBottom: Spacing.xs,
+  },
+  gatingSubtitle: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    marginBottom: Spacing.lg,
+    paddingHorizontal: Spacing.sm,
+  },
+  gatingFeatureList: {
+    width: "100%",
+    backgroundColor: Colors.cardBackgroundSecondary,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.xl,
+    gap: Spacing.sm,
+  },
+  gatingFeatureRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  gatingFeatureText: {
+    flex: 1,
+    fontSize: 13,
+    color: Colors.textPrimary,
+    lineHeight: 18,
+  },
+  gatingActions: {
+    width: "100%",
+    gap: Spacing.md,
+  },
+  gatingPrimaryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.sm,
+    backgroundColor: Colors.primary,
+    borderRadius: Radius.md,
+    paddingVertical: 14,
+  },
+  gatingPrimaryBtnText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  gatingSecondaryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.xs,
+    paddingVertical: Spacing.sm,
+  },
+  gatingSecondaryBtnText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.primary,
+  },
+  prerequisiteTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: Colors.textPrimary,
+    marginTop: Spacing.md,
+    textAlign: "center",
+  },
+  prerequisiteSub: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    marginTop: Spacing.xs,
+    textAlign: "center",
+  },
+  aiConnectedPill: {
+    position: "absolute",
+    top: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.65)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: Radius.pill,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
+  },
+  aiConnectedDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: Colors.success,
+  },
+  aiConnectedPillText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
 });

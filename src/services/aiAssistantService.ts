@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
-import { AIMessage } from '../types';
+import { AIMessage, DosageForm } from '../types';
+import { ocrService, ExtractedMedicineData } from './ocrService';
 
 /**
  * Real AI assistant backend (Google Gemini REST API).
@@ -13,7 +14,7 @@ import { AIMessage } from '../types';
 
 const KEY_STORE_NAME = 'gemini_api_key';
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
-const DEFAULT_MODEL = 'gemini-2.5-flash';
+const DEFAULT_MODEL = 'gemini-flash-lite-latest';
 const MAX_HISTORY_TURNS = 12; // keep requests bounded; persistence holds more
 
 export const MEDICATION_GUARDRAIL_SYSTEM_PROMPT = [
@@ -219,4 +220,290 @@ export const aiAssistantService = {
       clearTimeout(timer);
     }
   },
+
+  /**
+   * Verifies a Gemini API key by making a lightweight test ping to the API.
+   */
+  async verifyApiKey(key: string): Promise<{ valid: boolean; error?: string }> {
+    const trimmed = key.trim();
+    if (!trimmed) {
+      return { valid: false, error: 'Please enter a Gemini API key.' };
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
+    const modelsToTry = [
+      DEFAULT_MODEL,
+      'gemini-2.0-flash-lite',
+      'gemini-2.5-flash',
+      'gemini-1.5-flash',
+    ];
+
+    try {
+      for (const model of modelsToTry) {
+        try {
+          const response = await fetch(
+            `${API_BASE}/models/${model}:generateContent`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': trimmed,
+              },
+              body: JSON.stringify({
+                contents: [{ role: 'user', parts: [{ text: 'ping' }] }],
+                generationConfig: { maxOutputTokens: 2 },
+              }),
+              signal: controller.signal,
+            }
+          );
+
+          if (response.ok) {
+            return { valid: true };
+          }
+          if (
+            response.status === 400 ||
+            response.status === 401 ||
+            response.status === 403
+          ) {
+            return {
+              valid: false,
+              error: 'Invalid API key. Please check your key from Google AI Studio.',
+            };
+          }
+          if (response.status === 429) {
+            return {
+              valid: false,
+              error: 'Rate limit exceeded on Google AI Studio. Please try again shortly.',
+            };
+          }
+          if (response.status === 404) {
+            continue;
+          }
+          return {
+            valid: false,
+            error: `Gemini API returned status ${response.status}.`,
+          };
+        } catch (innerErr: any) {
+          if (innerErr?.name === 'AbortError') throw innerErr;
+          continue;
+        }
+      }
+      return {
+        valid: false,
+        error: 'Verification failed. Could not reach Gemini models.',
+      };
+    } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        return {
+          valid: false,
+          error: 'Verification timed out. Check your internet connection.',
+        };
+      }
+      return {
+        valid: false,
+        error: 'Network error. Please check your internet connection.',
+      };
+    } finally {
+      clearTimeout(timer);
+    }
+  },
+
+  /**
+   * Interprets raw OCR text from medicine packaging using the user's personal
+   * Gemini AI to accurately identify medicine name, strength, form, batch, and expiry.
+   */
+  async parseMedicinePackagingWithAI(
+    rawOcrText: string
+  ): Promise<ExtractedMedicineData> {
+    const baseExtraction = ocrService.extractMedicineData(rawOcrText);
+    const apiKey = await this.getApiKey();
+    if (!apiKey || !rawOcrText.trim()) {
+      return baseExtraction;
+    }
+
+    const systemPrompt = [
+      'You are a precision pharmaceutical OCR interpreter for HealthMate.',
+      'Given messy raw OCR text extracted from a medication label, bottle, blister pack, or box packaging:',
+      'Analyze the full text context to accurately identify the pharmaceutical fields.',
+      'Intelligently deduce what is the brand name versus generic active ingredients without requiring pre-split tokens.',
+      '',
+      'JSON Schema:',
+      '{',
+      '  "medicineName": "Commercial brand name (e.g. Augmentin, Lipitor, Tylenol, Dolo 650, Panadol)",',
+      '  "genericName": "Active salt/ingredient name (e.g. Amoxicillin and Clavulanate Potassium, Atorvastatin, Acetaminophen, Paracetamol)",',
+      '  "detectedStrength": "Strength with unit (e.g. 625 mg, 500mg, 10mg/5ml, 0.5% w/v)",',
+      '  "dosageForm": "One of: tablet, capsule, softgel, eye_drop, syrup, injection, cream, other",',
+      '  "manufacturer": "Pharmaceutical manufacturing company (e.g. GlaxoSmithKline, Pfizer, Cipla, Sun Pharma)",',
+      '  "batchNumber": "Batch or Lot number if present (e.g. B12345, Lot 982A)",',
+      '  "expiryDate": "Expiration date formatted as MM/YYYY or Month YYYY (e.g. 12/2027)"',
+      '}',
+      '',
+      'Rules:',
+      '- Fix obvious OCR character/digit confusions (e.g. "Tab1et" -> "tablet", "Paracetamo1" -> "Paracetamol", "5OOmg" -> "500mg", "DU0" -> "DUO").',
+      '- If brand name and generic name are identical (e.g. unbranded generic Paracetamol 500mg), set both fields.',
+      '- Return ONLY valid JSON, with NO markdown backticks or commentary.',
+    ].join('\n');
+
+    const modelsToTry = [
+      DEFAULT_MODEL,
+      'gemini-2.0-flash-lite',
+      'gemini-2.5-flash',
+      'gemini-1.5-flash',
+    ];
+
+    for (const model of modelsToTry) {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 12000);
+
+        const response = await fetch(
+          `${API_BASE}/models/${model}:generateContent`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': apiKey,
+            },
+            body: JSON.stringify({
+              systemInstruction: {
+                parts: [{ text: systemPrompt }],
+              },
+              contents: [
+                {
+                  role: 'user',
+                  parts: [
+                    {
+                      text: `Raw OCR text from medication packaging:\n\n${rawOcrText}`,
+                    },
+                  ],
+                },
+              ],
+              generationConfig: {
+                temperature: 0.1,
+                responseMimeType: 'application/json',
+                maxOutputTokens: 512,
+              },
+            }),
+            signal: controller.signal,
+          }
+        );
+
+        clearTimeout(timer);
+
+        if (!response.ok) {
+          if (response.status === 404) continue;
+          break;
+        }
+
+        const data = await response.json();
+        const answerText = this.extractAnswerText(data);
+        if (!answerText) break;
+
+        const cleanJson = answerText
+          .replace(/```json/gi, '')
+          .replace(/```/g, '')
+          .trim();
+        const parsed = JSON.parse(cleanJson);
+
+        const resolvedMedName =
+          parsed.medicineName?.trim() ||
+          parsed.genericName?.trim() ||
+          baseExtraction.medicineName;
+        const resolvedGenName =
+          parsed.genericName?.trim() ||
+          parsed.medicineName?.trim() ||
+          baseExtraction.genericName;
+
+        return {
+          medicineName: resolvedMedName,
+          genericName: resolvedGenName,
+          detectedStrength:
+            parsed.detectedStrength?.trim() || baseExtraction.detectedStrength,
+          dosageForm:
+            normalizeDosageForm(parsed.dosageForm) ||
+            baseExtraction.dosageForm ||
+            'tablet',
+          manufacturer:
+            parsed.manufacturer?.trim() || baseExtraction.manufacturer,
+          batchNumber: parsed.batchNumber?.trim() || baseExtraction.batchNumber,
+          expiryDate: parsed.expiryDate?.trim() || baseExtraction.expiryDate,
+          rawText: rawOcrText,
+          isHighConfidence: Boolean(resolvedMedName || resolvedGenName),
+          confidenceScore: 0.98,
+          candidates: (resolvedMedName || resolvedGenName)
+            ? [
+                {
+                  name: resolvedMedName || resolvedGenName || '',
+                  genericName: resolvedGenName || resolvedMedName || '',
+                  isBrand: Boolean(
+                    parsed.medicineName &&
+                      parsed.genericName &&
+                      parsed.medicineName.toLowerCase() !==
+                        parsed.genericName.toLowerCase()
+                  ),
+                  score: 0.99,
+                  isExact: true,
+                  originalText: parsed.medicineName || parsed.genericName || '',
+                },
+              ]
+            : baseExtraction.candidates,
+        };
+      } catch (err) {
+        console.warn(`Gemini packaging parse on model ${model} failed:`, err);
+      }
+    }
+
+    return baseExtraction;
+  },
 };
+
+function normalizeDosageForm(form?: string): DosageForm {
+  if (!form) return 'tablet';
+  const lower = form.toLowerCase().trim();
+  if (
+    lower.includes('tablet') ||
+    lower.includes('tab') ||
+    lower.includes('pill')
+  ) {
+    return 'tablet';
+  }
+  if (lower.includes('capsule') || lower.includes('cap')) {
+    return 'capsule';
+  }
+  if (lower.includes('softgel') || lower.includes('gel cap')) {
+    return 'softgel';
+  }
+  if (
+    lower.includes('eye drop') ||
+    lower.includes('ophthalmic') ||
+    lower.includes('eye_drop')
+  ) {
+    return 'eye_drop';
+  }
+  if (
+    lower.includes('syrup') ||
+    lower.includes('liquid') ||
+    lower.includes('suspension') ||
+    lower.includes('solution') ||
+    lower.includes('elixir')
+  ) {
+    return 'syrup';
+  }
+  if (
+    lower.includes('injection') ||
+    lower.includes('injectable') ||
+    lower.includes('vial') ||
+    lower.includes('ampoule')
+  ) {
+    return 'injection';
+  }
+  if (
+    lower.includes('cream') ||
+    lower.includes('ointment') ||
+    lower.includes('gel') ||
+    lower.includes('lotion')
+  ) {
+    return 'cream';
+  }
+  return 'other';
+}

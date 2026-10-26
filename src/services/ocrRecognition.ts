@@ -44,6 +44,7 @@ import {
   reconstructReadingOrder,
   computeTextRegion,
 } from './ocrTextGeometry';
+import { aiAssistantService } from './aiAssistantService';
 
 export { OcrConnectionError } from './remoteOcrService';
 
@@ -235,7 +236,15 @@ export async function processLabelImage(
   const remoteResult = await recognizePackagingImage(uploadUri);
 
   const rawText = remoteResult.text || "";
-  const extracted = ocrService.extractMedicineData(rawText);
+  let extracted = ocrService.extractMedicineData(rawText);
+  try {
+    const aiParsed = await aiAssistantService.parseMedicinePackagingWithAI(rawText);
+    if (aiParsed) {
+      extracted = aiParsed;
+    }
+  } catch (aiErr) {
+    console.warn("AI medication packaging interpretation fallback:", aiErr);
+  }
 
   return {
     rawText,

@@ -9,8 +9,10 @@ import {
   TextInput,
   Modal,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { Radius, Spacing, Typography } from '../../theme/tokens';
@@ -25,6 +27,8 @@ import { notificationService } from '../../services/notificationService';
 import Constants from 'expo-constants';
 import { GenderOption, UnitSystem, SnoozeIntervalMinutes } from '../../types';
 import { AlarmReliabilityCard } from '../../components/profile/AlarmReliabilityCard';
+import { aiAssistantService } from '../../services/aiAssistantService';
+import { ConnectGeminiModal } from '../../components/ai/ConnectGeminiModal';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -52,6 +56,49 @@ export default function ProfileScreen() {
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+
+  const [geminiKey, setGeminiKey] = useState<string | null>(null);
+  const [showGeminiModal, setShowGeminiModal] = useState(false);
+
+  const loadGeminiKey = () => {
+    aiAssistantService.getApiKey().then((k) => setGeminiKey(k));
+  };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadGeminiKey();
+    }, [])
+  );
+
+  const maskKey = (key: string) => {
+    if (key.length <= 8) return '••••••••';
+    return `${key.slice(0, 6)}••••${key.slice(-4)}`;
+  };
+
+  const toggleUnitSystem = (newUnit: UnitSystem) => {
+    if (newUnit === unitSystemInput) return;
+    if (heightInput.trim()) {
+      const h = parseFloat(heightInput);
+      if (!isNaN(h) && h > 0) {
+        if (newUnit === 'imperial') {
+          setHeightInput((h / 30.48).toFixed(1));
+        } else {
+          setHeightInput(Math.round(h * 30.48).toString());
+        }
+      }
+    }
+    if (weightInput.trim()) {
+      const w = parseFloat(weightInput);
+      if (!isNaN(w) && w > 0) {
+        if (newUnit === 'imperial') {
+          setWeightInput(Math.round(w * 2.20462).toString());
+        } else {
+          setWeightInput(Math.round(w / 2.20462).toString());
+        }
+      }
+    }
+    setUnitSystemInput(newUnit);
+  };
 
   const userName = profile?.name || 'Alex';
   const userInitials = userName
@@ -383,6 +430,50 @@ export default function ProfileScreen() {
 
           <TouchableOpacity
             style={styles.settingRow}
+            onPress={() => setShowGeminiModal(true)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.settingIconContainer}>
+              <Ionicons name="sparkles" size={18} color={Colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.settingLabel}>Personal AI (Google Gemini)</Text>
+              <Text style={styles.settingSub}>
+                {geminiKey
+                  ? `Connected (${maskKey(geminiKey)})`
+                  : 'Free API key for smart scan & AI guide'}
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.geminiBadgeStatus,
+                geminiKey
+                  ? styles.geminiBadgeConnected
+                  : styles.geminiBadgeDisconnected,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.geminiBadgeText,
+                  geminiKey
+                    ? styles.geminiBadgeTextConnected
+                    : styles.geminiBadgeTextDisconnected,
+                ]}
+              >
+                {geminiKey ? 'Connected' : 'Setup AI'}
+              </Text>
+            </View>
+            <Ionicons
+              name="chevron-forward"
+              size={16}
+              color={Colors.textTertiary}
+            />
+          </TouchableOpacity>
+
+          <View style={styles.rowDivider} />
+
+          <TouchableOpacity
+            style={styles.settingRow}
             onPress={() => router.push('/scan-history')}
           >
             <View style={styles.settingIconContainer}>
@@ -533,166 +624,171 @@ export default function ProfileScreen() {
       {/* Edit Profile Modal */}
       <Modal visible={isEditingProfile} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.profileModalCard}>
-            <Text style={styles.modalTitle}>Edit Profile</Text>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={{ width: '100%', maxWidth: 420 }}
+          >
+            <View style={styles.profileModalCard}>
+              <Text style={styles.modalTitle}>Edit Profile</Text>
 
-            <ScrollView
-              style={{ maxHeight: 380 }}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              {/* Full Name */}
-              <View style={styles.modalFieldGroup}>
-                <Text style={styles.modalFieldLabel}>Full Name *</Text>
-                <TextInput
-                  style={[styles.modalInputBox, editErrors.name ? styles.inputErrorBorder : null]}
-                  value={nameInput}
-                  onChangeText={(t) => {
-                    setNameInput(t);
-                    if (editErrors.name) setEditErrors((p) => ({ ...p, name: undefined }));
-                  }}
-                  placeholder="Full name"
-                />
-                {editErrors.name ? <Text style={styles.errorText}>{editErrors.name}</Text> : null}
-              </View>
+              <ScrollView
+                style={{ maxHeight: 380 }}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                {/* Full Name */}
+                <View style={styles.modalFieldGroup}>
+                  <Text style={styles.modalFieldLabel}>Full Name *</Text>
+                  <TextInput
+                    style={[styles.modalInputBox, editErrors.name ? styles.inputErrorBorder : null]}
+                    value={nameInput}
+                    onChangeText={(t) => {
+                      setNameInput(t);
+                      if (editErrors.name) setEditErrors((p) => ({ ...p, name: undefined }));
+                    }}
+                    placeholder="Full name"
+                  />
+                  {editErrors.name ? <Text style={styles.errorText}>{editErrors.name}</Text> : null}
+                </View>
 
-              {/* Age */}
-              <View style={styles.modalFieldGroup}>
-                <Text style={styles.modalFieldLabel}>Age (optional)</Text>
-                <TextInput
-                  style={[styles.modalInputBox, editErrors.age ? styles.inputErrorBorder : null]}
-                  value={ageInput}
-                  onChangeText={(t) => {
-                    setAgeInput(t.replace(/[^0-9]/g, ''));
-                    if (editErrors.age) setEditErrors((p) => ({ ...p, age: undefined }));
-                  }}
-                  placeholder="e.g. 25"
-                  keyboardType="number-pad"
-                  maxLength={3}
-                />
-                {editErrors.age ? <Text style={styles.errorText}>{editErrors.age}</Text> : null}
-              </View>
+                {/* Age */}
+                <View style={styles.modalFieldGroup}>
+                  <Text style={styles.modalFieldLabel}>Age (optional)</Text>
+                  <TextInput
+                    style={[styles.modalInputBox, editErrors.age ? styles.inputErrorBorder : null]}
+                    value={ageInput}
+                    onChangeText={(t) => {
+                      setAgeInput(t.replace(/[^0-9]/g, ''));
+                      if (editErrors.age) setEditErrors((p) => ({ ...p, age: undefined }));
+                    }}
+                    placeholder="e.g. 25"
+                    keyboardType="number-pad"
+                    maxLength={3}
+                  />
+                  {editErrors.age ? <Text style={styles.errorText}>{editErrors.age}</Text> : null}
+                </View>
 
-              {/* Gender */}
-              <View style={styles.modalFieldGroup}>
-                <Text style={styles.modalFieldLabel}>Gender (optional)</Text>
-                <View style={styles.genderPillsRow}>
-                  {(['Male', 'Female', 'Other', 'Prefer not to say'] as GenderOption[]).map((g) => (
+                {/* Gender */}
+                <View style={styles.modalFieldGroup}>
+                  <Text style={styles.modalFieldLabel}>Gender (optional)</Text>
+                  <View style={styles.genderPillsRow}>
+                    {(['Male', 'Female', 'Other', 'Prefer not to say'] as GenderOption[]).map((g) => (
+                      <TouchableOpacity
+                        key={g}
+                        style={[
+                          styles.genderPill,
+                          genderInput === g && styles.genderPillSelected,
+                        ]}
+                        onPress={() => setGenderInput(genderInput === g ? null : g)}
+                      >
+                        <Text
+                          style={[
+                            styles.genderPillText,
+                            genderInput === g && styles.genderPillTextSelected,
+                          ]}
+                        >
+                          {g}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Height & Weight */}
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <View style={[styles.modalFieldGroup, { flex: 1 }]}>
+                    <Text style={styles.modalFieldLabel}>
+                      Height ({unitSystemInput === 'metric' ? 'cm' : 'ft'})
+                    </Text>
+                    <TextInput
+                      style={[styles.modalInputBox, editErrors.height ? styles.inputErrorBorder : null]}
+                      value={heightInput}
+                      onChangeText={(t) => {
+                        setHeightInput(t);
+                        if (editErrors.height) setEditErrors((p) => ({ ...p, height: undefined }));
+                      }}
+                      placeholder={unitSystemInput === 'metric' ? 'e.g. 170' : 'e.g. 5.8'}
+                      keyboardType="numeric"
+                    />
+                    {editErrors.height ? <Text style={styles.errorText}>{editErrors.height}</Text> : null}
+                  </View>
+
+                  <View style={[styles.modalFieldGroup, { flex: 1 }]}>
+                    <Text style={styles.modalFieldLabel}>
+                      Weight ({unitSystemInput === 'metric' ? 'kg' : 'lb'})
+                    </Text>
+                    <TextInput
+                      style={[styles.modalInputBox, editErrors.weight ? styles.inputErrorBorder : null]}
+                      value={weightInput}
+                      onChangeText={(t) => {
+                        setWeightInput(t);
+                        if (editErrors.weight) setEditErrors((p) => ({ ...p, weight: undefined }));
+                      }}
+                      placeholder={unitSystemInput === 'metric' ? 'e.g. 65' : 'e.g. 145'}
+                      keyboardType="numeric"
+                    />
+                    {editErrors.weight ? <Text style={styles.errorText}>{editErrors.weight}</Text> : null}
+                  </View>
+                </View>
+
+                {/* Units */}
+                <View style={styles.modalFieldGroup}>
+                  <Text style={styles.modalFieldLabel}>Units</Text>
+                  <View style={styles.unitsSegmentRow}>
                     <TouchableOpacity
-                      key={g}
                       style={[
-                        styles.genderPill,
-                        genderInput === g && styles.genderPillSelected,
+                        styles.unitSegBtn,
+                        unitSystemInput === 'metric' && styles.unitSegBtnSelected,
                       ]}
-                      onPress={() => setGenderInput(genderInput === g ? null : g)}
+                      onPress={() => toggleUnitSystem('metric')}
                     >
                       <Text
                         style={[
-                          styles.genderPillText,
-                          genderInput === g && styles.genderPillTextSelected,
+                          styles.unitSegText,
+                          unitSystemInput === 'metric' && styles.unitSegTextSelected,
                         ]}
                       >
-                        {g}
+                        Metric (cm, kg)
                       </Text>
                     </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              {/* Height & Weight */}
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <View style={[styles.modalFieldGroup, { flex: 1 }]}>
-                  <Text style={styles.modalFieldLabel}>
-                    Height ({unitSystemInput === 'metric' ? 'cm' : 'ft'})
-                  </Text>
-                  <TextInput
-                    style={[styles.modalInputBox, editErrors.height ? styles.inputErrorBorder : null]}
-                    value={heightInput}
-                    onChangeText={(t) => {
-                      setHeightInput(t);
-                      if (editErrors.height) setEditErrors((p) => ({ ...p, height: undefined }));
-                    }}
-                    placeholder={unitSystemInput === 'metric' ? 'e.g. 170' : 'e.g. 5.8'}
-                    keyboardType="numeric"
-                  />
-                  {editErrors.height ? <Text style={styles.errorText}>{editErrors.height}</Text> : null}
-                </View>
-
-                <View style={[styles.modalFieldGroup, { flex: 1 }]}>
-                  <Text style={styles.modalFieldLabel}>
-                    Weight ({unitSystemInput === 'metric' ? 'kg' : 'lb'})
-                  </Text>
-                  <TextInput
-                    style={[styles.modalInputBox, editErrors.weight ? styles.inputErrorBorder : null]}
-                    value={weightInput}
-                    onChangeText={(t) => {
-                      setWeightInput(t);
-                      if (editErrors.weight) setEditErrors((p) => ({ ...p, weight: undefined }));
-                    }}
-                    placeholder={unitSystemInput === 'metric' ? 'e.g. 65' : 'e.g. 145'}
-                    keyboardType="numeric"
-                  />
-                  {editErrors.weight ? <Text style={styles.errorText}>{editErrors.weight}</Text> : null}
-                </View>
-              </View>
-
-              {/* Units */}
-              <View style={styles.modalFieldGroup}>
-                <Text style={styles.modalFieldLabel}>Units</Text>
-                <View style={styles.unitsSegmentRow}>
-                  <TouchableOpacity
-                    style={[
-                      styles.unitSegBtn,
-                      unitSystemInput === 'metric' && styles.unitSegBtnSelected,
-                    ]}
-                    onPress={() => setUnitSystemInput('metric')}
-                  >
-                    <Text
+                    <TouchableOpacity
                       style={[
-                        styles.unitSegText,
-                        unitSystemInput === 'metric' && styles.unitSegTextSelected,
+                        styles.unitSegBtn,
+                        unitSystemInput === 'imperial' && styles.unitSegBtnSelected,
                       ]}
+                      onPress={() => toggleUnitSystem('imperial')}
                     >
-                      Metric (cm, kg)
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.unitSegBtn,
-                      unitSystemInput === 'imperial' && styles.unitSegBtnSelected,
-                    ]}
-                    onPress={() => setUnitSystemInput('imperial')}
-                  >
-                    <Text
-                      style={[
-                        styles.unitSegText,
-                        unitSystemInput === 'imperial' && styles.unitSegTextSelected,
-                      ]}
-                    >
-                      Imperial (ft, lb)
-                    </Text>
-                  </TouchableOpacity>
+                      <Text
+                        style={[
+                          styles.unitSegText,
+                          unitSystemInput === 'imperial' && styles.unitSegTextSelected,
+                        ]}
+                      >
+                        Imperial (ft, lb)
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
-            </ScrollView>
+              </ScrollView>
 
-            <View style={[styles.modalButtons, { marginTop: 16 }]}>
-              <AppButton
-                title="Cancel"
-                onPress={() => setIsEditingProfile(false)}
-                variant="outline"
-                size="md"
-                style={{ flex: 1, marginRight: 8 }}
-              />
-              <AppButton
-                title="Save"
-                onPress={handleSaveProfile}
-                variant="primary"
-                size="md"
-                style={{ flex: 1 }}
-              />
+              <View style={[styles.modalButtons, { marginTop: 16 }]}>
+                <AppButton
+                  title="Cancel"
+                  onPress={() => setIsEditingProfile(false)}
+                  variant="outline"
+                  size="md"
+                  style={{ flex: 1, marginRight: 8 }}
+                />
+                <AppButton
+                  title="Save"
+                  onPress={handleSaveProfile}
+                  variant="primary"
+                  size="md"
+                  style={{ flex: 1 }}
+                />
+              </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
 
@@ -715,6 +811,17 @@ export default function ProfileScreen() {
         destructive
         onConfirm={handleClearAllData}
         onCancel={() => setShowClearConfirm(false)}
+      />
+
+      <ConnectGeminiModal
+        visible={showGeminiModal}
+        onClose={() => setShowGeminiModal(false)}
+        onSuccess={() => {
+          loadGeminiKey();
+        }}
+        onDisconnected={() => {
+          setGeminiKey(null);
+        }}
       />
     </AppScreen>
   );
@@ -989,5 +1096,27 @@ const styles = StyleSheet.create({
   snoozePillTextActive: {
     color: Colors.primary,
     fontWeight: '700',
+  },
+  geminiBadgeStatus: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: Radius.pill,
+    marginRight: 6,
+  },
+  geminiBadgeConnected: {
+    backgroundColor: Colors.successLight,
+  },
+  geminiBadgeDisconnected: {
+    backgroundColor: Colors.primaryLight,
+  },
+  geminiBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  geminiBadgeTextConnected: {
+    color: Colors.successDark,
+  },
+  geminiBadgeTextDisconnected: {
+    color: Colors.primary,
   },
 });

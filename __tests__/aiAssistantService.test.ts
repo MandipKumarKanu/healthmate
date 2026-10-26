@@ -74,7 +74,7 @@ describe('aiAssistantService (Gemini)', () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const [url, init] = mockFetch.mock.calls[0];
-    expect(String(url)).toContain('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent');
+    expect(String(url)).toContain('https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent');
     const headers = (init as { headers: Record<string, string> }).headers;
     expect(headers['x-goog-api-key']).toBe('sk-live-key');
 
