@@ -25,6 +25,12 @@ import { useReminderStore } from '../../store/reminderStore';
 import { notificationService } from '../../services/notificationService';
 import { Medicine, RecurrenceType, ReminderTime } from '../../types';
 
+function formatTime(time: string): string {
+  const parts = time.split(':').map(Number);
+  if (parts.length !== 2 || !Number.isFinite(parts[0]) || !Number.isFinite(parts[1])) return time;
+  return (parts[0] % 12 || 12) + ':' + String(parts[1]).padStart(2, '0') + (parts[0] >= 12 ? ' PM' : ' AM');
+}
+
 export default function SetReminderScreen() {
   const router = useRouter();
   const { medicineId, date } = useLocalSearchParams<{ medicineId?: string; date?: string }>();
@@ -39,6 +45,7 @@ export default function SetReminderScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [amount, setAmount] = useState('1 tablet');
   const [medicineSearch, setMedicineSearch] = useState('');
+  const [editingTimes, setEditingTimes] = useState(true);
 
   useEffect(() => {
     const list = medicineRepository.getAll();
@@ -89,7 +96,7 @@ export default function SetReminderScreen() {
       return;
     }
 
-    const invalidTime = times.find((t) => !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(t.time));
+    const invalidTime = times.find((t) => !/^([01]\d|2[0-3]):[0-5]\d$/.test(t.time));
     if (invalidTime) {
       Alert.alert('Invalid time', 'Enter each dose time in 24-hour HH:mm format, for example 08:00 or 18:30.');
       return;
@@ -117,7 +124,7 @@ export default function SetReminderScreen() {
       id: scheduleId,
       medicineId: selectedMed.id,
       recurrence,
-      startDate: existingSchedule?.startDate ?? (date && /^\\d{4}-\\d{2}-\\d{2}$/.test(date) ? date : getTodayDateString()),
+      startDate: existingSchedule?.startDate ?? (date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : getTodayDateString()),
       endDate: existingSchedule?.endDate,
       times,
       enabled: true,
@@ -230,7 +237,7 @@ export default function SetReminderScreen() {
         </View>
 
         {/* Reminder Times Section */}
-        <SectionHeader title="Reminder Times" />
+        <View style={styles.reminderHeading}><SectionHeader title="Reminder Times" /><TouchableOpacity onPress={() => setEditingTimes((value) => !value)} accessibilityRole="button"><Text style={styles.editAction}>{editingTimes ? "Done" : "Edit"}</Text></TouchableOpacity></View>
         <AppCard style={styles.card}>
           {times.map((t) => (
             <View key={t.id} style={styles.timeRow}>
@@ -247,16 +254,8 @@ export default function SetReminderScreen() {
               </View>
 
               <View style={styles.timeActions}>
-                <TextInput
-                  style={styles.timePill}
-                  value={t.time}
-                  onChangeText={(value) => setTimes(times.map((item) => item.id === t.id ? { ...item, time: value } : item))}
-                  placeholder="HH:mm"
-                  keyboardType="numbers-and-punctuation"
-                  maxLength={5}
-                  accessibilityLabel={`Time for ${t.label || 'dose'}`}
-                />
-                <TouchableOpacity
+                {editingTimes ? <TextInput style={styles.timePill} value={t.time} onChangeText={(value) => setTimes(times.map((item) => item.id === t.id ? { ...item, time: value } : item))} placeholder="HH:mm" keyboardType="numbers-and-punctuation" maxLength={5} accessibilityLabel={'Time for ' + (t.label || 'dose')} /> : <Text style={styles.timePillText}>{formatTime(t.time)}</Text>}
+                {editingTimes && <TouchableOpacity
                 style={styles.deleteTimeButton}
                 onPress={() => removeTime(t.id)}
               >
@@ -265,14 +264,15 @@ export default function SetReminderScreen() {
                   size={18}
                   color={Colors.error}
                 />
-                </TouchableOpacity>
+                </TouchableOpacity>}
               </View>
             </View>
           ))}
 
           {/* Preset time buttons */}
-          <Text style={styles.presetsLabel}>Add another dose time</Text>
-          <View style={styles.presetRow}>
+          {editingTimes && <Text style={styles.presetsLabel}>Add another dose time</Text>}
+          {editingTimes && <TouchableOpacity style={styles.addAnotherTime} onPress={() => addTime(['08:00','14:00','18:00','22:00'].find((preset) => !times.some((t) => t.time === preset)) ?? '08:00')}><Ionicons name="add" size={22} color={Colors.primary} /><Text style={styles.addAnotherText}>Add Another Time</Text></TouchableOpacity>}
+          {editingTimes && <View style={styles.presetRow}>
             {['08:00', '14:00', '18:00', '22:00'].map((preset) => (
               <TouchableOpacity
                 key={preset}
@@ -282,7 +282,7 @@ export default function SetReminderScreen() {
                 <Text style={styles.presetChipText}>+ {preset < '11:00' ? 'Morning' : preset < '17:00' ? 'Afternoon' : preset < '21:00' ? 'Evening' : 'Night'} · {preset}</Text>
               </TouchableOpacity>
             ))}
-          </View>
+          </View>}
         </AppCard>
 
         {/* Dosage Amount */}
@@ -442,6 +442,11 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 2,
   },
+  reminderHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  editAction: { color: Colors.primary, fontSize: 16, fontWeight: '600' },
+  addAnotherTime: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#E8E7ED', borderRadius: Radius.pill, paddingVertical: 16, marginTop: 14, marginBottom: 8 },
+  addAnotherText: { color: Colors.primary, fontSize: 16, fontWeight: '600', marginLeft: 8 },
+  timePillText: { backgroundColor: '#F0EFF3', borderRadius: Radius.pill, paddingHorizontal: 12, paddingVertical: 8, minWidth: 96, textAlign: 'center', fontSize: 16, color: Colors.textPrimary, fontWeight: '600' },
   timeActions: {
     flexDirection: 'row',
     alignItems: 'center',
