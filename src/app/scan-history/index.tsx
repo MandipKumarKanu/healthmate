@@ -4,10 +4,10 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Alert,
   ScrollView,
   Modal,
 } from 'react-native';
+import { AppAlert as Alert } from "../../services/appAlert";
 import { useRouter } from 'expo-router';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
