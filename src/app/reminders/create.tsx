@@ -713,8 +713,9 @@ export default function SetReminderScreen() {
       {/* Medicine Selection Modal */}
       <Modal
         visible={isMedModalVisible}
-        animationType="slide"
+        animationType="fade"
         transparent
+        statusBarTranslucent
         onRequestClose={() => setIsMedModalVisible(false)}
       >
         <View style={styles.medModalOverlay}>
@@ -1336,17 +1337,27 @@ const styles = StyleSheet.create({
   },
   medModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.60)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.lg,
   },
   medModalContainer: {
+    width: '100%',
+    maxWidth: 420,
+    maxHeight: '85%',
     backgroundColor: Colors.cardBackground,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '80%',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 34,
+    borderRadius: Radius.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.xl,
+    paddingBottom: Spacing.lg,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 12,
   },
   medModalHeader: {
     flexDirection: 'row',
