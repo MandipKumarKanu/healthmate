@@ -595,6 +595,7 @@ export default function OnboardingProfileScreen() {
         visible={genderModalVisible}
         transparent
         animationType="fade"
+        statusBarTranslucent
         onRequestClose={() => setGenderModalVisible(false)}
       >
         <TouchableOpacity
@@ -875,19 +876,24 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(15, 23, 42, 0.45)",
+    backgroundColor: "rgba(0, 0, 0, 0.60)",
     justifyContent: "center",
-    paddingHorizontal: 28,
+    alignItems: "center",
+    paddingHorizontal: Spacing.lg,
   },
   modalCard: {
+    width: "100%",
+    maxWidth: 420,
     backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 20,
+    borderRadius: Radius.card,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    padding: Spacing.xl,
     shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 12,
   },
   modalHeader: {
     flexDirection: "row",
