@@ -120,7 +120,7 @@ export default function SetReminderScreen() {
     const scheduleId = existingSchedule?.id ?? `sched_${selectedMed.id}`;
     const now = new Date().toISOString();
 
-    await saveSchedule({
+    const alarmsScheduled = await saveSchedule({
       id: scheduleId,
       medicineId: selectedMed.id,
       recurrence,
@@ -133,9 +133,22 @@ export default function SetReminderScreen() {
       updatedAt: now,
     });
 
-    Alert.alert('Success', 'Medication schedule saved successfully!', [
-      { text: 'OK', onPress: () => router.back() },
-    ]);
+    if (!alarmsScheduled) {
+      Alert.alert(
+        'Schedule saved without alarms',
+        'Your medication schedule was saved, but at least one alarm could not be scheduled. Allow notifications and “Alarms & reminders” access in Android Settings, then edit and save this schedule again.',
+        [{ text: 'OK', onPress: () => router.back() }]
+      );
+      return;
+    }
+
+    Alert.alert(
+      'Success',
+      canNotify
+        ? 'Medication schedule saved and alarm reminders scheduled.'
+        : 'Medication schedule saved. Alarm reminders are OFF until you grant notification and exact-alarm access.',
+      [{ text: 'OK', onPress: () => router.back() }]
+    );
   };
 
   const recurrenceOptions: Array<{ type: RecurrenceType; label: string }> = [
