@@ -19,6 +19,8 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
   private scheduleHistory = new Map<string, Record<string, unknown>>();
   private adherenceLogs = new Map<string, Record<string, unknown>>();
   private scanHistory = new Map<string, Record<string, unknown>>();
+  private aiConversations = new Map<string, Record<string, unknown>>();
+  private aiMessages = new Map<string, Record<string, unknown>>();
 
   execSync(sql: string): void {
     if (sql.includes("DROP TABLE")) {
@@ -29,6 +31,8 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       this.scheduleHistory.clear();
       this.adherenceLogs.clear();
       this.scanHistory.clear();
+      this.aiConversations.clear();
+      this.aiMessages.clear();
     }
   }
 
@@ -297,6 +301,64 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return { changes: existed ? 1 : 0, lastInsertRowId: 0 };
     }
 
+    if (clean.startsWith("INSERT INTO AI_CONVERSATIONS")) {
+      const [id, title, createdAt] = params;
+      this.aiConversations.set(String(id), {
+        id: String(id),
+        title: String(title),
+        created_at: String(createdAt),
+      });
+      return { changes: 1, lastInsertRowId: 1 };
+    }
+
+    if (clean.startsWith("INSERT INTO AI_MESSAGES")) {
+      const [id, conversationId, role, content, timestamp] = params;
+      this.aiMessages.set(String(id), {
+        id: String(id),
+        conversation_id: String(conversationId),
+        role: String(role),
+        content: String(content),
+        timestamp: String(timestamp),
+      });
+      return { changes: 1, lastInsertRowId: 1 };
+    }
+
+    if (clean.startsWith("DELETE FROM AI_MESSAGES WHERE CONVERSATION_ID")) {
+      const [conversationId] = params;
+      let changes = 0;
+      for (const [id, msg] of this.aiMessages.entries()) {
+        if (msg.conversation_id === String(conversationId)) {
+          this.aiMessages.delete(id);
+          changes++;
+        }
+      }
+      return { changes, lastInsertRowId: 0 };
+    }
+
+    if (clean.startsWith("DELETE FROM AI_CONVERSATIONS WHERE ID")) {
+      const [id] = params;
+      const existed = this.aiConversations.delete(String(id));
+      return { changes: existed ? 1 : 0, lastInsertRowId: 0 };
+    }
+
+    if (
+      clean === "DELETE FROM AI_MESSAGES;" ||
+      clean === "DELETE FROM AI_MESSAGES"
+    ) {
+      const changes = this.aiMessages.size;
+      this.aiMessages.clear();
+      return { changes, lastInsertRowId: 0 };
+    }
+
+    if (
+      clean === "DELETE FROM AI_CONVERSATIONS;" ||
+      clean === "DELETE FROM AI_CONVERSATIONS"
+    ) {
+      const changes = this.aiConversations.size;
+      this.aiConversations.clear();
+      return { changes, lastInsertRowId: 0 };
+    }
+
     return { changes: 0, lastInsertRowId: 0 };
   }
 
@@ -380,6 +442,31 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       }
       return Array.from(this.scanHistory.values()).sort((a, b) =>
         String(b.scanned_at).localeCompare(String(a.scanned_at)),
+      ) as unknown as T[];
+    }
+
+    if (clean.includes("FROM AI_CONVERSATIONS")) {
+      if (clean.includes("WHERE ID =")) {
+        const [id] = params;
+        const item = this.aiConversations.get(String(id));
+        return item ? ([item] as unknown as T[]) : [];
+      }
+      return Array.from(this.aiConversations.values()).sort((a, b) =>
+        String(b.created_at).localeCompare(String(a.created_at)),
+      ) as unknown as T[];
+    }
+
+    if (clean.includes("FROM AI_MESSAGES")) {
+      if (clean.includes("WHERE CONVERSATION_ID =")) {
+        const [convId] = params;
+        return Array.from(this.aiMessages.values())
+          .filter((m) => m.conversation_id === String(convId))
+          .sort((a, b) =>
+            String(a.timestamp).localeCompare(String(b.timestamp)),
+          ) as unknown as T[];
+      }
+      return Array.from(this.aiMessages.values()).sort((a, b) =>
+        String(a.timestamp).localeCompare(String(b.timestamp)),
       ) as unknown as T[];
     }
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   StyleSheet,
   View,
@@ -15,6 +15,7 @@ import { Colors } from '../../theme/colors';
 import { Radius, Spacing, Typography } from '../../theme/tokens';
 import { AppScreen } from '../../components/ui/AppScreen';
 import { AppHeader } from '../../components/ui/AppHeader';
+import { aiRepository } from '../../database/repositories/aiRepository';
 import { AIMessage } from '../../types';
 
 const INITIAL_SUGGESTIONS = [
@@ -38,12 +39,30 @@ export default function AIAssistantScreen() {
   const router = useRouter();
   const { query } = useLocalSearchParams<{ query?: string }>();
 
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<AIMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
 
-  const sendMessage = (text: string) => {
+  // Load latest conversation from SQLite on mount
+  useEffect(() => {
+    const latest = aiRepository.getLatestConversation();
+    if (latest && latest.messages.length > 0) {
+      setConversationId(latest.id);
+      setMessages(latest.messages);
+    }
+  }, []);
+
+  const sendMessage = useCallback((text: string) => {
     if (!text.trim()) return;
+
+    let activeConvId = conversationId;
+    if (!activeConvId) {
+      const title = text.trim().slice(0, 36) + (text.length > 36 ? '...' : '');
+      const created = aiRepository.createConversation(title);
+      activeConvId = created.id;
+      setConversationId(created.id);
+    }
 
     const userMsg: AIMessage = {
       id: `msg_${Date.now()}`,
@@ -52,6 +71,8 @@ export default function AIAssistantScreen() {
       timestamp: new Date().toISOString(),
     };
 
+    // Persist user message to SQLite
+    aiRepository.addMessage(activeConvId, userMsg);
     setMessages((prev) => [...prev, userMsg]);
     setInputText('');
     setIsTyping(true);
@@ -83,18 +104,24 @@ export default function AIAssistantScreen() {
         timestamp: new Date().toISOString(),
       };
 
+      // Persist assistant message to SQLite
+      if (activeConvId) {
+        aiRepository.addMessage(activeConvId, assistantMsg);
+      }
       setMessages((prev) => [...prev, assistantMsg]);
       setIsTyping(false);
     }, 700);
-  };
+  }, [conversationId]);
 
   useEffect(() => {
     if (query) {
       sendMessage(query);
     }
-  }, [query]);
+  }, [query, sendMessage]);
 
   const handleNewChat = () => {
+    const newConv = aiRepository.createConversation('Medication Q&A');
+    setConversationId(newConv.id);
     setMessages([]);
   };
 

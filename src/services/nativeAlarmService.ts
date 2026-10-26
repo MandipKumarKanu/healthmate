@@ -22,6 +22,12 @@ interface NativeAlarmModuleInterface {
   cancelAllAlarms(): Promise<boolean>;
   canScheduleExactAlarms(): Promise<boolean>;
   dismissKeyguard(): Promise<boolean>;
+  isIgnoringBatteryOptimizations(): Promise<boolean>;
+  requestIgnoreBatteryOptimizations(): Promise<boolean>;
+  openExactAlarmSettings(): Promise<boolean>;
+  openAppBatterySettings(): Promise<boolean>;
+  openOemAutoStartSettings(): Promise<boolean>;
+  getDeviceManufacturer(): Promise<string>;
 }
 
 const AlarmModule: NativeAlarmModuleInterface | undefined =
@@ -127,6 +133,78 @@ export const nativeAlarmService = {
     } catch (e) {
       console.warn("nativeAlarmService.dismissKeyguard failed:", e);
       return false;
+    }
+  },
+
+  async isIgnoringBatteryOptimizations(): Promise<boolean> {
+    if (Platform.OS !== "android") return true;
+    if (!AlarmModule?.isIgnoringBatteryOptimizations) return true;
+    try {
+      return await AlarmModule.isIgnoringBatteryOptimizations();
+    } catch (e) {
+      console.warn(
+        "nativeAlarmService.isIgnoringBatteryOptimizations failed:",
+        e,
+      );
+      return false;
+    }
+  },
+
+  async requestIgnoreBatteryOptimizations(): Promise<boolean> {
+    if (Platform.OS !== "android") return true;
+    if (!AlarmModule?.requestIgnoreBatteryOptimizations) return false;
+    try {
+      return await AlarmModule.requestIgnoreBatteryOptimizations();
+    } catch (e) {
+      console.warn(
+        "nativeAlarmService.requestIgnoreBatteryOptimizations failed:",
+        e,
+      );
+      return false;
+    }
+  },
+
+  async openExactAlarmSettings(): Promise<boolean> {
+    if (Platform.OS !== "android") return true;
+    if (!AlarmModule?.openExactAlarmSettings) return false;
+    try {
+      return await AlarmModule.openExactAlarmSettings();
+    } catch (e) {
+      console.warn("nativeAlarmService.openExactAlarmSettings failed:", e);
+      return false;
+    }
+  },
+
+  async openAppBatterySettings(): Promise<boolean> {
+    if (Platform.OS !== "android") return true;
+    if (!AlarmModule?.openAppBatterySettings) return false;
+    try {
+      return await AlarmModule.openAppBatterySettings();
+    } catch (e) {
+      console.warn("nativeAlarmService.openAppBatterySettings failed:", e);
+      return false;
+    }
+  },
+
+  async openOemAutoStartSettings(): Promise<boolean> {
+    if (Platform.OS !== "android") return true;
+    if (!AlarmModule?.openOemAutoStartSettings) return false;
+    try {
+      return await AlarmModule.openOemAutoStartSettings();
+    } catch (e) {
+      console.warn("nativeAlarmService.openOemAutoStartSettings failed:", e);
+      return false;
+    }
+  },
+
+  async getDeviceManufacturer(): Promise<string> {
+    if (Platform.OS !== "android") return "generic";
+    if (!AlarmModule?.getDeviceManufacturer) return "unknown";
+    try {
+      return await AlarmModule.getDeviceManufacturer();
+    } catch (e) {
+      console.warn("nativeAlarmService.getDeviceManufacturer failed:", e);
+      return "unknown";
     }
   },
 };

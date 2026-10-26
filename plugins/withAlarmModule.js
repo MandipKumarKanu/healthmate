@@ -20,6 +20,7 @@ function withAlarmPermissions(config) {
       "android.permission.SCHEDULE_EXACT_ALARM",
       "android.permission.RECEIVE_BOOT_COMPLETED",
       "android.permission.VIBRATE",
+      "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
     ];
 
     androidManifest["uses-permission"] =

@@ -1,10 +1,12 @@
 import React, { useEffect } from "react";
 import { StyleSheet, View, Text, Alert } from "react-native";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
 import { Spacing, Radius } from "../../theme/tokens";
 import { AppScreen } from "../../components/ui/AppScreen";
 import { AppHeader } from "../../components/ui/AppHeader";
+import { AppButton } from "../../components/ui/AppButton";
 import { CalendarGrid } from "../../components/ui/CalendarGrid";
 import { DayAdherenceSummaryCard } from "../../components/ui/DayAdherenceSummaryCard";
 import { SectionHeader } from "../../components/ui/SectionHeader";
@@ -74,10 +76,6 @@ export default function CalendarScreen() {
           schedules={scheduleRepository.getAll()}
           onSelectDate={(date) => {
             setSelectedDate(date);
-            const scheduledForDate = adherenceRepository.getDosesForDate(date);
-            if (scheduledForDate.length === 0) {
-              router.push({ pathname: "/reminders/create", params: { date } });
-            }
           }}
         />
 
@@ -110,12 +108,27 @@ export default function CalendarScreen() {
 
         {doses.length === 0 ? (
           <View style={styles.emptyContainer}>
+            <View style={styles.emptyIconCircle}>
+              <Ionicons name="calendar-outline" size={30} color={Colors.primary} />
+            </View>
             <Text style={styles.emptyTitle}>
-              No reminders scheduled for this date
+              No medication scheduled for this date
             </Text>
             <Text style={styles.emptySubtitle}>
-              Tap + Add to set up a reminder schedule for your medicine.
+              Tap the button below to set up a medication reminder for this date.
             </Text>
+            <AppButton
+              title="Schedule Medication"
+              variant="outline"
+              size="md"
+              style={styles.emptyScheduleButton}
+              onPress={() =>
+                router.push({
+                  pathname: "/reminders/create",
+                  params: { date: selectedDate },
+                })
+              }
+            />
           </View>
         ) : (
           /* Helper Note */
@@ -171,5 +184,18 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: "center",
     lineHeight: 18,
+  },
+  emptyIconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: Colors.primaryLight,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  emptyScheduleButton: {
+    marginTop: 14,
+    minWidth: 180,
   },
 });

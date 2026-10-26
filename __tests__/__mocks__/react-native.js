@@ -13,6 +13,12 @@ const NativeModules = {
     cancelAllAlarms: jest.fn().mockResolvedValue(true),
     canScheduleExactAlarms: jest.fn().mockResolvedValue(true),
     dismissKeyguard: jest.fn().mockResolvedValue(true),
+    isIgnoringBatteryOptimizations: jest.fn().mockResolvedValue(true),
+    requestIgnoreBatteryOptimizations: jest.fn().mockResolvedValue(true),
+    openExactAlarmSettings: jest.fn().mockResolvedValue(true),
+    openAppBatterySettings: jest.fn().mockResolvedValue(true),
+    getDeviceManufacturer: jest.fn().mockResolvedValue("samsung"),
+    openOemAutoStartSettings: jest.fn().mockResolvedValue(true),
   },
 };
 

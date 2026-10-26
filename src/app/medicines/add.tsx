@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
   View,
@@ -7,21 +7,23 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
-} from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Colors } from '../../theme/colors';
-import { Radius, Spacing, Typography } from '../../theme/tokens';
-import { AppScreen } from '../../components/ui/AppScreen';
-import { AppHeader } from '../../components/ui/AppHeader';
-import { AppCard } from '../../components/ui/AppCard';
-import { AppButton } from '../../components/ui/AppButton';
-import { SectionHeader } from '../../components/ui/SectionHeader';
-import { useMedicineStore } from '../../store/medicineStore';
-import { DosageForm, Medicine } from '../../types';
+} from "react-native";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import { Colors } from "../../theme/colors";
+import { Radius, Spacing, Typography } from "../../theme/tokens";
+import { AppScreen } from "../../components/ui/AppScreen";
+import { AppHeader } from "../../components/ui/AppHeader";
+import { AppCard } from "../../components/ui/AppCard";
+import { AppButton } from "../../components/ui/AppButton";
+import { SectionHeader } from "../../components/ui/SectionHeader";
+import { useMedicineStore } from "../../store/medicineStore";
+import { medicineRepository } from "../../database/repositories/medicineRepository";
+import { DosageForm, Medicine } from "../../types";
 
 export default function AddMedicineScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
+    editId?: string;
     name?: string;
     strength?: string;
     form?: string;
@@ -30,61 +32,102 @@ export default function AddMedicineScreen() {
     manufacturer?: string;
   }>();
 
-  const { addMedicine } = useMedicineStore();
+  const isEditing = Boolean(params.editId);
+  const { addMedicine, updateMedicine } = useMedicineStore();
 
-  const [name, setName] = useState(params.name || '');
-  const [strength, setStrength] = useState(params.strength || '');
+  const [name, setName] = useState(params.name || "");
+  const [strength, setStrength] = useState(params.strength || "");
   const [dosageForm, setDosageForm] = useState<DosageForm>(
-    (params.form as DosageForm) || 'tablet'
+    (params.form as DosageForm) || "tablet",
   );
-  const [category, setCategory] = useState('Generic');
-  const [expiryDate, setExpiryDate] = useState(params.expiry || '');
-  const [batchNumber, setBatchNumber] = useState(params.batch || '');
-  const [manufacturer, setManufacturer] = useState(params.manufacturer || '');
-  const [instructions, setInstructions] = useState('');
+  const [category, setCategory] = useState("Generic");
+  const [expiryDate, setExpiryDate] = useState(params.expiry || "");
+  const [batchNumber, setBatchNumber] = useState(params.batch || "");
+  const [manufacturer, setManufacturer] = useState(params.manufacturer || "");
+  const [instructions, setInstructions] = useState("");
+
+  useEffect(() => {
+    if (params.editId) {
+      const existing = medicineRepository.getById(params.editId);
+      if (existing) {
+        setName(existing.name);
+        setStrength(existing.strength);
+        setDosageForm(existing.dosageForm);
+        setCategory(existing.category || "Generic");
+        setExpiryDate(existing.packageDetails?.expiryDate || "");
+        setBatchNumber(existing.packageDetails?.batchNumber || "");
+        setManufacturer(existing.packageDetails?.manufacturer || "");
+        setInstructions(existing.packageDetails?.packageDetailsText || "");
+      }
+    }
+  }, [params.editId]);
 
   const forms: DosageForm[] = [
-    'tablet',
-    'capsule',
-    'softgel',
-    'eye_drop',
-    'syrup',
-    'cream',
+    "tablet",
+    "capsule",
+    "softgel",
+    "eye_drop",
+    "syrup",
+    "cream",
   ];
 
   const handleSave = () => {
-    if (!name.trim()) {
-      Alert.alert('Validation Error', 'Please enter a medicine name.');
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      Alert.alert("Validation Error", "Please enter a medicine name.");
       return;
     }
 
-    const newMed = addMedicine({
-      id: `med_${Date.now()}`,
-      name: name.trim(),
-      strength: strength.trim() || 'Standard dose',
-      dosageForm,
-      category,
-      packageDetails: {
-        manufacturer: manufacturer.trim() || undefined,
-        expiryDate: expiryDate.trim() || undefined,
-        batchNumber: batchNumber.trim() || undefined,
-        packageDetailsText: instructions.trim() || undefined,
-        originalPackageChecked: false,
-      },
-      informationSource: 'User-entered medication record.',
-      isSample: false,
-    });
+    if (isEditing && params.editId) {
+      updateMedicine(params.editId, {
+        name: trimmedName,
+        strength: strength.trim() || "Standard dose",
+        dosageForm,
+        category,
+        packageDetails: {
+          manufacturer: manufacturer.trim() || undefined,
+          expiryDate: expiryDate.trim() || undefined,
+          batchNumber: batchNumber.trim() || undefined,
+          packageDetailsText: instructions.trim() || undefined,
+        },
+      });
 
-    Alert.alert('Success', `${newMed.name} added to your cabinet!`, [
-      { text: 'OK', onPress: () => router.back() },
-    ]);
+      Alert.alert("Success", `${trimmedName} updated successfully!`, [
+        { text: "OK", onPress: () => router.back() },
+      ]);
+    } else {
+      const newMed = addMedicine({
+        id: `med_${Date.now()}`,
+        name: trimmedName,
+        strength: strength.trim() || "Standard dose",
+        dosageForm,
+        category,
+        packageDetails: {
+          manufacturer: manufacturer.trim() || undefined,
+          expiryDate: expiryDate.trim() || undefined,
+          batchNumber: batchNumber.trim() || undefined,
+          packageDetailsText: instructions.trim() || undefined,
+          originalPackageChecked: false,
+        },
+        informationSource: "User-entered medication record.",
+        isSample: false,
+      });
+
+      Alert.alert("Success", `${newMed.name} added to your cabinet!`, [
+        { text: "OK", onPress: () => router.back() },
+      ]);
+    }
   };
 
   return (
     <AppScreen scrollable contentContainerStyle={styles.scrollContent}>
       <AppHeader
-        title="Add Medicine"
-        subtitle="Record a new medication in your cabinet"
+        title={isEditing ? "Edit Medicine" : "Add Medicine"}
+        subtitle={
+          isEditing
+            ? "Update medication details in your cabinet"
+            : "Record a new medication in your cabinet"
+        }
         brandText="HealthMate AI"
         onBackPress={() => router.back()}
       />
@@ -136,7 +179,7 @@ export default function AddMedicineScreen() {
                   dosageForm === f && styles.formChipTextActive,
                 ]}
               >
-                {f.replace('_', ' ').toUpperCase()}
+                {f.replace("_", " ").toUpperCase()}
               </Text>
             </TouchableOpacity>
           ))}
@@ -193,7 +236,7 @@ export default function AddMedicineScreen() {
         {/* Save Button */}
         <View style={styles.saveContainer}>
           <AppButton
-            title="Save to Medicine Cabinet"
+            title={isEditing ? "Save Changes" : "Save to Medicine Cabinet"}
             onPress={handleSave}
             variant="primary"
             size="lg"
@@ -217,7 +260,7 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.textSecondary,
     marginBottom: 4,
   },
@@ -232,7 +275,7 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
   formScroll: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginBottom: Spacing.lg,
   },
   formChip: {
@@ -250,7 +293,7 @@ const styles = StyleSheet.create({
   },
   formChipText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.textPrimary,
   },
   formChipTextActive: {

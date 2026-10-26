@@ -24,10 +24,11 @@ import { useAppStore } from '../../store/appStore';
 import { notificationService } from '../../services/notificationService';
 import Constants from 'expo-constants';
 import { GenderOption, UnitSystem } from '../../types';
+import { AlarmReliabilityCard } from '../../components/profile/AlarmReliabilityCard';
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const appVersion = Constants.expoConfig?.version ?? '1.3.1';
+  const appVersion = Constants.expoConfig?.version ?? '1.3.2';
   const { profile, preferences, updateProfile, togglePreference, resetAllData, clearAllData } =
     useAppStore();
 
@@ -377,6 +378,10 @@ export default function ProfileScreen() {
             />
           </TouchableOpacity>
         </AppCard>
+
+        {/* Section: Alarm Reliability & Battery */}
+        <SectionHeader title="Alarm Reliability & Battery" />
+        <AlarmReliabilityCard />
 
         {/* Section: Medical Disclaimer & About */}
         <SectionHeader title="Medical Disclaimer & About" />
