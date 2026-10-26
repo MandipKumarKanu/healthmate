@@ -53,7 +53,8 @@ export const notificationService = {
     scheduleId: string,
     medicineName: string,
     amount: string,
-    time: string // 'HH:mm'
+    time: string, // 'HH:mm'
+    doseLabel?: string
   ): Promise<string | null> {
     try {
       const [hourStr, minStr] = time.split(':');
@@ -63,7 +64,7 @@ export const notificationService = {
       const identifier = await Notifications.scheduleNotificationAsync({
         content: {
           title: `Time to take ${medicineName}`,
-          body: `Scheduled dose: ${amount}`,
+          body: `${doseLabel ? `${doseLabel} · ` : ''}Scheduled dose: ${amount}`,
           data: { scheduleId, time, medicineName },
           sound: true,
         },
