@@ -53,7 +53,8 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
           schedule.id,
           medicineName,
           t.amount,
-          t.time
+          t.time,
+          t.label
         );
       }
     }
