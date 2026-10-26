@@ -40,9 +40,9 @@ class ImageEnhancerModule : Module() {
 
   private fun enhance(uri: String): Map<String, Any> {
     val sourceFile = resolveFile(uri)
-      ?: throw CodedException("ERR_IMAGE_NOT_FOUND", "Cannot resolve a local file path from: $uri")
+      ?: throw CodedException(code = "ERR_IMAGE_NOT_FOUND", message = "Cannot resolve a local file path from: $uri", cause = null)
     val bitmap = decodeBitmap(sourceFile)
-      ?: throw CodedException("ERR_IMAGE_DECODE_FAILED", "Image could not be decoded: $sourceFile")
+      ?: throw CodedException(code = "ERR_IMAGE_DECODE_FAILED", message = "Image could not be decoded: $sourceFile", cause = null)
 
     try {
       applyGrayscaleAndContrast(bitmap)
@@ -172,7 +172,7 @@ class ImageEnhancerModule : Module() {
 
   private fun writeJpeg(bitmap: Bitmap): File {
     val cacheDirectory = appContext.cacheDirectory
-      ?: throw CodedException("ERR_NO_CONTEXT", "Cache directory is unavailable for image enhancement.")
+      ?: throw CodedException(code = "ERR_NO_CONTEXT", message = "Cache directory is unavailable for image enhancement.", cause = null)
 
     val outputDirectory = File(cacheDirectory, "ocr-enhanced").apply {
       if (!exists()) mkdirs()
@@ -183,7 +183,7 @@ class ImageEnhancerModule : Module() {
     val outputFile = File(outputDirectory, "enhanced-${System.currentTimeMillis()}.jpg")
     FileOutputStream(outputFile).use { stream ->
       if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 92, stream)) {
-        throw CodedException("ERR_IMAGE_ENCODE_FAILED", "JPEG encoding failed for the enhanced image.")
+        throw CodedException(code = "ERR_IMAGE_ENCODE_FAILED", message = "JPEG encoding failed for the enhanced image.", cause = null)
       }
     }
     return outputFile

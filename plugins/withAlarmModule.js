@@ -157,6 +157,7 @@ function withAlarmNativeFiles(config) {
         "AlarmReceiver.kt",
         "AlarmModule.kt",
         "AlarmPackage.kt",
+        "AlarmArming.kt",
       ];
       for (const file of ktFiles) {
         const srcFile = path.join(srcDir, file);

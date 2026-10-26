@@ -14,6 +14,7 @@ import { MedicalDisclaimer } from "../../components/ui/MedicalDisclaimer";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { medicineRepository } from "../../database/repositories/medicineRepository";
 import { scheduleRepository } from "../../database/repositories/scheduleRepository";
+import { isLowStock } from "../../services/refillService";
 import { useMedicineStore } from "../../store/medicineStore";
 
 export default function MedicineDetailsScreen() {
@@ -219,6 +220,41 @@ export default function MedicineDetailsScreen() {
           </View>
 
           <View style={styles.rowDivider} />
+
+          {medicine.currentInventory != null ? (
+            <>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>
+                  Stock remaining{medicine.unitDosage ? ` (${medicine.unitDosage})` : ""}
+                </Text>
+                <Text
+                  style={[
+                    styles.infoValue,
+                    isLowStock(medicine) && styles.lowStockValue,
+                  ]}
+                >
+                  {medicine.currentInventory}
+                  {medicine.refillThreshold != null
+                    ? ` · refill at ${medicine.refillThreshold}`
+                    : ""}
+                </Text>
+              </View>
+              {isLowStock(medicine) ? (
+                <View style={styles.stockWarningRow}>
+                  <Ionicons
+                    name="alert-circle"
+                    size={16}
+                    color={Colors.warningDark}
+                  />
+                  <Text style={styles.stockWarningText}>
+                    Stock is at or below the refill threshold. Enter the correct
+                    count after each refill in the Edit screen.
+                  </Text>
+                </View>
+              ) : null}
+              <View style={styles.rowDivider} />
+            </>
+          ) : null}
 
           <TouchableOpacity
             style={styles.originalPackageRow}
@@ -608,6 +644,26 @@ const styles = StyleSheet.create({
   rowDivider: {
     height: 1,
     backgroundColor: Colors.borderLight,
+  },
+  lowStockValue: {
+    color: Colors.error,
+    fontWeight: '700',
+  },
+  stockWarningRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: Colors.warningLight,
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 8,
+    gap: 6,
+  },
+  stockWarningText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
+    color: Colors.warningDark,
+    maxWidth: '92%',
   },
   originalPackageRow: {
     flexDirection: "row",

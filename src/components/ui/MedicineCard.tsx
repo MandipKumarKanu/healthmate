@@ -4,6 +4,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { Radius, Spacing, Typography } from '../../theme/tokens';
 import { Medicine, ReminderSchedule } from '../../types';
+import { isLowStock } from '../../services/refillService';
 import { MedicineIcon } from './MedicineIcon';
 import { StatusBadge } from './StatusBadge';
 
@@ -73,6 +74,8 @@ export function MedicineCard({
 
         {isExpired ? (
           <StatusBadge status="expired" />
+        ) : isLowStock(medicine) ? (
+          <StatusBadge status="low-stock" />
         ) : schedule?.enabled ? (
           <StatusBadge status="reminders-on" />
         ) : null}

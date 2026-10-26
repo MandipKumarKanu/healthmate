@@ -13,8 +13,11 @@ class AlarmReceiver : BroadcastReceiver() {
             action == Intent.ACTION_MY_PACKAGE_REPLACED ||
             action == "android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED"
         ) {
-            // Android boot or permission state change:
-            // Alarm reconciliation will run when the app becomes active, restoring all alarms.
+            // Android wipes all AlarmManager alarms on reboot. Re-arm every
+            // stored dose alarm natively here instead of waiting for the app to
+            // next become active (the old behavior left doses silent until the
+            // user opened the app).
+            AlarmArming.reArmAll(context)
             return
         }
 
@@ -46,5 +49,9 @@ class AlarmReceiver : BroadcastReceiver() {
         } catch (e: Exception) {
             e.printStackTrace()
         }
+
+        // Advance the persisted chain: drop the fired trigger, arm the next
+        // one so recurring doses keep ringing even if the app is never opened.
+        AlarmArming.fireAndAdvance(context, scheduleId, time)
     }
 }

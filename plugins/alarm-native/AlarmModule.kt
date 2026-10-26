@@ -15,14 +15,13 @@ import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
-import com.healthmate.app.MainActivity
 
 class AlarmModule(private val reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
 
     override fun getName(): String = "AlarmModule"
 
     private val prefs by lazy {
-        reactContext.getSharedPreferences("healthmate_active_alarms", Context.MODE_PRIVATE)
+        reactContext.getSharedPreferences(AlarmArming.PREFS_NAME, Context.MODE_PRIVATE)
     }
 
     @ReactMethod
@@ -69,10 +68,52 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
         promise: Promise
     ) {
         try {
-            scheduleAlarmInternal(scheduleId, medicineName, amount, time, label, triggerAtMillis.toLong())
+            scheduleAlarmInternal(scheduleId, medicineName, amount, time, label, "once", triggerAtMillis.toLong())
             promise.resolve(true)
         } catch (e: Exception) {
             promise.reject("SCHEDULE_FAILED", e.message, e)
+        }
+    }
+
+    /**
+     * Stores the full upcoming trigger chain (epoch millis, computed by the JS
+     * scheduler) for one dose and arms the earliest future trigger. Also
+     * de-duplicates by clearing any previous alarm for this schedule+time.
+     */
+    @ReactMethod
+    fun syncAlarmChain(
+        scheduleId: String,
+        medicineName: String,
+        amount: String,
+        time: String,
+        label: String,
+        recurrence: String,
+        triggersJson: String,
+        promise: Promise
+    ) {
+        try {
+            val triggers = org.json.JSONArray(triggersJson)
+            val millis = (0 until triggers.length())
+                .map { triggers.optLong(it) }
+                .filter { it > System.currentTimeMillis() }
+                .sorted()
+                .toMutableList()
+
+            // Replace any previously armed alarm for the same dose.
+            AlarmArming.cancelPendingIntent(reactContext, scheduleId, time)
+
+            val entry = AlarmArming.Entry(scheduleId, time, medicineName, amount, label, recurrence, millis)
+            AlarmArming.saveEntry(reactContext, entry)
+
+            val earliest = millis.firstOrNull()
+            if (earliest != null) {
+                AlarmArming.armEntry(reactContext, entry, earliest)
+                promise.resolve(true)
+            } else {
+                promise.resolve(false)
+            }
+        } catch (e: Exception) {
+            promise.reject("SYNC_CHAIN_FAILED", e.message, e)
         }
     }
 
@@ -90,22 +131,7 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
     fun cancelAllAlarms(promise: Promise) {
         try {
             stopAlarmInternal()
-            val alarmManager = reactContext.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
-            val activeIds = prefs.getStringSet("active_ids", emptySet()) ?: emptySet()
-
-            for (id in activeIds) {
-                val intent = Intent(reactContext, AlarmReceiver::class.java)
-                val pendingIntent = PendingIntent.getBroadcast(
-                    reactContext,
-                    id.hashCode(),
-                    intent,
-                    PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
-                )
-                if (pendingIntent != null && alarmManager != null) {
-                    alarmManager.cancel(pendingIntent)
-                    pendingIntent.cancel()
-                }
-            }
+            AlarmArming.cancelAll(reactContext)
             prefs.edit().remove("active_ids").apply()
             promise.resolve(true)
         } catch (e: Exception) {
@@ -299,18 +325,7 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
     }
 
     private fun cancelAlarmInternal(scheduleId: String) {
-        val alarmManager = reactContext.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
-        val intent = Intent(reactContext, AlarmReceiver::class.java)
-        val pendingIntent = PendingIntent.getBroadcast(
-            reactContext,
-            scheduleId.hashCode(),
-            intent,
-            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
-        )
-        if (pendingIntent != null && alarmManager != null) {
-            alarmManager.cancel(pendingIntent)
-            pendingIntent.cancel()
-        }
+        AlarmArming.cancelAllForSchedule(reactContext, scheduleId)
         val currentIds = prefs.getStringSet("active_ids", emptySet())?.toMutableSet() ?: mutableSetOf()
         currentIds.remove(scheduleId)
         prefs.edit().putStringSet("active_ids", currentIds).apply()
@@ -322,51 +337,19 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
         amount: String,
         time: String,
         label: String,
+        recurrence: String,
         triggerAtMillis: Long
     ) {
-        val alarmManager = reactContext.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
-        val intent = Intent(reactContext, AlarmReceiver::class.java).apply {
-            putExtra(AlarmService.EXTRA_SCHEDULE_ID, scheduleId)
-            putExtra(AlarmService.EXTRA_MEDICINE_NAME, medicineName)
-            putExtra(AlarmService.EXTRA_AMOUNT, amount)
-            putExtra(AlarmService.EXTRA_TIME, time)
-            putExtra(AlarmService.EXTRA_LABEL, label)
-        }
-
-        val pendingIntent = PendingIntent.getBroadcast(
+        // Persist first so the alarm survives reboots, then arm it.
+        AlarmArming.saveEntry(
             reactContext,
-            scheduleId.hashCode(),
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            AlarmArming.Entry(scheduleId, time, medicineName, amount, label, recurrence, mutableListOf(triggerAtMillis))
         )
-
-        val showIntent = Intent(reactContext, MainActivity::class.java)
-        val showPendingIntent = PendingIntent.getActivity(
+        AlarmArming.armEntry(
             reactContext,
-            scheduleId.hashCode(),
-            showIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            AlarmArming.Entry(scheduleId, time, medicineName, amount, label, recurrence, mutableListOf(triggerAtMillis)),
+            triggerAtMillis
         )
-
-        val canExact = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            alarmManager.canScheduleExactAlarms()
-        } else {
-            true
-        }
-
-        if (canExact) {
-            alarmManager.setAlarmClock(
-                AlarmManager.AlarmClockInfo(triggerAtMillis, showPendingIntent),
-                pendingIntent
-            )
-        } else {
-            // Graceful fallback if exact-alarm permission was revoked or absent
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
-            } else {
-                alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
-            }
-        }
 
         // Track active schedule ID
         val currentIds = prefs.getStringSet("active_ids", emptySet())?.toMutableSet() ?: mutableSetOf()

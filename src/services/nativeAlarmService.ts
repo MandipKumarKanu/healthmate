@@ -1,8 +1,18 @@
 import { NativeModules, Platform } from "react-native";
+import type { ReminderSchedule } from "../types";
 import { profileRepository } from "../database/repositories/profileRepository";
 
 interface NativeAlarmModuleInterface {
   stopAlarm(): Promise<boolean>;
+  syncAlarmChain(
+    scheduleId: string,
+    medicineName: string,
+    amount: string,
+    time: string,
+    label: string,
+    recurrence: string,
+    triggersJson: string,
+  ): Promise<boolean>;
   snoozeAlarm(
     scheduleId: string,
     medicineName: string,
@@ -83,6 +93,37 @@ export const nativeAlarmService = {
     } catch (e) {
       console.warn("nativeAlarmService.snoozeAlarm failed:", e);
       return null;
+    }
+  },
+
+  /**
+   * Pushes the full upcoming trigger window (epoch millis, computed by the JS
+   * scheduler) for one dose into native storage and arms the earliest one.
+   * The native side re-arms these chains after reboot with no app launch.
+   */
+  async syncAlarmChain(params: {
+    scheduleId: string;
+    medicineName: string;
+    amount: string;
+    time: string;
+    label?: string;
+    recurrence: ReminderSchedule["recurrence"];
+    triggerMillis: number[];
+  }): Promise<boolean> {
+    if (!AlarmModule) return false;
+    try {
+      return await AlarmModule.syncAlarmChain(
+        params.scheduleId,
+        params.medicineName,
+        params.amount,
+        params.time,
+        params.label ?? "",
+        params.recurrence,
+        JSON.stringify(params.triggerMillis),
+      );
+    } catch (e) {
+      console.warn("nativeAlarmService.syncAlarmChain failed:", e);
+      return false;
     }
   },
 

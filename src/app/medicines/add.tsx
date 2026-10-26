@@ -45,6 +45,8 @@ export default function AddMedicineScreen() {
   const [batchNumber, setBatchNumber] = useState(params.batch || "");
   const [manufacturer, setManufacturer] = useState(params.manufacturer || "");
   const [instructions, setInstructions] = useState("");
+  const [currentStock, setCurrentStock] = useState("");
+  const [refillThreshold, setRefillThreshold] = useState("");
 
   useEffect(() => {
     if (params.editId) {
@@ -58,6 +60,12 @@ export default function AddMedicineScreen() {
         setBatchNumber(existing.packageDetails?.batchNumber || "");
         setManufacturer(existing.packageDetails?.manufacturer || "");
         setInstructions(existing.packageDetails?.packageDetailsText || "");
+        setCurrentStock(
+          existing.currentInventory != null ? String(existing.currentInventory) : "",
+        );
+        setRefillThreshold(
+          existing.refillThreshold != null ? String(existing.refillThreshold) : "",
+        );
       }
     }
   }, [params.editId]);
@@ -70,6 +78,13 @@ export default function AddMedicineScreen() {
     "syrup",
     "cream",
   ];
+
+  const parseOptionalInt = (value: string): number | undefined => {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    const parsed = Number.parseInt(trimmed, 10);
+    return Number.isNaN(parsed) ? undefined : Math.max(0, parsed);
+  };
 
   const handleSave = () => {
     const trimmedName = name.trim();
@@ -90,6 +105,8 @@ export default function AddMedicineScreen() {
           batchNumber: batchNumber.trim() || undefined,
           packageDetailsText: instructions.trim() || undefined,
         },
+        currentInventory: parseOptionalInt(currentStock),
+        refillThreshold: parseOptionalInt(refillThreshold),
       });
 
       Alert.alert("Success", `${trimmedName} updated successfully!`, [
@@ -111,6 +128,8 @@ export default function AddMedicineScreen() {
         },
         informationSource: "User-entered medication record.",
         isSample: false,
+        currentInventory: parseOptionalInt(currentStock),
+        refillThreshold: parseOptionalInt(refillThreshold),
       });
 
       Alert.alert("Success", `${newMed.name} added to your cabinet!`, [
@@ -233,6 +252,38 @@ export default function AddMedicineScreen() {
           />
         </AppCard>
 
+        {/* Inventory tracking (optional) */}
+        <SectionHeader title="Inventory Tracking (optional)" />
+        <AppCard style={styles.card}>
+          <Text style={styles.inputLabel}>Current stock</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="e.g. 30 — leave empty to skip tracking"
+            placeholderTextColor={Colors.textTertiary}
+            value={currentStock}
+            onChangeText={setCurrentStock}
+            keyboardType="number-pad"
+          />
+
+          <View style={styles.divider} />
+
+          <Text style={styles.inputLabel}>Refill alert threshold</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="e.g. 5"
+            placeholderTextColor={Colors.textTertiary}
+            value={refillThreshold}
+            onChangeText={setRefillThreshold}
+            keyboardType="number-pad"
+          />
+
+          <Text style={styles.trackingHint}>
+            Each logged &quot;taken&quot; dose decrements your stock. When stock
+            reaches the threshold you get a refill nudge. Only the two fields
+            you fill in are tracked.
+          </Text>
+        </AppCard>
+
         {/* Save Button */}
         <View style={styles.saveContainer}>
           <AppButton
@@ -277,6 +328,12 @@ const styles = StyleSheet.create({
   formScroll: {
     flexDirection: "row",
     marginBottom: Spacing.lg,
+  },
+  trackingHint: {
+    fontSize: 12,
+    color: Colors.textTertiary,
+    marginTop: 8,
+    lineHeight: 17,
   },
   formChip: {
     backgroundColor: Colors.cardBackground,

@@ -267,6 +267,136 @@ export function getNotificationTriggersForDose(
   return [];
 }
 
+/**
+ * Computes a discrete window of upcoming epoch-millis triggers for ONE dose of a
+ * schedule, used for the native reboot-proof alarm chain: the JNI side stores
+ * these and re-arms exact alarms at boot, so it needs concrete dates rather than
+ * the repeating trigger types the OS-notification path may use.
+ *
+ * Caps per recurrence type mirror the OS-notification caps (60 daily occurrences,
+ * 52 weekly, 24 monthly); unbounded recurring chains are extended natively dose
+ * by dose after each firing.
+ */
+export function getNativeAlarmTriggerWindow(
+  schedule:
+    | Pick<ReminderSchedule, "recurrence" | "startDate" | "endDate">
+    | undefined,
+  time: string,
+  now: Date = new Date(),
+): number[] {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(time);
+  if (!match) return [];
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+
+  const todayStr = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("-");
+
+  const effectiveSchedule = schedule ?? {
+    recurrence: "daily" as const,
+    startDate: todayStr,
+  };
+
+  const start = parseDateParts(effectiveSchedule.startDate);
+  if (!start) return [];
+
+  if (effectiveSchedule.endDate) {
+    const end = parseDateParts(effectiveSchedule.endDate);
+    if (!end || effectiveSchedule.endDate < effectiveSchedule.startDate) {
+      return [];
+    }
+  }
+
+  const { recurrence, startDate, endDate } = effectiveSchedule;
+  const triggers: number[] = [];
+
+  if (recurrence === "once") {
+    const targetDate = new Date(start[0], start[1] - 1, start[2], hour, minute, 0, 0);
+    if (targetDate.getTime() > now.getTime()) triggers.push(targetDate.getTime());
+    return triggers;
+  }
+
+  const scanStart = startDate > todayStr ? startDate : todayStr;
+
+  if (recurrence === "daily") {
+    const [y, m, d] = parseDateParts(scanStart)!;
+    const cursor = new Date(y, m - 1, d);
+    while (triggers.length < 60) {
+      const y = cursor.getFullYear();
+      const month = cursor.getMonth();
+      const day = cursor.getDate();
+      const dateStr = [
+        y,
+        String(month + 1).padStart(2, "0"),
+        String(day).padStart(2, "0"),
+      ].join("-");
+      if (endDate && dateStr > endDate) break;
+      if (isScheduleDueOnDate(effectiveSchedule, dateStr)) {
+        const targetDate = new Date(y, month, day, hour, minute, 0, 0);
+        if (targetDate.getTime() > now.getTime()) triggers.push(targetDate.getTime());
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return triggers;
+  }
+
+  if (recurrence === "weekly") {
+    const startJsWeekday = new Date(start[0], start[1] - 1, start[2]).getDay();
+    const [startY, startM, startD] = parseDateParts(scanStart)!;
+    const cursor = new Date(startY, startM - 1, startD);
+    while (cursor.getDay() !== startJsWeekday) {
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    while (triggers.length < 52) {
+      const y = cursor.getFullYear();
+      const month = cursor.getMonth();
+      const day = cursor.getDate();
+      const dateStr = [
+        y,
+        String(month + 1).padStart(2, "0"),
+        String(day).padStart(2, "0"),
+      ].join("-");
+      if (endDate && dateStr > endDate) break;
+      if (isScheduleDueOnDate(effectiveSchedule, dateStr)) {
+        const targetDate = new Date(y, month, day, hour, minute, 0, 0);
+        if (targetDate.getTime() > now.getTime()) triggers.push(targetDate.getTime());
+      }
+      cursor.setDate(cursor.getDate() + 7);
+    }
+    return triggers;
+  }
+
+  if (recurrence === "monthly") {
+    const startDay = start[2];
+    const currentRef = startDate > todayStr
+      ? new Date(start[0], start[1] - 1, 1)
+      : new Date(now.getFullYear(), now.getMonth(), 1);
+    for (let i = 0; i < 24; i++) {
+      const year = currentRef.getFullYear();
+      const month = currentRef.getMonth();
+      const lastDay = new Date(year, month + 1, 0).getDate();
+      const clampedDay = Math.min(startDay, lastDay);
+      const dateStr = [
+        year,
+        String(month + 1).padStart(2, "0"),
+        String(clampedDay).padStart(2, "0"),
+      ].join("-");
+      if (endDate && dateStr > endDate) break;
+      if (dateStr >= startDate && isScheduleDueOnDate(effectiveSchedule, dateStr)) {
+        const targetDate = new Date(year, month, clampedDay, hour, minute, 0, 0);
+        if (targetDate.getTime() > now.getTime()) triggers.push(targetDate.getTime());
+      }
+      currentRef.setMonth(currentRef.getMonth() + 1);
+    }
+    return triggers;
+  }
+
+  return [];
+}
+
 export const notificationService = {
   async init(): Promise<void> {
     if (Platform.OS !== "android") return;
@@ -447,64 +577,29 @@ export const notificationService = {
         identifiers.push(identifier);
       }
 
-      // Schedule full-screen continuous alarm on native Android for the earliest upcoming trigger
-      if (Platform.OS === "android" && triggers.length > 0) {
+      // Schedule the reboot-proof native alarm chain on Android: each dose's
+      // full upcoming trigger window is persisted natively (and re-armed at
+      // boot by AlarmArming), with the earliest trigger armed now.
+      if (Platform.OS === "android" && nativeAlarmService.isAvailable()) {
         try {
-          let earliestMs: number | null = null;
-          const firstTrigger = triggers[0] as any;
-          if (
-            firstTrigger.type ===
-              Notifications.SchedulableTriggerInputTypes.DATE &&
-            firstTrigger.date
-          ) {
-            earliestMs =
-              firstTrigger.date instanceof Date
-                ? firstTrigger.date.getTime()
-                : Number(firstTrigger.date);
-          } else if (
-            firstTrigger.type ===
-            Notifications.SchedulableTriggerInputTypes.DAILY
-          ) {
-            const d = new Date();
-            d.setHours(firstTrigger.hour, firstTrigger.minute, 0, 0);
-            if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1);
-            earliestMs = d.getTime();
-          } else if (
-            firstTrigger.type ===
-            Notifications.SchedulableTriggerInputTypes.WEEKLY
-          ) {
-            const d = new Date();
-            const targetJsDay = firstTrigger.weekday - 1;
-            d.setHours(firstTrigger.hour, firstTrigger.minute, 0, 0);
-            while (d.getDay() !== targetJsDay || d.getTime() <= Date.now()) {
-              d.setDate(d.getDate() + 1);
-            }
-            earliestMs = d.getTime();
-          } else if (
-            firstTrigger.type ===
-            Notifications.SchedulableTriggerInputTypes.MONTHLY
-          ) {
-            const d = new Date();
-            d.setDate(firstTrigger.day);
-            d.setHours(firstTrigger.hour, firstTrigger.minute, 0, 0);
-            if (d.getTime() <= Date.now()) {
-              d.setMonth(d.getMonth() + 1);
-            }
-            earliestMs = d.getTime();
-          }
-
-          if (earliestMs && earliestMs > Date.now()) {
-            await nativeAlarmService.scheduleAlarm({
+          const windowMillis = getNativeAlarmTriggerWindow(
+            scheduleConfig,
+            time,
+            new Date(),
+          );
+          if (windowMillis.length > 0) {
+            await nativeAlarmService.syncAlarmChain({
               scheduleId,
               medicineName,
               amount,
               time,
               label: doseLabel,
-              triggerAtMillis: earliestMs,
+              recurrence: scheduleConfig?.recurrence ?? "daily",
+              triggerMillis: windowMillis,
             });
           }
         } catch (alarmErr) {
-          console.warn("Could not schedule native alarm:", alarmErr);
+          console.warn("Could not schedule native alarm chain:", alarmErr);
         }
       }
 

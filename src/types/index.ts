@@ -66,6 +66,22 @@ export interface Medicine {
   createdAt: string;
   updatedAt: string;
   isSample?: boolean;
+  /** Stock tracking (migration 003). undefined = inventory not tracked. */
+  currentInventory?: number;
+  /** Alert when currentInventory drops to or below this. undefined = never alerts. */
+  refillThreshold?: number;
+  /** Display unit for inventory counts, e.g. 'tablets', 'ml', 'puffs'. */
+  unitDosage?: string;
+}
+
+export interface RefillReminder {
+  id: string;
+  medicineId: string;
+  threshold: number;
+  currentStock: number;
+  status: 'pending' | 'reminded';
+  remindedAt?: string;
+  createdAt: string;
 }
 
 export interface ReminderTime {

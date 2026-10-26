@@ -20,6 +20,7 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
   private schedules = new Map<string, Record<string, unknown>>();
   private scheduleHistory = new Map<string, Record<string, unknown>>();
   private adherenceLogs = new Map<string, Record<string, unknown>>();
+  private refillReminders = new Map<string, Record<string, unknown>>();
   private scanHistory = new Map<string, Record<string, unknown>>();
   private aiConversations = new Map<string, Record<string, unknown>>();
   private aiMessages = new Map<string, Record<string, unknown>>();
@@ -35,7 +36,7 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       this.schedules.clear();
       this.scheduleHistory.clear();
       this.adherenceLogs.clear();
-      this.scanHistory.clear();
+      this.refillReminders.clear();
       this.aiConversations.clear();
       this.aiMessages.clear();
     }
@@ -145,6 +146,9 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
         createdAt,
         updatedAt,
         isSample,
+        currentInventory,
+        refillThreshold,
+        unitDosage,
       ] = params;
       this.medicines.set(String(id), {
         id: String(id),
@@ -161,6 +165,45 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
         created_at: String(createdAt),
         updated_at: String(updatedAt),
         is_sample: Number(isSample),
+        current_inventory:
+          currentInventory === null || currentInventory === undefined
+            ? null
+            : Number(currentInventory),
+        refill_threshold:
+          refillThreshold === null || refillThreshold === undefined
+            ? null
+            : Number(refillThreshold),
+        unit_dosage: unitDosage ?? null,
+      });
+      return { changes: 1, lastInsertRowId: 1 };
+    }
+
+    // Column order mirrors medicineRepository.update() SET clause exactly:
+    // name, strength, dosage_form, category, ingredient, manufacturer,
+    // expiry_date, batch_number, package_details_text, information_source,
+    // updated_at, current_inventory, refill_threshold, unit_dosage, id.
+    if (clean.startsWith("UPDATE MEDICINES SET") && params.length === 15) {
+      const id = String(params[14]);
+      const existing = this.medicines.get(id);
+      if (!existing) return { changes: 0, lastInsertRowId: 0 };
+      this.medicines.set(id, {
+        ...existing,
+        name: String(params[0]),
+        strength: String(params[1]),
+        dosage_form: String(params[2]),
+        category: String(params[3]),
+        ingredient: params[4] ?? null,
+        manufacturer: params[5] ?? null,
+        expiry_date: params[6] ?? null,
+        batch_number: params[7] ?? null,
+        package_details_text: params[8] ?? null,
+        information_source: params[9] ?? null,
+        updated_at: String(params[10]),
+        current_inventory:
+          params[11] === null || params[11] === undefined ? null : Number(params[11]),
+        refill_threshold:
+          params[12] === null || params[12] === undefined ? null : Number(params[12]),
+        unit_dosage: params[13] ?? null,
       });
       return { changes: 1, lastInsertRowId: 1 };
     }
@@ -278,6 +321,72 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       for (const [id, log] of this.adherenceLogs.entries()) {
         if (log.schedule_id === String(scheduleId)) {
           this.adherenceLogs.delete(id);
+          changes++;
+        }
+      }
+      return { changes, lastInsertRowId: 0 };
+    }
+
+    if (clean.startsWith("INSERT OR REPLACE INTO REFILL_REMINDERS")) {
+      const [
+        id,
+        medicineId,
+        threshold,
+        currentStock,
+        status,
+        remindedAt,
+        createdAt,
+      ] = params;
+      this.refillReminders.set(String(id), {
+        id: String(id),
+        medicine_id: String(medicineId),
+        threshold: Number(threshold),
+        current_stock: Number(currentStock),
+        status: String(status),
+        reminded_at: remindedAt ?? null,
+        created_at: String(createdAt),
+      });
+      return { changes: 1, lastInsertRowId: 1 };
+    }
+
+    if (clean.startsWith("UPDATE REFILL_REMINDERS SET STATUS")) {
+      // Order mirrors refillService.markReminded: reminded_at, id
+      const [remindedAt, id] = params;
+      const row = this.refillReminders.get(String(id));
+      if (!row) return { changes: 0, lastInsertRowId: 0 };
+      this.refillReminders.set(String(id), {
+        ...row,
+        status: "reminded",
+        reminded_at: remindedAt == null ? null : String(remindedAt),
+      });
+      return { changes: 1, lastInsertRowId: 1 };
+    }
+
+    if (clean.startsWith("UPDATE REFILL_REMINDERS")) {
+      // Order mirrors refillService: current_stock = ?, threshold = ? ... id = ?
+      const [currentStock, threshold, id] = params;
+      const row = this.refillReminders.get(String(id));
+      if (!row) return { changes: 0, lastInsertRowId: 0 };
+      this.refillReminders.set(String(id), {
+        ...row,
+        current_stock: Number(currentStock),
+        threshold: Number(threshold),
+      });
+      return { changes: 1, lastInsertRowId: 1 };
+    }
+
+    if (clean.startsWith("DELETE FROM REFILL_REMINDERS WHERE ID")) {
+      const [id] = params;
+      const existed = this.refillReminders.delete(String(id));
+      return { changes: existed ? 1 : 0, lastInsertRowId: 0 };
+    }
+
+    if (clean.startsWith("DELETE FROM REFILL_REMINDERS WHERE MEDICINE_ID")) {
+      const [medicineId] = params;
+      let changes = 0;
+      for (const [id, row] of this.refillReminders.entries()) {
+        if (row.medicine_id === String(medicineId)) {
+          this.refillReminders.delete(id);
           changes++;
         }
       }
@@ -467,11 +576,35 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
     if (clean.includes("FROM ADHERENCE_LOGS")) {
       if (clean.includes("WHERE DOSE_DATE =")) {
         const [doseDate] = params;
-        return Array.from(this.adherenceLogs.values()).filter(
+        let rows = Array.from(this.adherenceLogs.values()).filter(
           (l) => l.dose_date === String(doseDate),
-        ) as unknown as T[];
+        ) as unknown as Record<string, unknown>[];
+        if (clean.includes("AND DOSE_TIME =")) {
+          const doseTime = String(params[1]);
+          rows = rows.filter((l) => l.dose_time === doseTime);
+        }
+        if (clean.includes("AND SCHEDULE_ID =")) {
+          const scheduleId = String(params[2]);
+          rows = rows.filter((l) => l.schedule_id === scheduleId);
+        }
+        return rows as unknown as T[];
       }
       return Array.from(this.adherenceLogs.values()) as unknown as T[];
+    }
+
+    if (clean.includes("FROM REFILL_REMINDERS")) {
+      if (clean.includes("WHERE ID =")) {
+        const [id] = params;
+        const item = this.refillReminders.get(String(id));
+        return item ? ([item] as unknown as T[]) : [];
+      }
+      if (clean.includes("WHERE MEDICINE_ID =")) {
+        const [medicineId] = params;
+        return Array.from(this.refillReminders.values()).filter(
+          (r) => r.medicine_id === String(medicineId),
+        ) as unknown as T[];
+      }
+      return Array.from(this.refillReminders.values()) as unknown as T[];
     }
 
     if (clean.includes("FROM SCAN_HISTORY")) {

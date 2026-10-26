@@ -16,6 +16,9 @@ interface MedicineRow {
   created_at: string;
   updated_at: string;
   is_sample: number;
+  current_inventory: number | null;
+  refill_threshold: number | null;
+  unit_dosage: string | null;
 }
 
 function mapRowToMedicine(row: MedicineRow): Medicine {
@@ -36,6 +39,9 @@ function mapRowToMedicine(row: MedicineRow): Medicine {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     isSample: row.is_sample === 1,
+    currentInventory: row.current_inventory ?? undefined,
+    refillThreshold: row.refill_threshold ?? undefined,
+    unitDosage: row.unit_dosage ?? undefined,
   };
 }
 
@@ -102,8 +108,9 @@ export const medicineRepository = {
       `INSERT INTO medicines (
         id, name, strength, dosage_form, category, ingredient,
         manufacturer, expiry_date, batch_number, package_details_text,
-        information_source, created_at, updated_at, is_sample
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+        information_source, created_at, updated_at, is_sample,
+        current_inventory, refill_threshold, unit_dosage
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         newMedicine.id,
         newMedicine.name,
@@ -119,6 +126,9 @@ export const medicineRepository = {
         newMedicine.createdAt,
         newMedicine.updatedAt,
         newMedicine.isSample ? 1 : 0,
+        newMedicine.currentInventory ?? null,
+        newMedicine.refillThreshold ?? null,
+        newMedicine.unitDosage ?? null,
       ]
     );
 
@@ -144,7 +154,8 @@ export const medicineRepository = {
       `UPDATE medicines SET
         name = ?, strength = ?, dosage_form = ?, category = ?, ingredient = ?,
         manufacturer = ?, expiry_date = ?, batch_number = ?, package_details_text = ?,
-        information_source = ?, updated_at = ?
+        information_source = ?, updated_at = ?,
+        current_inventory = ?, refill_threshold = ?, unit_dosage = ?
       WHERE id = ?;`,
       [
         updated.name,
@@ -158,6 +169,9 @@ export const medicineRepository = {
         updated.packageDetails.packageDetailsText ?? null,
         updated.informationSource ?? null,
         updated.updatedAt,
+        updated.currentInventory ?? null,
+        updated.refillThreshold ?? null,
+        updated.unitDosage ?? null,
         id,
       ]
     );
@@ -173,6 +187,7 @@ export const medicineRepository = {
     // This keeps cleanup consistent with the demonstration database adapter.
     db.runSync('DELETE FROM schedules WHERE medicine_id = ?;', [id]);
     db.runSync('DELETE FROM adherence_logs WHERE medicine_id = ?;', [id]);
+    db.runSync('DELETE FROM refill_reminders WHERE medicine_id = ?;', [id]);
     const result = db.runSync('DELETE FROM medicines WHERE id = ?;', [id]);
     return result.changes > 0;
   },

@@ -16,6 +16,7 @@ import { Radius, Spacing, Typography } from '../../theme/tokens';
 import { AppScreen } from '../../components/ui/AppScreen';
 import { AppHeader } from '../../components/ui/AppHeader';
 import { aiRepository } from '../../database/repositories/aiRepository';
+import { aiAssistantService } from '../../services/aiAssistantService';
 import { AIMessage } from '../../types';
 
 const INITIAL_SUGGESTIONS = [
@@ -43,6 +44,10 @@ export default function AIAssistantScreen() {
   const [messages, setMessages] = useState<AIMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [hasApiKey, setHasApiKey] = useState(false);
+  const [keyModalVisible, setKeyModalVisible] = useState(false);
+  const [keyDraft, setKeyDraft] = useState('');
+  const [keyError, setKeyError] = useState<string | null>(null);
 
   // Load latest conversation from SQLite on mount
   useEffect(() => {
@@ -51,9 +56,39 @@ export default function AIAssistantScreen() {
       setConversationId(latest.id);
       setMessages(latest.messages);
     }
+    aiAssistantService.getApiKey().then((key) => setHasApiKey(Boolean(key)));
   }, []);
 
-  const sendMessage = useCallback((text: string) => {
+  /** Offline fallback: fixed terminology guide, unchanged behavior. */
+  const generateOfflineReply = useCallback((text: string): string => {
+    const lower = text.toLowerCase();
+    const asksForPersonalMedicalAdvice = /\b(dose|dosage|take|taking|safe for me|side effects?|interaction\w*|pregnan\w*|symptom\w*|diagnos\w*|overdose|missed dose|stop taking)\b/.test(lower);
+    if (asksForPersonalMedicalAdvice) {
+      return 'I can’t assess your personal treatment, symptoms, dose, or medicine interactions. Do not start, stop, or change a medicine based on this offline guide. Check the leaflet for your exact product and contact your pharmacist or prescriber. If you may have taken too much medicine or have severe symptoms, seek urgent local medical help.';
+    }
+    if (lower.includes('mg') || lower.includes('ml')) return KNOWLEDGE_RESPONSES.mg;
+    if (lower.includes('ingredient')) return KNOWLEDGE_RESPONSES.ingredient;
+    if (lower.includes('batch') || lower.includes('lot')) return KNOWLEDGE_RESPONSES.batch;
+    if (lower.includes('store') || lower.includes('storage')) return KNOWLEDGE_RESPONSES.store;
+    return 'This offline guide covers a few general medication terms only; it is not a verified drug reference. For diagnosis, doses, symptoms, or treatment decisions, contact your pharmacist or prescriber.';
+  }, []);
+
+  /** Maps a failed Gemini call to a short, honest prefix for the offline reply. */
+  const offlinePrefixForError = useCallback((error: unknown): string => {
+    const code = (error as { code?: string })?.code;
+    switch (code) {
+      case 'BAD_KEY':
+        return 'Your Gemini API key was rejected, so the offline guide answered below. Reconnect a valid key from the AI key screen.\n\n';
+      case 'RATE_LIMIT':
+        return 'Gemini’s free-tier limit was just reached, so the offline guide answered below.\n\n';
+      case 'TIMEOUT':
+        return 'The AI request timed out, so the offline guide answered below.\n\n';
+      default:
+        return 'No network connection for live AI right now, so the offline guide answered below.\n\n';
+    }
+  }, []);
+
+  const sendMessage = useCallback(async (text: string) => {
     if (!text.trim()) return;
 
     let activeConvId = conversationId;
@@ -77,41 +112,43 @@ export default function AIAssistantScreen() {
     setInputText('');
     setIsTyping(true);
 
-    setTimeout(() => {
-      let reply =
-        'This offline guide covers a few general medication terms only; it is not a verified drug reference. For diagnosis, doses, symptoms, or treatment decisions, contact your pharmacist or prescriber.';
+    let reply: string;
+    let usedNetwork = false;
 
-      const lower = text.toLowerCase();
-      const asksForPersonalMedicalAdvice = /\b(dose|dosage|take|taking|safe for me|side effects?|interaction\w*|pregnan\w*|symptom\w*|diagnos\w*|overdose|missed dose|stop taking)\b/.test(lower);
-      if (asksForPersonalMedicalAdvice) {
-        reply = 'I can’t assess your personal treatment, symptoms, dose, or medicine interactions. Do not start, stop, or change a medicine based on this offline guide. Check the leaflet for your exact product and contact your pharmacist or prescriber. If you may have taken too much medicine or have severe symptoms, seek urgent local medical help.';
-      } else if (lower.includes('mg') || lower.includes('ml')) {
-        reply = KNOWLEDGE_RESPONSES.mg;
-      } else if (lower.includes('ingredient')) {
-        reply = KNOWLEDGE_RESPONSES.ingredient;
-      } else if (lower.includes('batch') || lower.includes('lot')) {
-        reply = KNOWLEDGE_RESPONSES.batch;
-      } else if (lower.includes('store') || lower.includes('storage')) {
-        reply = KNOWLEDGE_RESPONSES.store;
-      } else if (lower.includes('metformin')) {
-        reply = 'I can provide only general terminology here, not confirm a medicine’s use or how you should take it. Check the patient leaflet for your exact product or ask your pharmacist or prescriber.';
+    if (hasApiKey) {
+      try {
+        const answer = await aiAssistantService.askGemini(
+          text.trim(),
+          messages.map((m) => ({
+            // Map persisted message roles to the wires format: user|assistant
+            role: m.role === 'assistant' ? 'assistant' : 'user',
+            content: m.content,
+          })),
+        );
+        reply = answer.text;
+        usedNetwork = true;
+      } catch (error) {
+        console.warn('Gemini request failed, falling back to offline guide:', error);
+        reply = `${offlinePrefixForError(error)}${generateOfflineReply(text)}`;
       }
+    } else {
+      reply = generateOfflineReply(text);
+    }
 
-      const assistantMsg: AIMessage = {
-        id: `msg_${Date.now() + 1}`,
-        role: 'assistant',
-        content: reply,
-        timestamp: new Date().toISOString(),
-      };
+    const assistantMsg: AIMessage = {
+      id: `msg_${Date.now() + 1}`,
+      role: 'assistant',
+      content: reply,
+      timestamp: new Date().toISOString(),
+    };
 
-      // Persist assistant message to SQLite
-      if (activeConvId) {
-        aiRepository.addMessage(activeConvId, assistantMsg);
-      }
-      setMessages((prev) => [...prev, assistantMsg]);
-      setIsTyping(false);
-    }, 700);
-  }, [conversationId]);
+    // Persist assistant message to SQLite
+    if (activeConvId) {
+      aiRepository.addMessage(activeConvId, assistantMsg);
+    }
+    setMessages((prev) => [...prev, assistantMsg]);
+    setIsTyping(false);
+  }, [conversationId, messages, hasApiKey, generateOfflineReply, offlinePrefixForError]);
 
   useEffect(() => {
     if (query) {

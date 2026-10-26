@@ -8,6 +8,7 @@ const Platform = {
 const NativeModules = {
   AlarmModule: {
     stopAlarm: jest.fn().mockResolvedValue(true),
+    syncAlarmChain: jest.fn().mockResolvedValue(true),
     snoozeAlarm: jest.fn().mockResolvedValue(Date.now() + 600000),
     scheduleAlarm: jest.fn().mockResolvedValue(true),
     cancelAlarm: jest.fn().mockResolvedValue(true),

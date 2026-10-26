@@ -9,7 +9,8 @@ export type StatusBadgeType =
   | 'skipped'
   | 'upcoming'
   | 'expired'
-  | 'reminders-on';
+  | 'reminders-on'
+  | 'low-stock';
 
 interface StatusBadgeProps {
   status: StatusBadgeType;
@@ -55,6 +56,12 @@ export function StatusBadge({ status, label, style }: StatusBadgeProps) {
           bg: Colors.primaryLight,
           textColor: Colors.primary,
           text: label ?? 'Reminders on',
+        };
+      case 'low-stock':
+        return {
+          bg: Colors.warningLight,
+          textColor: Colors.warningDark,
+          text: label ?? 'Low stock',
         };
     }
   };
