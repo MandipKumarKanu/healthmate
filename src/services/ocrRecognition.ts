@@ -63,12 +63,10 @@ interface TextRecognitionModuleLike {
 }
 
 let TextRecognitionModule: TextRecognitionModuleLike | null = null;
-let mlKitAvailable = false;
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const mod = require('@react-native-ml-kit/text-recognition');
   TextRecognitionModule = (mod.default || mod) as TextRecognitionModuleLike;
-  mlKitAvailable = !!TextRecognitionModule?.recognize;
 } catch {
   // Native ML Kit not installed (e.g. Expo Go); fallback gracefully below.
 }
@@ -84,13 +82,6 @@ const OCR_VARIANT_COMPACT = 2048;
 /** JPEG quality of the high-res / compact variants. */
 const HIGH_RES_QUALITY = 0.9;
 const COMPACT_QUALITY = 0.8;
-
-/**
- * Demo text used when the native engine is not bundled with the app, so the
- * review flow remains demonstrable. The UI marks this as a sample.
- */
-export const DEMO_LABEL_TEXT =
-  'Metformin 500mg Tablets BP\nBatch: DEMO-MF0426\nExp: 12/2027\nMfg: Example Pharma';
 
 export interface LabelScanResult {
   /** Full label text, cleaned line-by-line, ready to display. */
