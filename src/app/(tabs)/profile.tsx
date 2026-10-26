@@ -5,13 +5,13 @@ import {
   Text,
   TouchableOpacity,
   Switch,
-  Alert,
   TextInput,
   Modal,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { AppAlert as Alert } from "../../services/appAlert";
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
