@@ -9,6 +9,34 @@ import { AppScreen } from '../../components/ui/AppScreen';
 
 type PermissionState = 'idle' | 'granted' | 'denied' | 'unavailable';
 
+type PermissionCardProps = {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  description: string;
+  important?: boolean;
+  state: PermissionState;
+  stateLabel: (state: PermissionState) => string;
+};
+
+function PermissionCard ({ icon, title, description, important, state, stateLabel }: PermissionCardProps
+    icon: keyof typeof Ionicons.glyphMap;
+    title: string;
+    description: string;
+    important?: boolean;
+    state: PermissionState;
+  }) => (
+    <View style={styles.card}>
+      <View style={styles.iconBox}><Ionicons name={icon} size={27} color="#5B65D9" /></View>
+      <View style={styles.cardCopy}>
+        <Text style={styles.cardTitle}>{title}</Text>
+        <Text style={styles.cardDescription}>{description}</Text>
+        {!!stateLabel(state) && <Text style={[styles.status, state === 'granted' ? styles.allowed : styles.denied]}>{stateLabel(state)}</Text>}
+      </View>
+      <Text style={[styles.priority, important ? styles.important : styles.optional]}>{important ? 'Important' : 'Optional'}</Text>
+    </View>
+  );
+}
+
 export default function OnboardingPermissionsScreen() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -75,23 +103,7 @@ export default function OnboardingPermissionsScreen() {
     return '';
   };
 
-  const PermissionCard = ({ icon, title, description, important, state }: {
-    icon: keyof typeof Ionicons.glyphMap;
-    title: string;
-    description: string;
-    important?: boolean;
-    state: PermissionState;
-  }) => (
-    <View style={styles.card}>
-      <View style={styles.iconBox}><Ionicons name={icon} size={27} color="#5B65D9" /></View>
-      <View style={styles.cardCopy}>
-        <Text style={styles.cardTitle}>{title}</Text>
-        <Text style={styles.cardDescription}>{description}</Text>
-        {!!stateLabel(state) && <Text style={[styles.status, state === 'granted' ? styles.allowed : styles.denied]}>{stateLabel(state)}</Text>}
-      </View>
-      <Text style={[styles.priority, important ? styles.important : styles.optional]}>{important ? 'Important' : 'Optional'}</Text>
-    </View>
-  );
+
 
   return (
     <AppScreen scrollable={false} contentContainerStyle={styles.screen}>
@@ -106,10 +118,10 @@ export default function OnboardingPermissionsScreen() {
         </View>
 
         <View style={styles.cards}>
-          <PermissionCard icon="notifications-outline" title="Medicine notifications" description="Receive reminders at the right time." important state={notificationState} />
-          <PermissionCard icon="alarm-outline" title="Precise reminders" description="Improve timing accuracy where supported." important state={exactAlarmState} />
-          <PermissionCard icon="camera-outline" title="Camera access" description="Scan medicine labels when needed." state={cameraState} />
-          <PermissionCard icon="images-outline" title="Photos and images" description="Choose prescriptions from your photos." state={photosState} />
+          <PermissionCard icon="notifications-outline" title="Medicine notifications" description="Receive reminders at the right time." important state={notificationState} stateLabel={stateLabel} />
+          <PermissionCard icon="alarm-outline" title="Precise reminders" description="Improve timing accuracy where supported." important state={exactAlarmState} stateLabel={stateLabel} />
+          <PermissionCard icon="camera-outline" title="Camera access" description="Scan medicine labels when needed." state={cameraState} stateLabel={stateLabel} />
+          <PermissionCard icon="images-outline" title="Photos and images" description="Choose prescriptions from your photos." state={photosState} stateLabel={stateLabel} />
         </View>
 
         <TouchableOpacity style={styles.primaryButton} onPress={requestPermissions} disabled={busy} activeOpacity={0.85} accessibilityRole="button">
