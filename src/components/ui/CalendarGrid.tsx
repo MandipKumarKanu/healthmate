@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { Radius, Spacing } from '../../theme/tokens';
 import { ReminderSchedule } from '../../types';
+import { isScheduleDueOnDate } from '../../database/repositories/adherenceRepository';
 
 interface CalendarGridProps {
   selectedDate: string; // 'YYYY-MM-DD'
@@ -135,15 +136,7 @@ export function CalendarGrid({
           const dateKey = item.dateStr;
           const hasScheduledReminder = schedules.some((schedule) => {
             if (!schedule.enabled || !schedule.notificationsEnabled || schedule.times.length === 0) return false;
-            if (dateKey < schedule.startDate || (schedule.endDate && dateKey > schedule.endDate)) return false;
-            const startParts = schedule.startDate.split('-').map(Number);
-            const start = new Date(startParts[0], startParts[1] - 1, startParts[2]);
-            const elapsedDays = Math.floor((date.getTime() - start.getTime()) / 86400000);
-            if (elapsedDays < 0) return false;
-            if (schedule.recurrence === 'once') return dateKey === schedule.startDate;
-            if (schedule.recurrence === 'weekly') return elapsedDays % 7 === 0;
-            if (schedule.recurrence === 'monthly') return date.getDate() === start.getDate();
-            return true;
+            return isScheduleDueOnDate(schedule, dateKey);
           });
           const hasReminder = datesWithReminders.has(dateKey) || hasScheduledReminder;
 

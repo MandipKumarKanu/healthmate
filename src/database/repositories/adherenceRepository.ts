@@ -13,7 +13,7 @@ interface AdherenceLogRow {
   logged_at: string;
 }
 
-function parseDateParts(value: string): [number, number, number] | null {
+export function parseDateParts(value: string): [number, number, number] | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (!match) return null;
   const parts: [number, number, number] = [Number(match[1]), Number(match[2]), Number(match[3])];

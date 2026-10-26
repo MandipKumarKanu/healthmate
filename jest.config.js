@@ -4,6 +4,8 @@ module.exports = {
   testMatch: ['**/__tests__/**/*.test.ts'],
   moduleNameMapper: {
     '^expo-sqlite$': '<rootDir>/__tests__/__mocks__/expo-sqlite.js',
+    '^expo-notifications$': '<rootDir>/__tests__/__mocks__/expo-notifications.js',
+    '^react-native$': '<rootDir>/__tests__/__mocks__/react-native.js',
     '^@/(.*)$': '<rootDir>/src/$1',
   },
   transform: {

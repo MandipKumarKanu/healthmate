@@ -56,7 +56,12 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
         medicineName,
         dose.amount,
         dose.time,
-        dose.label
+        dose.label,
+        {
+          recurrence: schedule.recurrence,
+          startDate: schedule.startDate,
+          endDate: schedule.endDate,
+        }
       );
       if (!identifier) {
         // Never leave a schedule marked as notification-enabled when one or more
