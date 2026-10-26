@@ -85,6 +85,22 @@ jobs:
       - name: Generate native Android project
         run: npx expo prebuild --platform android --clean
 
+      - name: 🗜️ Enforce Single-ABI Packaging & Library Compression
+        run: |
+          sed -i 's/expo.useLegacyPackaging=false/expo.useLegacyPackaging=true/g' android/gradle.properties
+          echo "android.enableShrinkResourcesInReleaseBuilds=true" >> android/gradle.properties
+          node -e "
+            const fs = require('fs');
+            let content = fs.readFileSync('android/app/build.gradle', 'utf8');
+            if (!content.includes('abiFilters')) {
+              content = content.replace(
+                'buildConfigField \"String\", \"REACT_NATIVE_RELEASE_LEVEL\"',
+                'ndk { def arch = findProperty(\"reactNativeArchitectures\"); if (arch) { abiFilters arch.split(\",\") } }\n        buildConfigField \"String\", \"REACT_NATIVE_RELEASE_LEVEL\"'
+              );
+              fs.writeFileSync('android/app/build.gradle', content);
+            }
+          "
+
       - name: Build x86 Release APK
         working-directory: android
         run: |
