@@ -17,7 +17,10 @@ import { useReminderStore } from "../../store/reminderStore";
 import { ScheduledDose } from "../../types";
 import { adherenceRepository } from "../../database/repositories/adherenceRepository";
 import { scheduleRepository } from "../../database/repositories/scheduleRepository";
-import { formatScheduleDateLabel } from "../../utils/scheduleRecurrence";
+import {
+  formatScheduleDateLabel,
+  getDateTapAction,
+} from "../../utils/scheduleRecurrence";
 
 export default function CalendarScreen() {
   const router = useRouter();
@@ -28,6 +31,20 @@ export default function CalendarScreen() {
   useEffect(() => {
     loadDosesForDate(selectedDate);
   }, [selectedDate, loadDosesForDate]);
+
+  const activeSchedules = scheduleRepository.getAll();
+
+  const handleSelectDate = (date: string) => {
+    setSelectedDate(date);
+    // Dates with reminders stay in place (list updates below the calendar);
+    // empty dates jump straight into Add Reminder with the date prefilled.
+    if (getDateTapAction(activeSchedules, date) === "openCreate") {
+      router.push({
+        pathname: "/reminders/create",
+        params: { date },
+      });
+    }
+  };
 
   const handleMorePress = (dose: ScheduledDose) => {
     Alert.alert(
@@ -73,10 +90,8 @@ export default function CalendarScreen() {
         {/* Monthly Calendar Widget */}
         <CalendarGrid
           selectedDate={selectedDate}
-          schedules={scheduleRepository.getAll()}
-          onSelectDate={(date) => {
-            setSelectedDate(date);
-          }}
+          schedules={activeSchedules}
+          onSelectDate={handleSelectDate}
         />
 
         {/* Selected Date Summary Card */}

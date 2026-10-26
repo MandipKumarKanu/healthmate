@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { StyleSheet, View, Text, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
@@ -46,6 +46,18 @@ export function CalendarGrid({
   const selectedObj = new Date(selectedYear, selectedMonth - 1, selectedDay);
   const [viewYear, setViewYear] = useState(selectedObj.getFullYear());
   const [viewMonth, setViewMonth] = useState(selectedObj.getMonth()); // 0-indexed
+
+  // Keep the visible month in sync when selectedDate changes from outside
+  // (e.g. a date tapped in another screen) across month/year boundaries.
+  // This depends ONLY on selectedDate: browsing with the arrows changes
+  // viewYear/viewMonth without touching selectedDate, so month navigation
+  // is never fought or reset by this effect.
+  useEffect(() => {
+    const [y, m, d] = selectedDate.split("-").map(Number);
+    if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return;
+    setViewYear(y);
+    setViewMonth(m - 1); // 0-indexed
+  }, [selectedDate]);
 
   const handlePrevMonth = () => {
     if (viewMonth === 0) {

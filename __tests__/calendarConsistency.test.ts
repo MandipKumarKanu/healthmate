@@ -3,6 +3,7 @@ import {
   parseDateParts,
   isScheduleDueOnDate,
   hasReminderForDate,
+  getDateTapAction,
   formatScheduleDateLabel,
 } from "../src/utils/scheduleRecurrence";
 import { ReminderSchedule } from "../src/types";
@@ -124,6 +125,51 @@ describe("Shared Recurrence & Calendar Consistency", () => {
     it("does not show dot for disabled schedule", () => {
       // 2026-11-02 is Monday, but s2 is disabled
       expect(hasReminderForDate([schedules[1]], "2026-11-02")).toBe(false);
+    });
+  });
+
+  describe("getDateTapAction (date routing/selection)", () => {
+    const schedules: ReminderSchedule[] = [
+      {
+        id: "s1",
+        medicineId: "m1",
+        recurrence: "daily",
+        startDate: "2026-10-01",
+        endDate: "2026-10-31",
+        times: [{ id: "t1", time: "08:00", amount: "1 tablet", label: "Morning" }],
+        enabled: true,
+        notificationsEnabled: true,
+        createdAt: "2026-09-01",
+        updatedAt: "2026-09-01",
+      },
+      {
+        id: "s2",
+        medicineId: "m2",
+        recurrence: "once",
+        startDate: "2026-11-05",
+        times: [{ id: "t2", time: "20:00", amount: "1 capsule" }],
+        enabled: false, // disabled schedules must route to Add Reminder
+        notificationsEnabled: false,
+        createdAt: "2026-09-01",
+        updatedAt: "2026-09-01",
+      },
+    ];
+
+    it("selects in place when the tapped date has reminders", () => {
+      expect(getDateTapAction(schedules, "2026-10-26")).toBe("select"); // within daily window
+      expect(getDateTapAction(schedules, "2026-10-31")).toBe("select"); // last day of window
+    });
+
+    it("routes empty dates to Add Reminder with the date prefilled", () => {
+      expect(getDateTapAction(schedules, "2026-11-06")).toBe("openCreate");
+      expect(getDateTapAction(schedules, "2026-09-30")).toBe("openCreate");
+    });
+
+    it("treats disabled or out-of-window schedules as empty dates", () => {
+      // s2 is disabled, so its date has no active reminders
+      expect(getDateTapAction([schedules[1]], "2026-11-05")).toBe("openCreate");
+      // daily schedule ended Oct 31
+      expect(getDateTapAction([schedules[0]], "2026-11-01")).toBe("openCreate");
     });
   });
 

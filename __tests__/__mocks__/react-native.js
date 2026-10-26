@@ -21,6 +21,8 @@ const NativeModules = {
     openAppBatterySettings: jest.fn().mockResolvedValue(true),
     getDeviceManufacturer: jest.fn().mockResolvedValue("samsung"),
     openOemAutoStartSettings: jest.fn().mockResolvedValue(true),
+    canUseFullScreenIntent: jest.fn().mockResolvedValue(true),
+    openFullScreenIntentSettings: jest.fn().mockResolvedValue(true),
   },
 };
 

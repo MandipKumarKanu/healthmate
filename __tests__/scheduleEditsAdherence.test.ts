@@ -88,6 +88,48 @@ describe("Dose history and schedule edits", () => {
     expect(futureDoses.map((d) => d.time)).toEqual(["09:00", "20:00"]);
   });
 
+  it("persists custom dose labels and times through SQLite round-trips", () => {
+    const scheduleId = "sched_labels";
+    scheduleRepository.save({
+      id: scheduleId,
+      medicineId: "med_test_1",
+      recurrence: "daily",
+      startDate: "2026-10-01",
+      times: [
+        { id: "t1", time: "08:00", amount: "1 capsule", label: "With breakfast" },
+        { id: "t2", time: "22:00", amount: "1 capsule" },
+      ],
+      enabled: true,
+      notificationsEnabled: true,
+      createdAt: "2026-10-01T00:00:00.000Z",
+      updatedAt: "2026-10-01T00:00:00.000Z",
+    });
+
+    // Round-trip: custom label preserved, default label derived for time-only entry
+    const loaded = scheduleRepository.getById(scheduleId);
+    expect(loaded?.times).toHaveLength(2);
+    expect(loaded?.times[0].label).toBe("With breakfast");
+    expect(loaded?.times[1].label).toBeUndefined();
+    expect(loaded?.times.map((t) => t.time)).toEqual(["08:00", "22:00"]);
+
+    // Editing labels in place updates the same row without duplicating the schedule
+    scheduleRepository.save({
+      ...loaded!,
+      times: [
+        { id: "t1", time: "08:00", amount: "1 capsule", label: "Breakfast meds" },
+        { id: "t2", time: "22:00", amount: "1 capsule", label: "Before bed" },
+      ],
+      updatedAt: "2026-10-02T00:00:00.000Z",
+    });
+
+    const reloaded = scheduleRepository.getById(scheduleId);
+    expect(reloaded?.times.map((t) => t.label)).toEqual([
+      "Breakfast meds",
+      "Before bed",
+    ]);
+    expect(scheduleRepository.getAll().filter((s) => s.id === scheduleId)).toHaveLength(1);
+  });
+
   it("preserves historical doses when a dose is deleted from the schedule", () => {
     const scheduleId = "sched_amox_del";
     const initialSchedule: ReminderSchedule = {

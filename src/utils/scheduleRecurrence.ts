@@ -129,6 +129,20 @@ export function hasReminderForDate(
 }
 
 /**
+ * Decides what tapping a calendar date should do:
+ * - "select" when reminders exist on that date: select it in place and show only
+ *   that date's doses, without navigating away.
+ * - "openCreate" when the date has no reminders: open Add Reminder with the
+ *   date prefilled so the user can schedule straight into it.
+ */
+export function getDateTapAction(
+  schedules: ReminderSchedule[],
+  date: string,
+): "select" | "openCreate" {
+  return hasReminderForDate(schedules, date) ? "select" : "openCreate";
+}
+
+/**
  * Formats the schedule section header title:
  * - If selectedDate is today: "Today's Schedule"
  * - If selectedDate is not today: "Schedule for <Month> <Day>" (e.g. "Schedule for Oct 29")

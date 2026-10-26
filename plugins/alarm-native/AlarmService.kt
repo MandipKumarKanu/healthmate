@@ -71,15 +71,23 @@ class AlarmService : Service() {
             "&label=" + Uri.encode(label)
         )
 
+        val requestCode = (scheduleId + "_" + time).hashCode()
+
         val fullScreenIntent = Intent(Intent.ACTION_VIEW, deepLinkUri, this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or
                     Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+            putExtra(EXTRA_SCHEDULE_ID, scheduleId)
+            putExtra(EXTRA_MEDICINE_NAME, medicineName)
+            putExtra(EXTRA_AMOUNT, amount)
+            putExtra(EXTRA_TIME, time)
+            putExtra(EXTRA_LABEL, label)
         }
 
         val fullScreenPendingIntent = PendingIntent.getActivity(
             this,
-            scheduleId.hashCode(),
+            requestCode,
             fullScreenIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -109,6 +117,13 @@ class AlarmService : Service() {
             .build()
 
         startForeground(NOTIFICATION_ID, notification)
+
+        // Try direct startActivity as well to ensure full-screen alarm appears
+        try {
+            startActivity(fullScreenIntent)
+        } catch (_: Exception) {
+            // fullScreenIntent on notification handles delivery when background launch is constrained
+        }
 
         playAudio()
         startVibration()
@@ -199,6 +214,9 @@ class AlarmService : Service() {
                 setSound(null, null)
                 enableVibration(false)
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                try {
+                    setBypassDnd(true)
+                } catch (_: Exception) {}
             }
             val manager = getSystemService(NotificationManager::class.java)
             manager?.createNotificationChannel(channel)

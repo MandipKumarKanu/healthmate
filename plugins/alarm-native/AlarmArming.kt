@@ -87,7 +87,8 @@ object AlarmArming {
 
     fun getAllEntries(context: Context): List<Entry> {
         val map = readPendingMap(context)
-        return (0 until map.length()).map { entryFromJson(map.getJSONObject(map.names().getString(it))) }
+        val names = map.names() ?: return emptyList()
+        return (0 until names.length()).map { entryFromJson(map.getJSONObject(names.getString(it))) }
     }
 
     fun getEntry(context: Context, scheduleId: String, time: String): Entry? {

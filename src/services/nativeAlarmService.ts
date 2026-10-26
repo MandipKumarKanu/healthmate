@@ -38,6 +38,8 @@ interface NativeAlarmModuleInterface {
   openExactAlarmSettings(): Promise<boolean>;
   openAppBatterySettings(): Promise<boolean>;
   openOemAutoStartSettings(): Promise<boolean>;
+  canUseFullScreenIntent(): Promise<boolean>;
+  openFullScreenIntentSettings(): Promise<boolean>;
   getDeviceManufacturer(): Promise<string>;
 }
 
@@ -248,6 +250,27 @@ export const nativeAlarmService = {
       return await AlarmModule.openOemAutoStartSettings();
     } catch (e) {
       console.warn("nativeAlarmService.openOemAutoStartSettings failed:", e);
+      return false;
+    }
+  },
+
+  async canUseFullScreenIntent(): Promise<boolean> {
+    if (Platform.OS !== "android") return true;
+    if (!AlarmModule?.canUseFullScreenIntent) return true;
+    try {
+      return await AlarmModule.canUseFullScreenIntent();
+    } catch {
+      return true;
+    }
+  },
+
+  async openFullScreenIntentSettings(): Promise<boolean> {
+    if (Platform.OS !== "android") return true;
+    if (!AlarmModule?.openFullScreenIntentSettings) return false;
+    try {
+      return await AlarmModule.openFullScreenIntentSettings();
+    } catch (e) {
+      console.warn("nativeAlarmService.openFullScreenIntentSettings failed:", e);
       return false;
     }
   },

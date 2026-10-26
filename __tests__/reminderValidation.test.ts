@@ -147,6 +147,13 @@ describe("reminderValidation", () => {
       expect(getTimeLabel("19:00")).toBe("Evening");
       expect(getTimeLabel("22:00")).toBe("Night");
     });
+
+    it("matches the release-checklist anchor times exactly", () => {
+      expect(getTimeLabel("08:00")).toBe("Morning"); // Morning anchor
+      expect(getTimeLabel("14:00")).toBe("Afternoon"); // Afternoon anchor
+      expect(getTimeLabel("18:00")).toBe("Evening"); // Evening anchor
+      expect(getTimeLabel("22:00")).toBe("Night"); // Night anchor
+    });
   });
 
   describe("Medicine Selection & Dosage Form Adaptation", () => {

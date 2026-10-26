@@ -115,10 +115,35 @@ function withAlarmMainActivity(config) {
     }
     window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 `;
+      const onNewIntentCode = `
+  override fun onNewIntent(intent: android.content.Intent) {
+    super.onNewIntent(intent)
+    setIntent(intent)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+      setShowWhenLocked(true)
+      setTurnScreenOn(true)
+    } else {
+      @Suppress("DEPRECATION")
+      window.addFlags(
+        android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+        android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+        android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+        android.view.WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+      )
+    }
+    window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    val keyguardManager = getSystemService(android.content.Context.KEYGUARD_SERVICE) as? android.app.KeyguardManager
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      keyguardManager?.requestDismissKeyguard(this, null)
+    }
+  }
+`;
       contents = contents.replace(
         "super.onCreate(null)",
-        `${lockScreenCode}\n    super.onCreate(null)`,
+        `${lockScreenCode}\n    super.onCreate(null)\n  }${onNewIntentCode}`,
       );
+      // clean up any duplicate closing brace if pattern replaced 'super.onCreate(null)'
+      contents = contents.replace("super.onCreate(null)\n  }\n  }", "super.onCreate(null)\n  }");
       config.modResults.contents = contents;
     }
     return config;

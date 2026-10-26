@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   StyleSheet,
   View,
   Text,
-  TouchableOpacity,
   Animated,
   PanResponder,
   Dimensions,
   Vibration,
+  Platform,
+  useColorScheme,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -18,15 +19,20 @@ import { adherenceRepository } from "../database/repositories/adherenceRepositor
 import { scheduleRepository } from "../database/repositories/scheduleRepository";
 import { medicineRepository } from "../database/repositories/medicineRepository";
 import { useAppStore } from "../store/appStore";
+import { Colors } from "../theme/colors";
+import { Radius, Spacing, Typography } from "../theme/tokens";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const SLIDER_WIDTH = Math.min(SCREEN_WIDTH - 48, 340);
+const SLIDER_WIDTH = Math.min(SCREEN_WIDTH - 44, 350);
 const PUCK_SIZE = 58;
-const MAX_DRAG = (SLIDER_WIDTH - PUCK_SIZE) / 2 - 8;
-const SWIPE_THRESHOLD = MAX_DRAG * 0.75;
+const MAX_DRAG = (SLIDER_WIDTH - PUCK_SIZE) / 2 - 6;
+const SWIPE_THRESHOLD = MAX_DRAG * 0.70;
 
 export default function FullScreenAlarmScreen() {
   const router = useRouter();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+
   const params = useLocalSearchParams<{
     scheduleId?: string;
     medicineName?: string;
@@ -40,41 +46,64 @@ export default function FullScreenAlarmScreen() {
 
   const [currentTime, setCurrentTime] = useState<string>("");
   const [currentDate, setCurrentDate] = useState<string>("");
-  const [completedAction, setCompletedAction] = useState<
-    "taken" | "snooze" | "skipped" | null
-  >(null);
+  const [completedAction, setCompletedAction] = useState<"taken" | "snooze" | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
-  // Fallback to query params or database lookup
-  const scheduleId = params.scheduleId ?? "";
-  let medicineName = params.medicineName ?? "Medication";
-  let amount = params.amount ?? "1 dose";
-  let doseTime = params.time ?? "";
-  let doseLabel = params.label ?? "";
-  let medicineId = "";
+  // Resolve medication and schedule details safely via useMemo
+  const medDetails = useMemo(() => {
+    const sId = params.scheduleId ?? "";
+    let mName = params.medicineName ?? "Medication";
+    let amt = params.amount ?? "1 dose";
+    let dTime = params.time ?? "";
+    let dLabel = params.label ?? "";
+    let mId = "";
+    let dForm = "";
 
-  if (scheduleId) {
-    const sched = scheduleRepository.getById(scheduleId);
-    if (sched) {
-      medicineId = sched.medicineId;
-      const med = medicineRepository.getById(sched.medicineId);
-      if (med) {
-        medicineName = med.name;
-        if (med.strength) amount = `${med.strength} · ${amount}`;
-      }
-      if (!doseTime && sched.times.length > 0) {
-        doseTime = sched.times[0].time;
-        doseLabel = sched.times[0].label ?? doseLabel;
+    if (sId) {
+      const sched = scheduleRepository.getById(sId);
+      if (sched) {
+        mId = sched.medicineId;
+        const med = medicineRepository.getById(sched.medicineId);
+        if (med) {
+          mName = med.name;
+          dForm = med.dosageForm || "";
+          if (med.strength) amt = `${med.strength} · ${amt}`;
+        }
+        if (!dTime && sched.times.length > 0) {
+          dTime = sched.times[0].time;
+          dLabel = sched.times[0].label ?? dLabel;
+        }
       }
     }
-  }
 
-  // Animation values initialized via useState for React Compiler compatibility
+    if (!mId && mName) {
+      const matched = medicineRepository.getAll().find((m) => m.name.toLowerCase() === mName.toLowerCase());
+      if (matched) {
+        mId = matched.id;
+        if (!dForm) dForm = matched.dosageForm || "";
+      }
+    }
+
+    return {
+      scheduleId: sId,
+      medicineId: mId,
+      medicineName: mName,
+      amount: amt,
+      doseTime: dTime,
+      doseLabel: dLabel,
+      dosageForm: dForm,
+    };
+  }, [params.scheduleId, params.medicineName, params.amount, params.time, params.label]);
+
+  const { scheduleId, medicineId, medicineName, amount, doseTime, doseLabel, dosageForm } = medDetails;
+
+  // Animation values
   const [panX] = useState(() => new Animated.Value(0));
-  const [pulseScale1] = useState(() => new Animated.Value(1));
-  const [pulseScale2] = useState(() => new Animated.Value(1));
-  const [bellSwing] = useState(() => new Animated.Value(0));
+  const [chimeScale] = useState(() => new Animated.Value(1));
+  const [chimeTilt] = useState(() => new Animated.Value(0));
 
-  // Clock ticker & native keyguard unlock
+  // Clock ticker & native lockscreen keyguard unlock
   useEffect(() => {
     nativeAlarmService.dismissKeyguard();
 
@@ -85,14 +114,14 @@ export default function FullScreenAlarmScreen() {
           hour: "2-digit",
           minute: "2-digit",
           second: "2-digit",
-        }),
+        })
       );
       setCurrentDate(
         now.toLocaleDateString([], {
           weekday: "long",
           month: "short",
           day: "numeric",
-        }),
+        })
       );
     };
 
@@ -101,89 +130,83 @@ export default function FullScreenAlarmScreen() {
     return () => clearInterval(timer);
   }, []);
 
-  // Looping pulsing ring and bell swing animations
+  // Subtle breathing chime animation (gentle and soothing, not blinding)
   useEffect(() => {
-    const pulse1 = Animated.loop(
+    const pulseAnim = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseScale1, {
-          toValue: 1.45,
-          duration: 1500,
+        Animated.timing(chimeScale, {
+          toValue: 1.08,
+          duration: 1400,
           useNativeDriver: true,
         }),
-        Animated.timing(pulseScale1, {
+        Animated.timing(chimeScale, {
           toValue: 1,
-          duration: 1500,
+          duration: 1400,
           useNativeDriver: true,
         }),
-      ]),
+      ])
     );
 
-    const pulse2 = Animated.loop(
+    const tiltAnim = Animated.loop(
       Animated.sequence([
-        Animated.delay(600),
-        Animated.timing(pulseScale2, {
-          toValue: 1.6,
-          duration: 1800,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseScale2, {
-          toValue: 1,
-          duration: 1800,
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-
-    const swing = Animated.loop(
-      Animated.sequence([
-        Animated.timing(bellSwing, {
-          toValue: -12,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-        Animated.timing(bellSwing, {
-          toValue: 12,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-        Animated.timing(bellSwing, {
+        Animated.timing(chimeTilt, {
           toValue: -8,
-          duration: 120,
+          duration: 160,
           useNativeDriver: true,
         }),
-        Animated.timing(bellSwing, {
+        Animated.timing(chimeTilt, {
           toValue: 8,
+          duration: 160,
+          useNativeDriver: true,
+        }),
+        Animated.timing(chimeTilt, {
+          toValue: -4,
+          duration: 140,
+          useNativeDriver: true,
+        }),
+        Animated.timing(chimeTilt, {
+          toValue: 4,
+          duration: 140,
+          useNativeDriver: true,
+        }),
+        Animated.timing(chimeTilt, {
+          toValue: 0,
           duration: 120,
           useNativeDriver: true,
         }),
-        Animated.timing(bellSwing, {
-          toValue: 0,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        Animated.delay(1200),
-      ]),
+        Animated.delay(1800),
+      ])
     );
 
-    pulse1.start();
-    pulse2.start();
-    swing.start();
+    pulseAnim.start();
+    tiltAnim.start();
 
     return () => {
-      pulse1.stop();
-      pulse2.stop();
-      swing.stop();
+      pulseAnim.stop();
+      tiltAnim.stop();
       nativeAlarmService.stopAlarm();
     };
-  }, [bellSwing, pulseScale1, pulseScale2]);
+  }, [chimeScale, chimeTilt]);
 
-  const handleTakeDose = useCallback(async () => {
+  // Swipe Action: Take Dose (Swipe Right)
+  const executeTakeDose = useCallback(async () => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+    setErrorMessage(null);
+
+    // Smooth glide to right edge
+    Animated.timing(panX, {
+      toValue: MAX_DRAG,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+
     try {
-      Vibration.vibrate(100);
+      Vibration.vibrate(Platform.OS === "android" ? [0, 60, 40, 60] : 100);
       setCompletedAction("taken");
       await nativeAlarmService.stopAlarm();
 
-      if (scheduleId && medicineId && doseTime) {
+      if (scheduleId && medicineId) {
         const now = new Date();
         const todayStr = [
           now.getFullYear(),
@@ -191,13 +214,15 @@ export default function FullScreenAlarmScreen() {
           String(now.getDate()).padStart(2, "0"),
         ].join("-");
 
+        const targetTime = doseTime || `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+
         try {
           adherenceRepository.logDoseStatus(
             scheduleId,
             medicineId,
             todayStr,
-            doseTime,
-            "taken",
+            targetTime,
+            "taken"
           );
         } catch (logErr) {
           console.warn("Could not record dose adherence log:", logErr);
@@ -206,17 +231,37 @@ export default function FullScreenAlarmScreen() {
 
       setTimeout(() => {
         router.replace("/(tabs)/home");
-      }, 1200);
+      }, 750);
     } catch (e) {
-      console.warn("Failed to take dose:", e);
-      router.replace("/(tabs)/home");
+      console.warn("Failed to record taken dose:", e);
+      setErrorMessage("Could not complete action. Please try again.");
+      setIsProcessing(false);
+      setCompletedAction(null);
+      Animated.spring(panX, {
+        toValue: 0,
+        useNativeDriver: true,
+        bounciness: 8,
+      }).start();
     }
-  }, [scheduleId, medicineId, doseTime, router]);
+  }, [isProcessing, panX, scheduleId, medicineId, doseTime, router]);
 
-  const handleSnooze = useCallback(async () => {
+  // Swipe Action: Snooze Alarm (Swipe Left)
+  const executeSnooze = useCallback(async () => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+    setErrorMessage(null);
+
+    // Smooth glide to left edge
+    Animated.timing(panX, {
+      toValue: -MAX_DRAG,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+
     try {
-      Vibration.vibrate(100);
+      Vibration.vibrate(Platform.OS === "android" ? [0, 40, 40, 80] : 100);
       setCompletedAction("snooze");
+
       await nativeAlarmService.snoozeAlarm({
         scheduleId,
         medicineName,
@@ -228,237 +273,258 @@ export default function FullScreenAlarmScreen() {
 
       setTimeout(() => {
         router.replace("/(tabs)/home");
-      }, 1200);
+      }, 750);
     } catch (e) {
       console.warn("Failed to snooze alarm:", e);
-      router.replace("/(tabs)/home");
+      setErrorMessage("Could not snooze alarm. Please try again.");
+      setIsProcessing(false);
+      setCompletedAction(null);
+      Animated.spring(panX, {
+        toValue: 0,
+        useNativeDriver: true,
+        bounciness: 8,
+      }).start();
     }
-  }, [scheduleId, medicineName, amount, doseTime, doseLabel, snoozeMinutes, router]);
+  }, [isProcessing, panX, scheduleId, medicineName, amount, doseTime, doseLabel, snoozeMinutes, router]);
 
-  const handleSkipDose = useCallback(async () => {
-    try {
-      Vibration.vibrate(50);
-      setCompletedAction("skipped");
-      await nativeAlarmService.stopAlarm();
-
-      if (scheduleId && medicineId && doseTime) {
-        const now = new Date();
-        const todayStr = [
-          now.getFullYear(),
-          String(now.getMonth() + 1).padStart(2, "0"),
-          String(now.getDate()).padStart(2, "0"),
-        ].join("-");
-
-        try {
-          adherenceRepository.logDoseStatus(
-            scheduleId,
-            medicineId,
-            todayStr,
-            doseTime,
-            "skipped",
-          );
-        } catch (logErr) {
-          console.warn("Could not record skip adherence log:", logErr);
-        }
-      }
-
-      setTimeout(() => {
-        router.replace("/(tabs)/home");
-      }, 1000);
-    } catch (e) {
-      console.warn("Failed to skip dose:", e);
-      router.replace("/(tabs)/home");
-    }
-  }, [scheduleId, medicineId, doseTime, router]);
-
-  // PanResponder for Interactive Swipe Slider
+  // Tactile PanResponder for the single physical slider
   const panResponder = useMemo(
     () =>
       PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
+        onStartShouldSetPanResponder: () => !isProcessing,
+        onMoveShouldSetPanResponder: (_, gesture) => !isProcessing && Math.abs(gesture.dx) > 6,
         onPanResponderMove: (_, gestureState) => {
-          const clampedX = Math.max(
-            -MAX_DRAG,
-            Math.min(MAX_DRAG, gestureState.dx),
-          );
-          panX.setValue(clampedX);
+          if (isProcessing) return;
+
+          // Non-linear damping near the ends for realistic physical resistance
+          let dx = gestureState.dx;
+          if (Math.abs(dx) > MAX_DRAG) {
+            const overflow = Math.abs(dx) - MAX_DRAG;
+            dx = (dx > 0 ? 1 : -1) * (MAX_DRAG + overflow * 0.22);
+          }
+
+          panX.setValue(dx);
+
+          // Threshold haptic feedback tick attached to the active gesture
+          const gs = gestureState as { dx: number; hasTriggeredHaptic?: boolean };
+          if (Math.abs(dx) >= SWIPE_THRESHOLD && !gs.hasTriggeredHaptic) {
+            gs.hasTriggeredHaptic = true;
+            try {
+              Vibration.vibrate(Platform.OS === "android" ? 25 : 40);
+            } catch (_) {}
+          } else if (Math.abs(dx) < SWIPE_THRESHOLD && gs.hasTriggeredHaptic) {
+            gs.hasTriggeredHaptic = false;
+          }
         },
         onPanResponderRelease: (_, gestureState) => {
+          if (isProcessing) return;
+
           if (gestureState.dx >= SWIPE_THRESHOLD) {
-            handleTakeDose();
+            executeTakeDose();
           } else if (gestureState.dx <= -SWIPE_THRESHOLD) {
-            handleSnooze();
+            executeSnooze();
           } else {
+            // Smooth spring return to center
             Animated.spring(panX, {
               toValue: 0,
               useNativeDriver: true,
-              bounciness: 12,
+              bounciness: 8,
+              speed: 14,
+            }).start();
+          }
+        },
+        onPanResponderTerminate: () => {
+          if (!isProcessing) {
+            Animated.spring(panX, {
+              toValue: 0,
+              useNativeDriver: true,
+              bounciness: 8,
             }).start();
           }
         },
       }),
-    [panX, handleTakeDose, handleSnooze],
+    [isProcessing, panX, executeTakeDose, executeSnooze]
   );
 
-  const bellRotation = bellSwing.interpolate({
-    inputRange: [-15, 15],
-    outputRange: ["-15deg", "15deg"],
+  const bellRotation = chimeTilt.interpolate({
+    inputRange: [-10, 10],
+    outputRange: ["-10deg", "10deg"],
   });
 
   const greenFillOpacity = panX.interpolate({
     inputRange: [0, MAX_DRAG],
-    outputRange: [0, 0.9],
+    outputRange: [0, 1],
     extrapolate: "clamp",
   });
 
   const amberFillOpacity = panX.interpolate({
     inputRange: [-MAX_DRAG, 0],
-    outputRange: [0.9, 0],
+    outputRange: [1, 0],
     extrapolate: "clamp",
   });
 
+  const themeColors = {
+    bg: isDark ? "#121217" : Colors.background,
+    cardBg: isDark ? "#1C1C24" : Colors.cardBackground,
+    cardBorder: isDark ? "#2A2A36" : Colors.border,
+    textPrimary: isDark ? "#F4F4F6" : Colors.textPrimary,
+    textSecondary: isDark ? "#9E9EA8" : Colors.textSecondary,
+    trackBg: isDark ? "#242430" : "#E8E7ED",
+    trackBorder: isDark ? "#323242" : "#DDDCDE",
+    puckBg: isDark ? "#2E2E3C" : "#FFFFFF",
+    puckBorder: isDark ? "#3E3E50" : "#D4D3D8",
+  };
+
   return (
-    <View style={styles.container}>
-      <StatusBar style="light" />
+    <View style={[styles.container, { backgroundColor: themeColors.bg }]}>
+      <StatusBar style={isDark ? "light" : "dark"} />
       <SafeAreaView style={styles.safeArea}>
-        {/* Top Clock and Date Header */}
+        {/* Top Brand Tag & Live Clock Header */}
         <View style={styles.header}>
-          <Text style={styles.dateText}>{currentDate.toUpperCase()}</Text>
-          <Text style={styles.clockText}>{currentTime}</Text>
-        </View>
-
-        {/* Pulsing Bell Icon */}
-        <View style={styles.animationArea}>
-          <Animated.View
-            style={[
-              styles.pulseCircle,
-              styles.pulseCircleOuter,
-              { transform: [{ scale: pulseScale2 }] },
-            ]}
-          />
-          <Animated.View
-            style={[
-              styles.pulseCircle,
-              styles.pulseCircleInner,
-              { transform: [{ scale: pulseScale1 }] },
-            ]}
-          />
-          <View style={styles.bellBackground}>
-            <Animated.View style={{ transform: [{ rotate: bellRotation }] }}>
-              <Ionicons name="notifications" size={56} color="#FFFFFF" />
-            </Animated.View>
+          <View style={styles.brandBadge}>
+            <Ionicons name="medkit" size={14} color={Colors.primary} />
+            <Text style={styles.brandBadgeText}>HealthMate Reminder</Text>
           </View>
+          <Text style={[styles.clockText, { color: themeColors.textPrimary }]}>{currentTime}</Text>
+          <Text style={[styles.dateText, { color: themeColors.textSecondary }]}>{currentDate}</Text>
         </View>
 
-        {/* Medication Details Card */}
-        <View style={styles.medCard}>
-          <View style={styles.doseBadge}>
-            <Ionicons name="time" size={14} color="#0788F5" />
-            <Text style={styles.doseBadgeText}>
-              {doseLabel
-                ? `${doseLabel} · ${doseTime}`
-                : doseTime || "Dose Reminder"}
+        {/* Medication Details Hero Card */}
+        <View
+          style={[
+            styles.heroCard,
+            {
+              backgroundColor: themeColors.cardBg,
+              borderColor: themeColors.cardBorder,
+            },
+          ]}
+        >
+          {/* Dose Scheduled Chip */}
+          <View style={styles.scheduleChip}>
+            <Ionicons name="time" size={14} color={Colors.primary} />
+            <Text style={styles.scheduleChipText}>
+              {doseLabel ? `${doseLabel} · ${doseTime}` : doseTime ? `Scheduled at ${doseTime}` : "Medication Due"}
             </Text>
           </View>
-          <Text style={styles.medName} numberOfLines={2}>
+
+          {/* Gentle Breathing Chime Indicator */}
+          <View style={styles.chimeArea}>
+            <Animated.View
+              style={[
+                styles.chimeHalo,
+                {
+                  transform: [{ scale: chimeScale }],
+                },
+              ]}
+            />
+            <View style={styles.chimeCircle}>
+              <Animated.View style={{ transform: [{ rotate: bellRotation }] }}>
+                <Ionicons name="notifications" size={36} color={Colors.primary} />
+              </Animated.View>
+            </View>
+          </View>
+
+          {/* Medication Name & Details */}
+          <Text style={[styles.medName, { color: themeColors.textPrimary }]} numberOfLines={3}>
             {medicineName}
           </Text>
-          <Text style={styles.medAmount}>{amount}</Text>
+          <Text style={[styles.medAmount, { color: themeColors.textSecondary }]}>
+            {dosageForm ? `${dosageForm.toUpperCase()} · ${amount}` : amount}
+          </Text>
         </View>
 
-        {/* Action Result Overlay */}
+        {/* Action Status Feedback Toast */}
         {completedAction && (
-          <View style={styles.actionBanner}>
+          <View
+            style={[
+              styles.actionToast,
+              completedAction === "taken" ? styles.actionToastTaken : styles.actionToastSnooze,
+            ]}
+          >
             <Ionicons
-              name={
-                completedAction === "taken"
-                  ? "checkmark-circle"
-                  : completedAction === "snooze"
-                    ? "alarm"
-                    : "close-circle"
-              }
-              size={24}
+              name={completedAction === "taken" ? "checkmark-circle" : "alarm"}
+              size={20}
               color="#FFFFFF"
             />
-            <Text style={styles.actionBannerText}>
-              {completedAction === "taken"
-                ? "Dose Logged as Taken!"
-                : completedAction === "snooze"
-                  ? `Snoozed for ${snoozeMinutes} minutes`
-                  : "Dose Skipped"}
+            <Text style={styles.actionToastText}>
+              {completedAction === "taken" ? "Dose Recorded as Taken" : `Snoozed for ${snoozeMinutes} Minutes`}
             </Text>
           </View>
         )}
 
-        {/* Interactive Swipe Slider */}
-        <View style={styles.sliderSection}>
-          <View style={styles.sliderTrack}>
+        {/* Error Notification */}
+        {errorMessage && (
+          <View style={styles.errorToast}>
+            <Ionicons name="alert-circle" size={18} color={Colors.error} />
+            <Text style={styles.errorToastText}>{errorMessage}</Text>
+          </View>
+        )}
+
+        {/* Single Primary Interaction: Physical Swipe Control */}
+        <View style={styles.sliderContainer}>
+          <View
+            style={[
+              styles.sliderTrack,
+              {
+                backgroundColor: themeColors.trackBg,
+                borderColor: themeColors.trackBorder,
+              },
+            ]}
+          >
             {/* Left Amber Snooze Fill */}
             <Animated.View
-              style={[styles.sliderFillAmber, { opacity: amberFillOpacity }]}
+              style={[
+                styles.sliderFill,
+                styles.sliderFillAmber,
+                { opacity: amberFillOpacity },
+              ]}
             />
             {/* Right Green Take Fill */}
             <Animated.View
-              style={[styles.sliderFillGreen, { opacity: greenFillOpacity }]}
+              style={[
+                styles.sliderFill,
+                styles.sliderFillGreen,
+                { opacity: greenFillOpacity },
+              ]}
             />
 
-            <View style={styles.sliderLabelsRow}>
-              <View style={styles.sliderLabelCol}>
-                <Ionicons name="alarm-outline" size={16} color="#F59E0B" />
-                <Text style={styles.sliderHintLeft}>Snooze {snoozeMinutes}m</Text>
+            {/* Left and Right Target Labels */}
+            <View style={styles.sliderLabelsLayer} pointerEvents="none">
+              <View style={styles.sliderLabelGroupLeft}>
+                <Ionicons name="alarm-outline" size={18} color="#D97706" />
+                <Text style={styles.sliderLabelLeftText}>Snooze {snoozeMinutes}m</Text>
               </View>
-              <View style={styles.sliderLabelCol}>
-                <Text style={styles.sliderHintRight}>Take Dose</Text>
-                <Ionicons name="checkmark-outline" size={16} color="#10B981" />
+              <View style={styles.sliderLabelGroupRight}>
+                <Text style={styles.sliderLabelRightText}>Take Dose</Text>
+                <Ionicons name="checkmark-circle-outline" size={18} color="#059669" />
               </View>
             </View>
 
-            {/* Draggable Puck */}
+            {/* Draggable Puck (Center Handle) */}
             <Animated.View
               {...panResponder.panHandlers}
               style={[
                 styles.sliderPuck,
                 {
+                  backgroundColor: themeColors.puckBg,
+                  borderColor: themeColors.puckBorder,
                   transform: [{ translateX: panX }],
                 },
               ]}
             >
-              <Ionicons name="swap-horizontal" size={26} color="#0B111E" />
+              <Ionicons
+                name="swap-horizontal"
+                size={26}
+                color={Colors.primary}
+              />
             </Animated.View>
           </View>
-          <Text style={styles.sliderInstruction}>
-            Swipe right to Take • Swipe left to Snooze
+
+          {/* Clean Guidance Hint */}
+          <Text style={[styles.sliderHint, { color: themeColors.textSecondary }]}>
+            Swipe right to take • Swipe left to snooze
           </Text>
         </View>
-
-        {/* Quick Action Buttons */}
-        <View style={styles.quickButtonsRow}>
-          <TouchableOpacity
-            style={styles.btnTake}
-            activeOpacity={0.8}
-            onPress={handleTakeDose}
-          >
-            <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
-            <Text style={styles.btnTakeText}>Take Dose</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.btnSnooze}
-            activeOpacity={0.8}
-            onPress={handleSnooze}
-          >
-            <Ionicons name="time" size={20} color="#FFFFFF" />
-            <Text style={styles.btnSnoozeText}>Snooze {snoozeMinutes}m</Text>
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity
-          style={styles.btnSkip}
-          activeOpacity={0.7}
-          onPress={handleSkipDose}
-        >
-          <Text style={styles.btnSkipText}>Skip this dose</Text>
-        </TouchableOpacity>
       </SafeAreaView>
     </View>
   );
@@ -467,250 +533,225 @@ export default function FullScreenAlarmScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#070D18",
   },
   safeArea: {
     flex: 1,
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 24,
+    paddingHorizontal: Spacing.screenPaddingHorizontal,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.xl,
   },
   header: {
     alignItems: "center",
-    marginTop: 8,
+    marginTop: Spacing.xs,
   },
-  dateText: {
-    fontSize: 13,
+  brandBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: Radius.pill,
+    marginBottom: 8,
+  },
+  brandBadgeText: {
+    fontSize: 12,
     fontWeight: "700",
-    letterSpacing: 2,
-    color: "#0788F5",
-    marginBottom: 4,
+    color: Colors.primaryDark,
+    letterSpacing: 0.2,
   },
   clockText: {
     fontSize: 44,
     fontWeight: "800",
-    color: "#FFFFFF",
+    letterSpacing: 0.5,
     fontVariant: ["tabular-nums"],
-    letterSpacing: 1,
   },
-  animationArea: {
-    alignItems: "center",
-    justifyContent: "center",
-    width: 180,
-    height: 180,
-    marginVertical: 10,
+  dateText: {
+    fontSize: 14,
+    fontWeight: "500",
+    marginTop: 2,
   },
-  pulseCircle: {
-    position: "absolute",
-    borderRadius: 999,
-  },
-  pulseCircleOuter: {
-    width: 170,
-    height: 170,
-    backgroundColor: "rgba(7, 136, 245, 0.12)",
-  },
-  pulseCircleInner: {
-    width: 130,
-    height: 130,
-    backgroundColor: "rgba(7, 136, 245, 0.22)",
-  },
-  bellBackground: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: "#0788F5",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#0788F5",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.6,
-    shadowRadius: 18,
-    elevation: 12,
-  },
-  medCard: {
+  heroCard: {
     width: "100%",
-    backgroundColor: "#0F1A2E",
-    borderRadius: 24,
-    padding: 22,
+    borderRadius: Radius.card,
+    paddingVertical: 24,
+    paddingHorizontal: 20,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#1D2F4E",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.4,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
     shadowRadius: 16,
-    elevation: 8,
+    elevation: 4,
+    marginVertical: Spacing.sm,
   },
-  doseBadge: {
+  scheduleChip: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(7, 136, 245, 0.15)",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
     gap: 6,
-    marginBottom: 12,
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: Radius.pill,
+    marginBottom: 16,
   },
-  doseBadgeText: {
+  scheduleChipText: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#60A5FA",
+    color: Colors.primaryDark,
+  },
+  chimeArea: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: 88,
+    height: 88,
+    marginVertical: 4,
+  },
+  chimeHalo: {
+    position: "absolute",
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: Colors.primaryLight,
+  },
+  chimeCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: Colors.primaryLight,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: "rgba(7, 136, 245, 0.25)",
   },
   medName: {
-    fontSize: 26,
-    fontWeight: "800",
-    color: "#FFFFFF",
+    fontSize: 24,
+    fontWeight: "700",
     textAlign: "center",
-    marginBottom: 6,
+    marginTop: 14,
+    marginBottom: 4,
+    lineHeight: 30,
   },
   medAmount: {
-    fontSize: 16,
-    color: "#94A3B8",
+    fontSize: 15,
     fontWeight: "500",
+    textAlign: "center",
   },
-  actionBanner: {
+  actionToast: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "#1E293B",
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingVertical: 10,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#334155",
+    borderRadius: Radius.pill,
+    marginVertical: 4,
   },
-  actionBannerText: {
-    fontSize: 15,
+  actionToastTaken: {
+    backgroundColor: Colors.success,
+  },
+  actionToastSnooze: {
+    backgroundColor: Colors.warning,
+  },
+  actionToastText: {
+    fontSize: 14,
     fontWeight: "700",
     color: "#FFFFFF",
   },
-  sliderSection: {
+  errorToast: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: Colors.errorLight,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: Radius.pill,
+    marginVertical: 4,
+  },
+  errorToastText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: Colors.errorDark,
+  },
+  sliderContainer: {
     width: "100%",
     alignItems: "center",
-    marginVertical: 12,
+    marginBottom: Spacing.sm,
   },
   sliderTrack: {
     width: SLIDER_WIDTH,
     height: 66,
-    backgroundColor: "#111D33",
-    borderRadius: 33,
-    justifyContent: "center",
-    alignItems: "center",
+    borderRadius: Radius.pill,
     borderWidth: 1.5,
-    borderColor: "#1E3256",
+    justifyContent: "center",
     overflow: "hidden",
+    position: "relative",
+  },
+  sliderFill: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    width: "50%",
+  },
+  sliderFillAmber: {
+    left: 0,
+    backgroundColor: "#FEF3C7",
   },
   sliderFillGreen: {
+    right: 0,
+    backgroundColor: "#D1FAE5",
+  },
+  sliderLabelsLayer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
     position: "absolute",
+    left: 0,
     right: 0,
     top: 0,
     bottom: 0,
-    left: "50%",
-    backgroundColor: "#10B981",
   },
-  sliderFillAmber: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    right: "50%",
-    backgroundColor: "#F59E0B",
-  },
-  sliderLabelsRow: {
-    flexDirection: "row",
-    width: "100%",
-    justifyContent: "space-between",
-    paddingHorizontal: 18,
-  },
-  sliderLabelCol: {
+  sliderLabelGroupLeft: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
   },
-  sliderHintLeft: {
-    fontSize: 12,
+  sliderLabelLeftText: {
+    fontSize: 13,
     fontWeight: "700",
-    color: "#F59E0B",
+    color: "#B45309",
   },
-  sliderHintRight: {
-    fontSize: 12,
+  sliderLabelGroupRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  sliderLabelRightText: {
+    fontSize: 13,
     fontWeight: "700",
-    color: "#10B981",
+    color: "#047857",
   },
   sliderPuck: {
-    position: "absolute",
     width: PUCK_SIZE,
     height: PUCK_SIZE,
     borderRadius: PUCK_SIZE / 2,
-    backgroundColor: "#FFFFFF",
+    position: "absolute",
+    left: (SLIDER_WIDTH - PUCK_SIZE) / 2,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 6,
+    borderWidth: 1,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.16,
+    shadowRadius: 6,
+    elevation: 5,
   },
-  sliderInstruction: {
-    fontSize: 12,
+  sliderHint: {
+    fontSize: 13,
     fontWeight: "500",
-    color: "#64748B",
-    marginTop: 8,
-  },
-  quickButtonsRow: {
-    flexDirection: "row",
-    gap: 12,
-    width: "100%",
-  },
-  btnTake: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: "#10B981",
-    paddingVertical: 14,
-    borderRadius: 16,
-    shadowColor: "#10B981",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  btnTakeText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  btnSnooze: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: "#D97706",
-    paddingVertical: 14,
-    borderRadius: 16,
-    shadowColor: "#D97706",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  btnSnoozeText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  btnSkip: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
-  btnSkipText: {
-    color: "#64748B",
-    fontSize: 14,
-    fontWeight: "600",
+    marginTop: 10,
+    letterSpacing: 0.1,
   },
 });

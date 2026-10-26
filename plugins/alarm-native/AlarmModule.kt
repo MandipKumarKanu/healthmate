@@ -28,6 +28,17 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
     fun stopAlarm(promise: Promise) {
         try {
             stopAlarmInternal()
+            reactContext.currentActivity?.runOnUiThread {
+                try {
+                    val activity = reactContext.currentActivity
+                    if (activity != null) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                            activity.setShowWhenLocked(false)
+                        }
+                        activity.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    }
+                } catch (_: Exception) {}
+            }
             promise.resolve(true)
         } catch (e: Exception) {
             promise.reject("STOP_ALARM_FAILED", e.message, e)
@@ -238,6 +249,38 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
             } catch (fallbackEx: Exception) {
                 promise.reject("OPEN_EXACT_ALARM_SETTINGS_FAILED", e.message, e)
             }
+        }
+    }
+
+    @ReactMethod
+    fun canUseFullScreenIntent(promise: Promise) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                val notificationManager = reactContext.getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+                promise.resolve(notificationManager?.canUseFullScreenIntent() ?: true)
+            } else {
+                promise.resolve(true)
+            }
+        } catch (e: Exception) {
+            promise.resolve(true)
+        }
+    }
+
+    @ReactMethod
+    fun openFullScreenIntentSettings(promise: Promise) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                val intent = Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+                    data = Uri.parse("package:${reactContext.packageName}")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                reactContext.startActivity(intent)
+                promise.resolve(true)
+            } else {
+                promise.resolve(true)
+            }
+        } catch (e: Exception) {
+            promise.reject("OPEN_FSI_SETTINGS_FAILED", e.message, e)
         }
     }
 
