@@ -10,9 +10,9 @@ import {
   Platform,
   Image,
   Modal,
-  Alert,
   ActivityIndicator,
 } from "react-native";
+import { AppAlert as Alert } from "../../services/appAlert";
 import { useRouter } from "expo-router";
 import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { AppScreen } from "../../components/ui/AppScreen";
