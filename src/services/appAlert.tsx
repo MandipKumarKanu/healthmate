@@ -5,7 +5,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { AppDialog, AppDialogButton } from '../components/ui/AppDialog';
+import { AppDialog, type AppDialogButton } from '../components/ui/AppDialog';
 
 export interface AppAlertOptions {
   cancelable?: boolean;
