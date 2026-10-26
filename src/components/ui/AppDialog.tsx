@@ -75,7 +75,7 @@ export function AppDialog({
           >
             {buttons.map((button, index) => {
               const intent =
-                button.style ?? (index === buttons.length - 1 ? 'default' : 'cancel');
+                button.style ?? (buttons.length === 2 && index === 0 ? 'cancel' : 'default');
               const isCancel = intent === 'cancel';
               const isDestructive = intent === 'destructive';
 
