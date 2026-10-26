@@ -33,7 +33,8 @@ export function CalendarGrid({
   datesWithReminders = new Set(),
 }: CalendarGridProps) {
   // Initialize current view from selectedDate
-  const selectedObj = new Date(selectedDate);
+  const [selectedYear, selectedMonth, selectedDay] = selectedDate.split('-').map(Number);
+  const selectedObj = new Date(selectedYear, selectedMonth - 1, selectedDay);
   const [viewYear, setViewYear] = useState(selectedObj.getFullYear());
   const [viewMonth, setViewMonth] = useState(selectedObj.getMonth()); // 0-indexed
 
@@ -127,9 +128,7 @@ export function CalendarGrid({
           }
 
           const isSelected = item.dateStr === selectedDate;
-          const hasReminder =
-            datesWithReminders.has(item.dateStr) ||
-            item.day >= 19; // Visual indication matching screenshot
+          const hasReminder = datesWithReminders.has(item.dateStr);
 
           return (
             <TouchableOpacity
