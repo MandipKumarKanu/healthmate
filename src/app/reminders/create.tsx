@@ -34,7 +34,7 @@ export default function SetReminderScreen() {
   const [selectedMed, setSelectedMed] = useState<Medicine | null>(null);
   const [recurrence, setRecurrence] = useState<RecurrenceType>('daily');
   const [times, setTimes] = useState<ReminderTime[]>([
-    { id: 't_1', time: '08:00', amount: '1 tablet' },
+    { id: 't_1', time: '08:00', amount: '1 tablet', label: 'Morning' },
   ]);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [amount, setAmount] = useState('1 tablet');
@@ -67,7 +67,7 @@ export default function SetReminderScreen() {
       id: `t_${Date.now()}`,
       time: newTime,
       amount,
-      label: newTime < '11:00' ? 'Morning' : newTime < '14:00' ? 'Afternoon' : newTime < '19:00' ? 'Evening' : 'Night',
+      label: newTime < '11:00' ? 'Morning' : newTime < '17:00' ? 'Afternoon' : newTime < '21:00' ? 'Evening' : 'Night',
     };
     setTimes([...times, newEntry].sort((a, b) => a.time.localeCompare(b.time)));
   };
@@ -234,10 +234,20 @@ export default function SetReminderScreen() {
                   placeholderTextColor={Colors.textTertiary}
                   accessibilityLabel={`Dose name for ${t.time}`}
                 />
-                <Text style={styles.doseNote}>{t.amount} · {t.time}</Text>
+                <Text style={styles.doseNote}>{t.amount}</Text>
               </View>
 
-              <TouchableOpacity
+              <View style={styles.timeActions}>
+                <TextInput
+                  style={styles.timePill}
+                  value={t.time}
+                  onChangeText={(value) => setTimes(times.map((item) => item.id === t.id ? { ...item, time: value } : item))}
+                  placeholder="HH:mm"
+                  keyboardType="numbers-and-punctuation"
+                  maxLength={5}
+                  accessibilityLabel={`Time for ${t.label || 'dose'}`}
+                />
+                <TouchableOpacity
                 style={styles.deleteTimeButton}
                 onPress={() => removeTime(t.id)}
               >
@@ -246,20 +256,21 @@ export default function SetReminderScreen() {
                   size={18}
                   color={Colors.error}
                 />
-              </TouchableOpacity>
+                </TouchableOpacity>
+              </View>
             </View>
           ))}
 
           {/* Preset time buttons */}
           <Text style={styles.presetsLabel}>Add another dose time</Text>
           <View style={styles.presetRow}>
-            {['08:00', '12:00', '18:00', '21:00'].map((preset) => (
+            {['08:00', '14:00', '18:00', '22:00'].map((preset) => (
               <TouchableOpacity
                 key={preset}
                 style={styles.presetChip}
                 onPress={() => addTime(preset)}
               >
-                <Text style={styles.presetChipText}>+ {preset < '11:00' ? 'Morning' : preset < '14:00' ? 'Afternoon' : preset < '19:00' ? 'Evening' : 'Night'} · {preset}</Text>
+                <Text style={styles.presetChipText}>+ {preset < '11:00' ? 'Morning' : preset < '17:00' ? 'Afternoon' : preset < '21:00' ? 'Evening' : 'Night'} · {preset}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -422,7 +433,7 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 2,
   },
-  deleteTimeButton: {
+  timeActions: {\n    flexDirection: 'row',\n    alignItems: 'center',\n    gap: 8,\n  },\n  timePill: {\n    backgroundColor: '#F0EFF3',\n    borderRadius: Radius.pill,\n    paddingHorizontal: 12,\n    paddingVertical: 8,\n    minWidth: 96,\n    textAlign: 'center',\n    fontSize: 16,\n    color: Colors.textPrimary,\n    fontWeight: '600',\n  },\n  deleteTimeButton: {
     padding: 8,
   },
   presetsLabel: {
