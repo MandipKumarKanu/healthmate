@@ -625,7 +625,7 @@ export default function ProfileScreen() {
       <Modal visible={isEditingProfile} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
             style={{ width: '100%', maxWidth: 420 }}
           >
             <View style={styles.profileModalCard}>
