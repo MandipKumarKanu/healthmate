@@ -1,5 +1,5 @@
 import React from 'react';
-import { AppDialog, AppDialogButton } from './AppDialog';
+import { AppDialog, type AppDialogButton } from './AppDialog';
 
 interface ConfirmDialogProps {
   visible: boolean;
