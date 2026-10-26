@@ -14,6 +14,7 @@ import { useAppStore } from '../../store/appStore';
 import { useReminderStore } from '../../store/reminderStore';
 import { ScheduledDose } from '../../types';
 import { adherenceRepository } from '../../database/repositories/adherenceRepository';
+import { scheduleRepository } from '../../database/repositories/scheduleRepository';
 
 export default function CalendarScreen() {
   const router = useRouter();
@@ -63,6 +64,7 @@ export default function CalendarScreen() {
         {/* Monthly Calendar Widget */}
         <CalendarGrid
           selectedDate={selectedDate}
+          schedules={scheduleRepository.getAll()}
           onSelectDate={(date) => {
             setSelectedDate(date);
             const scheduledForDate = adherenceRepository.getDosesForDate(date);
