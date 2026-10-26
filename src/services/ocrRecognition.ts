@@ -35,11 +35,17 @@ import {
 } from './imagePreProcessing';
 import { ocrService, ExtractedMedicineData } from './ocrService';
 import {
+  recognizePackagingImage,
+  OcrConnectionError,
+} from './remoteOcrService';
+import {
   FramedLine,
   LineFrame,
   reconstructReadingOrder,
   computeTextRegion,
 } from './ocrTextGeometry';
+
+export { OcrConnectionError } from './remoteOcrService';
 
 interface TextLineLike {
   text?: string;
@@ -211,131 +217,48 @@ function isStrongRead(scored: { signals: number; chars: number }): boolean {
 const devMode = typeof __DEV__ !== 'undefined' && __DEV__;
 
 /**
- * Runs the whole OCR pipeline for one medicine-label photo, prioritizing
- * accuracy: up to three recognition passes, best read wins.
+ * Runs the Cloud OCR pipeline for a medicine-label photo using the remote
+ * RapidOCR service. Requires an active internet connection.
  */
 export async function processLabelImage(
   imageUri: string
 ): Promise<LabelScanResult> {
-  const state: {
-    bestPass: RecognitionPass | null;
-    /** The image (and its pixel size) that produced the best read. */
-    bestSource: { uri: string; width: number; height: number } | null;
-    bestText: string;
-    bestScore: number;
-    passesUsed: number;
-    debugPasses: LabelScanPassDebug[];
-  } = {
-    bestPass: null,
-    bestSource: null,
-    bestText: '',
-    bestScore: -1,
-    passesUsed: 0,
-    debugPasses: [],
-  };
-
-  const triedUris = new Set<string>();
-
-  const attemptPass = async (
-    prepared: PreparedImage,
-    label: string
-  ): Promise<boolean> => {
-    if (!prepared.uri || triedUris.has(prepared.uri)) return false;
-    triedUris.add(prepared.uri);
-    const pass = await recognizePass(prepared.uri);
-    if (!pass) return false;
-    state.passesUsed += 1;
-    const scored = scorePass(pass);
-    if (devMode) {
-      state.debugPasses.push({
-        label,
-        score: scored.score,
-        signals: scored.signals,
-        chars: scored.chars,
-        imageUri: prepared.uri,
-        rawText: pass.rawText,
-      });
-      console.log(
-        `[OCR pass] ${label}: score=${scored.score} signals=${scored.signals} chars=${scored.chars}\n${pass.rawText}`
-      );
-    }
-    if (scored.score > state.bestScore) {
-      state.bestScore = scored.score;
-      state.bestText = pass.rawText;
-      state.bestPass = pass;
-      state.bestSource = {
-        uri: prepared.uri,
-        width: prepared.width,
-        height: prepared.height,
-      };
-    }
-    return isStrongRead(scored);
-  };
-
-  // Pass 1: high-resolution variant.
-  const highRes = await prepareImageForOcr(imageUri, {
-    maxDimension: OCR_VARIANT_HIGH_RES,
-    quality: HIGH_RES_QUALITY,
+  // Pre-process and optimize resolution for upload
+  const prepared = await prepareImageForOcr(imageUri, {
+    maxDimension: OCR_VARIANT_COMPACT,
+    quality: COMPACT_QUALITY,
   });
-  let strong = await attemptPass(highRes, 'highres');
 
-  // Pass 2: compact variant.
-  if (!strong) {
-    const compact = await prepareImageForOcr(imageUri, {
-      maxDimension: OCR_VARIANT_COMPACT,
-      quality: COMPACT_QUALITY,
-    });
-    strong = (await attemptPass(compact, 'compact')) || strong;
-  }
+  const uploadUri = prepared.uri || imageUri;
 
-  // Pass 3: grayscale + contrast normalization (native, when bundled).
-  if (!strong) {
-    const enhanced = await enhanceImageForOcr(imageUri);
-    strong = (await attemptPass(enhanced, 'grayscale+contrast')) || strong;
-  }
+  // Perform remote recognition via RapidOCR API
+  const remoteResult = await recognizePackagingImage(uploadUri);
 
-  // Pass 4: focused crop of the best whole-frame read, in that read's own
-  // image space (frames and crop rectangle must share a pixel space).
-  if (
-    !strong &&
-    state.bestPass &&
-    state.bestSource &&
-    state.bestPass.frames.length > 0 &&
-    state.bestSource.width > 0 &&
-    state.bestSource.height > 0
-  ) {
-    const region = computeTextRegion(
-      state.bestPass.frames,
-      state.bestSource.width,
-      state.bestSource.height
-    );
-    if (region) {
-      const cropped = await cropImageRegionForOcr(state.bestSource.uri, region);
-      if (cropped.processed) {
-        await attemptPass(cropped, 'crop');
-      }
-    }
-  }
+  const rawText = remoteResult.text || "";
+  const extracted = ocrService.extractMedicineData(rawText);
 
-  if (!state.bestText && !mlKitAvailable) {
-    // Engine not bundled (Expo Go): demo text keeps the review flow testable.
-    return {
-      rawText: DEMO_LABEL_TEXT,
-      extracted: ocrService.extractMedicineData(DEMO_LABEL_TEXT),
-      usedFallbackEngine: true,
-      retried: state.passesUsed > 1,
-      debugPasses: devMode ? state.debugPasses : null,
-    };
-  }
-
-  const extracted = state.bestText
-    ? ocrService.extractMedicineData(state.bestText)
-    : ocrService.extractMedicineData('');
   return {
-    rawText: state.bestText,
+    rawText,
     extracted,
     usedFallbackEngine: false,
-    retried: state.passesUsed > 1,
-    debugPasses: devMode ? state.debugPasses : null,
+    retried: false,
+    debugPasses: devMode
+      ? [
+          {
+            label: "cloud-rapidocr",
+            score: (remoteResult.count || 0) * 10,
+            signals: [
+              (extracted.candidates?.length ?? 0) > 0,
+              !!extracted.detectedStrength,
+              !!extracted.expiryDate,
+              !!extracted.batchNumber,
+              !!extracted.manufacturer,
+            ].filter(Boolean).length,
+            chars: rawText.replace(/\s+/g, "").length,
+            imageUri: uploadUri,
+            rawText,
+          },
+        ]
+      : null,
   };
 }

@@ -24,6 +24,7 @@ import { ExtractedMedicineData } from "../../services/ocrService";
 import {
   LabelScanPassDebug,
   processLabelImage,
+  OcrConnectionError,
 } from "../../services/ocrRecognition";
 import { scanHistoryRepository } from "../../database/repositories/scanHistoryRepository";
 import { useMedicineStore } from "../../store/medicineStore";
@@ -37,6 +38,7 @@ export default function ScanScreen() {
 
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const [extractedData, setExtractedData] =
     useState<ExtractedMedicineData | null>(null);
   // True when the demo text was used because the native engine is unavailable.
@@ -63,6 +65,7 @@ export default function ScanScreen() {
 
   const processImage = async (imageUri: string) => {
     setIsScanning(true);
+    setConnectionError(null);
     setExtractedData(null);
     setUsedFallbackEngine(false);
     setShowFullText(false);
@@ -90,12 +93,48 @@ export default function ScanScreen() {
       setMedExpiry(extracted.expiryDate || "");
       setMedBatch(extracted.batchNumber || "");
       setMedMfg(extracted.manufacturer || "");
-    } catch (error) {
+    } catch (error: any) {
       console.warn("Medicine label text recognition failed:", error);
-      Alert.alert(
-        "Could not read label",
-        "Please try another image or enter the medicine details manually."
-      );
+      const isConnectionIssue =
+        error instanceof OcrConnectionError ||
+        error?.isConnectionError ||
+        error?.name === "OcrConnectionError" ||
+        error?.message?.toLowerCase().includes("connect to internet") ||
+        error?.message?.toLowerCase().includes("network request failed") ||
+        error?.message?.toLowerCase().includes("failed to fetch") ||
+        error?.message?.toLowerCase().includes("timeout");
+
+      if (isConnectionIssue) {
+        setConnectionError(
+          "Please connect to internet to use this feature or add manually."
+        );
+        Alert.alert(
+          "Internet Connection Required",
+          "Please connect to internet to use this feature or add manually.",
+          [
+            {
+              text: "Add Manually",
+              onPress: () => router.push("/medicines/add"),
+            },
+            {
+              text: "Retry",
+              onPress: () => processImage(imageUri),
+            },
+            { text: "Cancel", style: "cancel" },
+          ]
+        );
+      } else {
+        const message =
+          error?.message ||
+          "Please try another image or enter the medicine details manually.";
+        Alert.alert("Could not read label", message, [
+          {
+            text: "Add Manually",
+            onPress: () => router.push("/medicines/add"),
+          },
+          { text: "OK", style: "cancel" },
+        ]);
+      }
     } finally {
       setIsScanning(false);
     }
@@ -162,6 +201,7 @@ export default function ScanScreen() {
 
   const handleReset = () => {
     setCapturedImage(null);
+    setConnectionError(null);
     setExtractedData(null);
     setUsedFallbackEngine(false);
     setShowFullText(false);
@@ -289,6 +329,69 @@ export default function ScanScreen() {
       />
 
       <View style={styles.body}>
+        {/* Notice banner: Connect to internet to use feature or add manually */}
+        <View style={styles.internetNoticeBanner}>
+          <View style={styles.internetNoticeLeft}>
+            <Ionicons name="wifi-outline" size={17} color="#B45309" />
+            <Text style={styles.internetNoticeText}>
+              Please connect to internet to use this feature or add manually
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.addManuallyPill}
+            onPress={() => router.push("/medicines/add")}
+            activeOpacity={0.8}
+          >
+            <Feather name="plus" size={13} color="#FFFFFF" />
+            <Text style={styles.addManuallyPillText}>Add Manually</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Connection Error Card */}
+        {connectionError ? (
+          <View style={styles.connectionErrorCard}>
+            <View style={styles.connectionErrorRow}>
+              <Ionicons
+                name="cloud-offline-outline"
+                size={22}
+                color={Colors.error}
+              />
+              <View style={styles.connectionErrorTextContainer}>
+                <Text style={styles.connectionErrorTitle}>
+                  Internet Connection Required
+                </Text>
+                <Text style={styles.connectionErrorText}>
+                  {connectionError}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.connectionErrorButtonsRow}>
+              <TouchableOpacity
+                style={styles.connectionErrorManualBtn}
+                onPress={() => router.push("/medicines/add")}
+                activeOpacity={0.8}
+              >
+                <Feather name="edit-3" size={14} color="#FFFFFF" />
+                <Text style={styles.connectionErrorManualBtnText}>
+                  Add Manually
+                </Text>
+              </TouchableOpacity>
+              {capturedImage ? (
+                <TouchableOpacity
+                  style={styles.connectionErrorRetryBtn}
+                  onPress={() => processImage(capturedImage)}
+                  activeOpacity={0.8}
+                >
+                  <Feather name="refresh-cw" size={14} color={Colors.primary} />
+                  <Text style={styles.connectionErrorRetryBtnText}>
+                    Retry Scan
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
+
         {!capturedImage ? (
           // Camera Viewport & Capture Controls
           <View style={styles.cameraContainer}>
@@ -369,9 +472,18 @@ export default function ScanScreen() {
           <View style={styles.reviewContainer}>
             <View style={styles.reviewHeader}>
               <Text style={styles.reviewTitle}>Detected Label Information</Text>
-              <TouchableOpacity onPress={handleReset}>
-                <Text style={styles.retakeText}>Retake</Text>
-              </TouchableOpacity>
+              <View style={styles.reviewHeaderActions}>
+                <TouchableOpacity
+                  style={styles.manualEntryLink}
+                  onPress={() => router.push("/medicines/add")}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.manualEntryLinkText}>Add Manually</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleReset}>
+                  <Text style={styles.retakeText}>Retake</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             <View style={styles.ocrAlertBanner}>
@@ -381,9 +493,7 @@ export default function ScanScreen() {
                 color="#0788F5"
               />
               <Text style={styles.ocrAlertText}>
-                {usedFallbackEngine
-                  ? "Sample scan (OCR engine not bundled). Add the ML Kit dependency for real label scans — fields below are demo data."
-                  : "OCR results are automated. Review and correct text against your physical prescription label before saving."}
+                OCR results are automated. Review and correct text against your physical prescription label before saving.
               </Text>
             </View>
 
@@ -391,7 +501,7 @@ export default function ScanScreen() {
               <View style={styles.ocrAlertBanner}>
                 <ActivityIndicator size="small" color={Colors.primary} />
                 <Text style={styles.ocrAlertText}>
-                  Reading text from the medicine label… hold the package steady.
+                  Connecting to Cloud OCR… Reading packaging text…
                 </Text>
               </View>
             ) : null}
@@ -1070,5 +1180,125 @@ const styles = StyleSheet.create({
   candidateChipTextActive: {
     color: Colors.primary,
     fontWeight: "700",
+  },
+  internetNoticeBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FFFBEB",
+    borderColor: "#FDE68A",
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    marginBottom: Spacing.md,
+    gap: 8,
+  },
+  internetNoticeLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    gap: 8,
+  },
+  internetNoticeText: {
+    fontSize: 12,
+    lineHeight: 16,
+    color: "#92400E",
+    fontWeight: "500",
+    flex: 1,
+  },
+  addManuallyPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.primary,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: Radius.pill,
+    gap: 4,
+  },
+  addManuallyPillText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  connectionErrorCard: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FECACA",
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    padding: Spacing.cardPadding,
+    marginBottom: Spacing.md,
+  },
+  connectionErrorRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginBottom: 12,
+  },
+  connectionErrorTextContainer: {
+    flex: 1,
+  },
+  connectionErrorTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: Colors.error,
+    marginBottom: 2,
+  },
+  connectionErrorText: {
+    fontSize: 13,
+    color: "#991B1B",
+    lineHeight: 18,
+  },
+  connectionErrorButtonsRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  connectionErrorManualBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.primary,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderRadius: Radius.md,
+    gap: 6,
+  },
+  connectionErrorManualBtnText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  connectionErrorRetryBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: Colors.primary,
+    borderWidth: 1,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderRadius: Radius.md,
+    gap: 6,
+  },
+  connectionErrorRetryBtnText: {
+    color: Colors.primary,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  reviewHeaderActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  manualEntryLink: {
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+  },
+  manualEntryLinkText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: Colors.primary,
   },
 });

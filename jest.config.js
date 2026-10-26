@@ -10,6 +10,8 @@ module.exports = {
       "<rootDir>/__tests__/__mocks__/expo-secure-store.js",
     "^@react-native-community/datetimepicker$":
       "<rootDir>/__tests__/__mocks__/datetimepicker.js",
+    "^expo-file-system$":
+      "<rootDir>/__tests__/__mocks__/expo-file-system.js",
     "^react-native$": "<rootDir>/__tests__/__mocks__/react-native.js",
     "^@/(.*)$": "<rootDir>/src/$1",
   },
