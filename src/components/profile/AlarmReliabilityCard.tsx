@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { Colors } from "../../theme/colors";
 import { Radius, Spacing } from "../../theme/tokens";
 import { AppCard } from "../ui/AppCard";
@@ -22,6 +23,7 @@ import {
 } from "../../services/batteryOptimizationService";
 
 export function AlarmReliabilityCard() {
+  const router = useRouter();
   const [status, setStatus] = useState<ReliabilityStatus | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -318,7 +320,7 @@ export function AlarmReliabilityCard() {
         {isAndroid && (
           <TouchableOpacity
             style={styles.guideButton}
-            onPress={() => setIsGuideModalVisible(true)}
+            onPress={() => router.push("/settings/battery-optimization" as any)}
           >
             <View style={styles.guideButtonContent}>
               <MaterialCommunityIcons

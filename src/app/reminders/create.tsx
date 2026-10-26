@@ -716,6 +716,41 @@ export default function SetReminderScreen() {
                         setSelectedMed(med);
                         setIsMedModalVisible(false);
                         setModalSearch("");
+
+                        const existingSched = scheduleRepository.getByMedicineId(med.id);
+                        if (existingSched) {
+                          setRecurrence(existingSched.recurrence);
+                          setTimes(
+                            existingSched.times.map((t) => ({
+                              ...t,
+                              label: t.label || getTimeLabel(t.time),
+                            }))
+                          );
+                          if (existingSched.times.length > 0 && existingSched.times[0].amount) {
+                            setAmount(existingSched.times[0].amount);
+                          }
+                          setNotificationsEnabled(existingSched.notificationsEnabled);
+                        } else {
+                          const defaultDose =
+                            med.dosageForm === 'syrup'
+                              ? '5 ml'
+                              : med.dosageForm === 'eye_drop'
+                                ? '2 drops'
+                                : med.dosageForm === 'cream'
+                                  ? '1 application'
+                                  : med.dosageForm === 'injection'
+                                    ? '1 dose'
+                                    : med.dosageForm === 'capsule'
+                                      ? '1 capsule'
+                                      : '1 tablet';
+                          setAmount(defaultDose);
+                          setTimes((prev) =>
+                            prev.map((t) => ({
+                              ...t,
+                              amount: defaultDose,
+                            }))
+                          );
+                        }
                       }}
                       activeOpacity={0.7}
                       accessibilityRole="button"

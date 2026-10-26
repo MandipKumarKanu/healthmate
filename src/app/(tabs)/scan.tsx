@@ -204,6 +204,7 @@ export default function ScanScreen() {
       strength: medStrength.trim() || "Standard dose",
       dosageForm: medForm,
       category: "Prescription",
+      ingredient: extractedData?.genericName || undefined,
       packageDetails: {
         manufacturer: medMfg || undefined,
         expiryDate: medExpiry || undefined,
@@ -378,7 +379,14 @@ export default function ScanScreen() {
                           medName.toLowerCase() === cand.name.toLowerCase() &&
                             styles.candidateChipActive,
                         ]}
-                        onPress={() => setMedName(cand.name)}
+                        onPress={() => {
+                          setMedName(cand.name);
+                          if (cand.genericName) {
+                            setExtractedData((prev) =>
+                              prev ? { ...prev, genericName: cand.genericName } : null
+                            );
+                          }
+                        }}
                         activeOpacity={0.7}
                       >
                         <Text

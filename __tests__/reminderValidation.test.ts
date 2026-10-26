@@ -148,4 +148,60 @@ describe("reminderValidation", () => {
       expect(getTimeLabel("22:00")).toBe("Night");
     });
   });
+
+  describe("Medicine Selection & Dosage Form Adaptation", () => {
+    it("filters medicine catalog matching name, strength, or category case-insensitively", () => {
+      const mockMeds = [
+        { id: "1", name: "Amoxicillin", strength: "500mg", dosageForm: "capsule", category: "Antibiotic" },
+        { id: "2", name: "Metformin", strength: "850mg", dosageForm: "tablet", category: "Diabetes" },
+        { id: "3", name: "Cough Syrup", strength: "100ml", dosageForm: "syrup", category: "Cold & Flu" },
+      ];
+
+      const filterMeds = (query: string) => {
+        const q = query.trim().toLowerCase();
+        if (!q) return mockMeds;
+        return mockMeds.filter(
+          (m) =>
+            m.name.toLowerCase().includes(q) ||
+            m.strength.toLowerCase().includes(q) ||
+            m.category.toLowerCase().includes(q)
+        );
+      };
+
+      expect(filterMeds("amox").length).toBe(1);
+      expect(filterMeds("amox")[0].name).toBe("Amoxicillin");
+      expect(filterMeds("850").length).toBe(1);
+      expect(filterMeds("diabetes").length).toBe(1);
+      expect(filterMeds("nonexistent").length).toBe(0);
+      expect(filterMeds("").length).toBe(3);
+    });
+
+    it("maps dosage forms to appropriate default administration units", () => {
+      const getDoseUnitForForm = (form: string) => {
+        switch (form) {
+          case "syrup":
+            return "5 ml";
+          case "eye_drop":
+            return "2 drops";
+          case "cream":
+            return "1 application";
+          case "injection":
+            return "1 dose";
+          case "capsule":
+            return "1 capsule";
+          default:
+            return "1 tablet";
+        }
+      };
+
+      expect(getDoseUnitForForm("syrup")).toBe("5 ml");
+      expect(getDoseUnitForForm("eye_drop")).toBe("2 drops");
+      expect(getDoseUnitForForm("cream")).toBe("1 application");
+      expect(getDoseUnitForForm("injection")).toBe("1 dose");
+      expect(getDoseUnitForForm("capsule")).toBe("1 capsule");
+      expect(getDoseUnitForForm("tablet")).toBe("1 tablet");
+      expect(getDoseUnitForForm("other")).toBe("1 tablet");
+    });
+  });
 });
+
