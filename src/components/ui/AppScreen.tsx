@@ -3,6 +3,8 @@ import {
   StyleSheet,
   View,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
   ViewStyle,
   StyleProp,
 } from 'react-native';
@@ -35,14 +37,22 @@ export function AppScreen({
     >
       <StatusBar style="dark" />
       {scrollable ? (
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={[styles.contentContainer, contentContainerStyle]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoiding}
+          behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
+          keyboardVerticalOffset={0}
         >
-          {children}
-        </ScrollView>
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={[styles.contentContainer, contentContainerStyle]}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+            automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+          >
+            {children}
+          </ScrollView>
+        </KeyboardAvoidingView>
       ) : (
         <View style={[styles.contentContainer, contentContainerStyle]}>
           {children}
@@ -56,6 +66,9 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  keyboardAvoiding: {
+    flex: 1,
   },
   scroll: {
     flex: 1,
