@@ -14,7 +14,7 @@ interface ReminderState {
     status: DoseStatus,
     targetDate: string
   ) => void;
-  saveSchedule: (schedule: ReminderSchedule) => Promise<void>;
+  saveSchedule: (schedule: ReminderSchedule) => Promise<boolean>;
   deleteSchedule: (scheduleId: string) => Promise<void>;
 }
 
@@ -40,24 +40,35 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
   },
 
   saveSchedule: async (schedule) => {
-    // Cancel existing triggers before replacing a schedule to avoid duplicates
-    // or stale times after an edit.
+    // Cancel old triggers before replacing a schedule to avoid duplicates or stale times.
     await notificationService.cancelForSchedule(schedule.id);
     scheduleRepository.save(schedule);
 
-    if (schedule.enabled && schedule.notificationsEnabled) {
-      const medicine = medicineRepository.getById(schedule.medicineId);
-      const medicineName = medicine?.name ?? 'Medicine';
-      for (const t of schedule.times) {
-        await notificationService.scheduleDoseReminder(
-          schedule.id,
-          medicineName,
-          t.amount,
-          t.time,
-          t.label
-        );
+    if (!schedule.enabled || !schedule.notificationsEnabled) return true;
+
+    const medicine = medicineRepository.getById(schedule.medicineId);
+    const medicineName = medicine?.name ?? 'Medicine';
+    const scheduledIds: string[] = [];
+
+    for (const dose of schedule.times) {
+      const identifier = await notificationService.scheduleDoseReminder(
+        schedule.id,
+        medicineName,
+        dose.amount,
+        dose.time,
+        dose.label
+      );
+      if (!identifier) {
+        // Never leave a schedule marked as notification-enabled when one or more
+        // alarms failed. Roll back any partially scheduled notifications.
+        await notificationService.cancelForSchedule(schedule.id);
+        scheduleRepository.save({ ...schedule, notificationsEnabled: false });
+        return false;
       }
+      scheduledIds.push(identifier);
     }
+
+    return scheduledIds.length === schedule.times.length;
   },
 
   deleteSchedule: async (scheduleId) => {
