@@ -22,6 +22,7 @@ import { medicineRepository } from '../../database/repositories/medicineReposito
 import { scheduleRepository } from '../../database/repositories/scheduleRepository';
 import { getTodayDateString } from '../../database/seed';
 import { useReminderStore } from '../../store/reminderStore';
+import { notificationService } from '../../services/notificationService';
 import { Medicine, RecurrenceType, ReminderTime } from '../../types';
 
 export default function SetReminderScreen() {
@@ -85,6 +86,19 @@ export default function SetReminderScreen() {
       return;
     }
 
+    // Ask Android/iOS for notification permission at the point the user enables reminders.
+    // This triggers the native runtime prompt when permission has not been granted yet.
+    let canNotify = notificationsEnabled;
+    if (notificationsEnabled) {
+      canNotify = await notificationService.requestPermissions();
+      if (!canNotify) {
+        Alert.alert(
+          'Notifications are disabled',
+          'The schedule can be saved, but alarm-style reminders will not alert you until you allow notifications in system settings.'
+        );
+      }
+    }
+
     // Use local calendar date (not UTC) and preserve the recurrence anchor when editing.
     const existingSchedule = scheduleRepository.getByMedicineId(selectedMed.id);
     const scheduleId = existingSchedule?.id ?? `sched_${selectedMed.id}`;
@@ -98,7 +112,7 @@ export default function SetReminderScreen() {
       endDate: existingSchedule?.endDate,
       times,
       enabled: true,
-      notificationsEnabled,
+      notificationsEnabled: canNotify,
       createdAt: existingSchedule?.createdAt ?? now,
       updatedAt: now,
     });
