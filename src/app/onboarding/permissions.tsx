@@ -18,13 +18,8 @@ type PermissionCardProps = {
   stateLabel: (state: PermissionState) => string;
 };
 
-function PermissionCard ({ icon, title, description, important, state, stateLabel }: PermissionCardProps
-    icon: keyof typeof Ionicons.glyphMap;
-    title: string;
-    description: string;
-    important?: boolean;
-    state: PermissionState;
-  }) => (
+function PermissionCard({ icon, title, description, important, state, stateLabel }: PermissionCardProps) {
+  return (
     <View style={styles.card}>
       <View style={styles.iconBox}><Ionicons name={icon} size={27} color="#5B65D9" /></View>
       <View style={styles.cardCopy}>
