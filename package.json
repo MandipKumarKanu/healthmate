@@ -47,8 +47,8 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "test": "jest",
-    "build:apk:x86": "cd android && ./gradlew assembleRelease -PreactNativeArchitectures=x86",
-    "build:apk:x64": "cd android && ./gradlew assembleRelease -PreactNativeArchitectures=x86_64"
+    "build:apk:arm64": "cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a",
+    "build:apk:armv7": "cd android && ./gradlew assembleRelease -PreactNativeArchitectures=armeabi-v7a"
   },
   "private": true,
   "expo": {

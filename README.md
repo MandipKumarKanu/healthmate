@@ -208,8 +208,8 @@ git push origin v1.3.1
 5. Click **Run workflow**.
 
 ### 3. Output & Distribution
-- **GitHub Releases**: Standalone installable APKs (`healthmate-v1.3.1-x86.apk` and `healthmate-v1.3.1-x64.apk`) are automatically attached to the published GitHub Release with generated release notes.
-- **Workflow Artifacts**: The APKs are also preserved as downloadable workflow artifacts (`healthmate-apk-x86` and `healthmate-apk-x64`) in the Actions run summary page for 30 days.
+- **GitHub Releases**: Standalone installable APKs (`healthmate-v1.3.1-arm64-v8a.apk` and `healthmate-v1.3.1-armeabi-v7a.apk`) are automatically attached to the published GitHub Release with generated release notes.
+- **Workflow Artifacts**: The APKs are also preserved as downloadable workflow artifacts (`healthmate-apk-arm64-v8a` and `healthmate-apk-armeabi-v7a`) in the Actions run summary page for 30 days.
 
 ---
 
