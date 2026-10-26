@@ -13,6 +13,8 @@ import { MedicalDisclaimer } from '../../components/ui/MedicalDisclaimer';
 import { useAppStore } from '../../store/appStore';
 import { useReminderStore } from '../../store/reminderStore';
 import { ScheduledDose } from '../../types';
+import { adherenceRepository } from '../../database/repositories/adherenceRepository';
+import { scheduleRepository } from '../../database/repositories/scheduleRepository';
 
 export default function CalendarScreen() {
   const router = useRouter();
@@ -55,15 +57,20 @@ export default function CalendarScreen() {
         title="Reminders"
         subtitle="Your schedule, one day at a time"
         brandText="HealthMate AI"
-        onAddPress={() => router.push('/reminders/create')}
+        onAddPress={() => router.push({ pathname: '/reminders/create', params: { date: selectedDate } })}
       />
 
       <View style={styles.body}>
         {/* Monthly Calendar Widget */}
         <CalendarGrid
           selectedDate={selectedDate}
+          schedules={scheduleRepository.getAll()}
           onSelectDate={(date) => {
             setSelectedDate(date);
+            const scheduledForDate = adherenceRepository.getDosesForDate(date);
+            if (scheduledForDate.length === 0) {
+              router.push({ pathname: '/reminders/create', params: { date } });
+            }
           }}
         />
 
@@ -76,7 +83,7 @@ export default function CalendarScreen() {
         <SectionHeader
           title="Today's Schedule"
           actionText="+ Add"
-          onActionPress={() => router.push('/reminders/create')}
+          onActionPress={() => router.push({ pathname: '/reminders/create', params: { date: selectedDate } })}
         />
 
         {/* Doses List */}

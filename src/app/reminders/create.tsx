@@ -22,21 +22,30 @@ import { medicineRepository } from '../../database/repositories/medicineReposito
 import { scheduleRepository } from '../../database/repositories/scheduleRepository';
 import { getTodayDateString } from '../../database/seed';
 import { useReminderStore } from '../../store/reminderStore';
+import { notificationService } from '../../services/notificationService';
 import { Medicine, RecurrenceType, ReminderTime } from '../../types';
+
+function formatTime(time: string): string {
+  const parts = time.split(':').map(Number);
+  if (parts.length !== 2 || !Number.isFinite(parts[0]) || !Number.isFinite(parts[1])) return time;
+  return (parts[0] % 12 || 12) + ':' + String(parts[1]).padStart(2, '0') + (parts[0] >= 12 ? ' PM' : ' AM');
+}
 
 export default function SetReminderScreen() {
   const router = useRouter();
-  const { medicineId } = useLocalSearchParams<{ medicineId?: string }>();
+  const { medicineId, date } = useLocalSearchParams<{ medicineId?: string; date?: string }>();
   const { saveSchedule } = useReminderStore();
 
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [selectedMed, setSelectedMed] = useState<Medicine | null>(null);
   const [recurrence, setRecurrence] = useState<RecurrenceType>('daily');
   const [times, setTimes] = useState<ReminderTime[]>([
-    { id: 't_1', time: '08:00', amount: '1 tablet' },
+    { id: 't_1', time: '08:00', amount: '1 tablet', label: 'Morning' },
   ]);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [amount, setAmount] = useState('1 tablet');
+  const [medicineSearch, setMedicineSearch] = useState('');
+  const [editingTimes, setEditingTimes] = useState(true);
 
   useEffect(() => {
     const list = medicineRepository.getAll();
@@ -48,7 +57,10 @@ export default function SetReminderScreen() {
       const existingSched = scheduleRepository.getByMedicineId(medicineId);
       if (existingSched) {
         setRecurrence(existingSched.recurrence);
-        setTimes(existingSched.times);
+        setTimes(existingSched.times.map((t) => ({
+          ...t,
+          label: t.label || (t.time < '11:00' ? 'Morning' : t.time < '17:00' ? 'Afternoon' : t.time < '21:00' ? 'Evening' : 'Night'),
+        })));
         setNotificationsEnabled(existingSched.notificationsEnabled);
       }
     } else if (list.length > 0) {
@@ -65,6 +77,7 @@ export default function SetReminderScreen() {
       id: `t_${Date.now()}`,
       time: newTime,
       amount,
+      label: newTime < '11:00' ? 'Morning' : newTime < '17:00' ? 'Afternoon' : newTime < '21:00' ? 'Evening' : 'Night',
     };
     setTimes([...times, newEntry].sort((a, b) => a.time.localeCompare(b.time)));
   };
@@ -83,27 +96,59 @@ export default function SetReminderScreen() {
       return;
     }
 
+    const invalidTime = times.find((t) => !/^([01]\d|2[0-3]):[0-5]\d$/.test(t.time));
+    if (invalidTime) {
+      Alert.alert('Invalid time', 'Enter each dose time in 24-hour HH:mm format, for example 08:00 or 18:30.');
+      return;
+    }
+
+    // Ask Android/iOS for notification permission at the point the user enables reminders.
+    // This triggers the native runtime prompt when permission has not been granted yet.
+    let canNotify = notificationsEnabled;
+    if (notificationsEnabled) {
+      canNotify = await notificationService.requestPermissions();
+      if (!canNotify) {
+        Alert.alert(
+          'Notifications are disabled',
+          'The schedule can be saved, but alarm-style reminders will not alert you until you allow notifications in system settings.'
+        );
+      }
+    }
+
     // Use local calendar date (not UTC) and preserve the recurrence anchor when editing.
     const existingSchedule = scheduleRepository.getByMedicineId(selectedMed.id);
     const scheduleId = existingSchedule?.id ?? `sched_${selectedMed.id}`;
     const now = new Date().toISOString();
 
-    await saveSchedule({
+    const alarmsScheduled = await saveSchedule({
       id: scheduleId,
       medicineId: selectedMed.id,
       recurrence,
-      startDate: existingSchedule?.startDate ?? getTodayDateString(),
+      startDate: existingSchedule?.startDate ?? (date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : getTodayDateString()),
       endDate: existingSchedule?.endDate,
       times,
       enabled: true,
-      notificationsEnabled,
+      notificationsEnabled: canNotify,
       createdAt: existingSchedule?.createdAt ?? now,
       updatedAt: now,
     });
 
-    Alert.alert('Success', 'Medication schedule saved successfully!', [
-      { text: 'OK', onPress: () => router.back() },
-    ]);
+    if (!alarmsScheduled) {
+      Alert.alert(
+        'Schedule saved without alarms',
+        'Your medication schedule was saved, but at least one alarm could not be scheduled. Allow notifications and “Alarms & reminders” access in Android Settings, then edit and save this schedule again.',
+        [{ text: 'OK', onPress: () => router.back() }]
+      );
+      return;
+    }
+
+    Alert.alert(
+      'Success',
+      canNotify
+        ? 'Medication schedule saved and alarm reminders scheduled.'
+        : 'Medication schedule saved. Alarm reminders are OFF until you grant notification and exact-alarm access.',
+      [{ text: 'OK', onPress: () => router.back() }]
+    );
   };
 
   const recurrenceOptions: Array<{ type: RecurrenceType; label: string }> = [
@@ -144,13 +189,21 @@ export default function SetReminderScreen() {
             <Text style={styles.noMedText}>No medicine selected</Text>
           )}
 
-          {/* Quick medicine switcher chips */}
+          <TextInput
+            style={styles.amountInput}
+            value={medicineSearch}
+            onChangeText={setMedicineSearch}
+            placeholder="Search medicines..."
+            placeholderTextColor={Colors.textTertiary}
+            accessibilityLabel="Search medicines"
+          />
+          {/* Searchable medicine switcher */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             style={styles.medChipsScroll}
           >
-            {medicines.map((m) => (
+            {medicines.filter((m) => `${m.name} ${m.strength}`.toLowerCase().includes(medicineSearch.trim().toLowerCase())).map((m) => (
               <TouchableOpacity
                 key={m.id}
                 style={[
@@ -197,16 +250,25 @@ export default function SetReminderScreen() {
         </View>
 
         {/* Reminder Times Section */}
-        <SectionHeader title="Reminder Times" />
+        <View style={styles.reminderHeading}><SectionHeader title="Reminder Times" /><TouchableOpacity onPress={() => setEditingTimes((value) => !value)} accessibilityRole="button"><Text style={styles.editAction}>{editingTimes ? "Done" : "Edit"}</Text></TouchableOpacity></View>
         <AppCard style={styles.card}>
           {times.map((t) => (
             <View key={t.id} style={styles.timeRow}>
               <View style={styles.timeCol}>
-                <Text style={styles.timeValue}>{t.time}</Text>
+                <TextInput
+                  style={styles.timeValue}
+                  value={t.label ?? ''}
+                  onChangeText={(label) => setTimes(times.map((item) => item.id === t.id ? { ...item, label } : item))}
+                  placeholder="Dose name (e.g. Morning)"
+                  placeholderTextColor={Colors.textTertiary}
+                  accessibilityLabel={`Dose name for ${t.time}`}
+                />
                 <Text style={styles.doseNote}>{t.amount}</Text>
               </View>
 
-              <TouchableOpacity
+              <View style={styles.timeActions}>
+                {editingTimes ? <TextInput style={styles.timePill} value={t.time} onChangeText={(value) => setTimes(times.map((item) => item.id === t.id ? { ...item, time: value } : item))} placeholder="HH:mm" keyboardType="numbers-and-punctuation" maxLength={5} accessibilityLabel={'Time for ' + (t.label || 'dose')} /> : <Text style={styles.timePillText}>{formatTime(t.time)}</Text>}
+                {editingTimes && <TouchableOpacity
                 style={styles.deleteTimeButton}
                 onPress={() => removeTime(t.id)}
               >
@@ -215,23 +277,25 @@ export default function SetReminderScreen() {
                   size={18}
                   color={Colors.error}
                 />
-              </TouchableOpacity>
+                </TouchableOpacity>}
+              </View>
             </View>
           ))}
 
           {/* Preset time buttons */}
-          <Text style={styles.presetsLabel}>Quick Add Time:</Text>
-          <View style={styles.presetRow}>
-            {['08:00', '12:00', '18:00', '21:00'].map((preset) => (
+          {editingTimes && <Text style={styles.presetsLabel}>Add another dose time</Text>}
+          {editingTimes && <TouchableOpacity style={styles.addAnotherTime} onPress={() => addTime(['08:00','14:00','18:00','22:00'].find((preset) => !times.some((t) => t.time === preset)) ?? '08:00')}><Ionicons name="add" size={22} color={Colors.primary} /><Text style={styles.addAnotherText}>Add Another Time</Text></TouchableOpacity>}
+          {editingTimes && <View style={styles.presetRow}>
+            {['08:00', '14:00', '18:00', '22:00'].map((preset) => (
               <TouchableOpacity
                 key={preset}
                 style={styles.presetChip}
                 onPress={() => addTime(preset)}
               >
-                <Text style={styles.presetChipText}>+{preset}</Text>
+                <Text style={styles.presetChipText}>+ {preset < '11:00' ? 'Morning' : preset < '17:00' ? 'Afternoon' : preset < '21:00' ? 'Evening' : 'Night'} · {preset}</Text>
               </TouchableOpacity>
             ))}
-          </View>
+          </View>}
         </AppCard>
 
         {/* Dosage Amount */}
@@ -390,6 +454,27 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textSecondary,
     marginTop: 2,
+  },
+  reminderHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  editAction: { color: Colors.primary, fontSize: 16, fontWeight: '600' },
+  addAnotherTime: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#E8E7ED', borderRadius: Radius.pill, paddingVertical: 16, marginTop: 14, marginBottom: 8 },
+  addAnotherText: { color: Colors.primary, fontSize: 16, fontWeight: '600', marginLeft: 8 },
+  timePillText: { backgroundColor: '#F0EFF3', borderRadius: Radius.pill, paddingHorizontal: 12, paddingVertical: 8, minWidth: 96, textAlign: 'center', fontSize: 16, color: Colors.textPrimary, fontWeight: '600' },
+  timeActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  timePill: {
+    backgroundColor: '#F0EFF3',
+    borderRadius: Radius.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minWidth: 96,
+    textAlign: 'center',
+    fontSize: 16,
+    color: Colors.textPrimary,
+    fontWeight: '600',
   },
   deleteTimeButton: {
     padding: 8,

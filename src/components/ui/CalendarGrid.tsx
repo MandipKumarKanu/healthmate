@@ -3,11 +3,13 @@ import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { Radius, Spacing } from '../../theme/tokens';
+import { ReminderSchedule } from '../../types';
 
 interface CalendarGridProps {
   selectedDate: string; // 'YYYY-MM-DD'
   onSelectDate: (date: string) => void;
   datesWithReminders?: Set<string>;
+  schedules?: ReminderSchedule[];
 }
 
 const MONTH_NAMES = [
@@ -31,9 +33,11 @@ export function CalendarGrid({
   selectedDate,
   onSelectDate,
   datesWithReminders = new Set(),
+  schedules = [],
 }: CalendarGridProps) {
   // Initialize current view from selectedDate
-  const selectedObj = new Date(selectedDate);
+  const [selectedYear, selectedMonth, selectedDay] = selectedDate.split('-').map(Number);
+  const selectedObj = new Date(selectedYear, selectedMonth - 1, selectedDay);
   const [viewYear, setViewYear] = useState(selectedObj.getFullYear());
   const [viewMonth, setViewMonth] = useState(selectedObj.getMonth()); // 0-indexed
 
@@ -127,9 +131,21 @@ export function CalendarGrid({
           }
 
           const isSelected = item.dateStr === selectedDate;
-          const hasReminder =
-            datesWithReminders.has(item.dateStr) ||
-            item.day >= 19; // Visual indication matching screenshot
+          const date = new Date(viewYear, viewMonth, item.day);
+          const dateKey = item.dateStr;
+          const hasScheduledReminder = schedules.some((schedule) => {
+            if (!schedule.enabled || !schedule.notificationsEnabled || schedule.times.length === 0) return false;
+            if (dateKey < schedule.startDate || (schedule.endDate && dateKey > schedule.endDate)) return false;
+            const startParts = schedule.startDate.split('-').map(Number);
+            const start = new Date(startParts[0], startParts[1] - 1, startParts[2]);
+            const elapsedDays = Math.floor((date.getTime() - start.getTime()) / 86400000);
+            if (elapsedDays < 0) return false;
+            if (schedule.recurrence === 'once') return dateKey === schedule.startDate;
+            if (schedule.recurrence === 'weekly') return elapsedDays % 7 === 0;
+            if (schedule.recurrence === 'monthly') return date.getDate() === start.getDate();
+            return true;
+          });
+          const hasReminder = datesWithReminders.has(dateKey) || hasScheduledReminder;
 
           return (
             <TouchableOpacity
