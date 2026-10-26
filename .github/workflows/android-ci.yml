@@ -1,0 +1,108 @@
+name: Android CI Build
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - main
+      - 'release/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  android-release:
+    name: Install, validate, and build Android APKs (x86 & x64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install dependencies and refresh lockfile
+        run: npm install --no-audit --no-fund
+
+      - name: Commit refreshed package-lock if changed
+        if: github.event_name == 'push'
+        run: |
+          if ! git diff --quiet -- package-lock.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add package-lock.json
+            git commit -m "chore: refresh package-lock"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          else
+            echo "package-lock.json is already up to date."
+          fi
+
+      - name: 🔢 Auto-increment build number
+        id: build_number
+        run: |
+          BASE_CODE=$(node -p "require('./app.json').expo.android.versionCode || 1")
+          BUILD_NUM=$(( BASE_CODE + ${{ github.run_number }} ))
+          VERSION=$(node -p "require('./package.json').version || '1.0.0'")
+          echo "Calculated build number (versionCode): $BUILD_NUM"
+          echo "App version: $VERSION"
+          node -e "
+            const fs = require('fs');
+            const app = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+            app.expo.android.versionCode = $BUILD_NUM;
+            app.expo.ios.buildNumber = '$BUILD_NUM';
+            fs.writeFileSync('app.json', JSON.stringify(app, null, 2));
+          "
+          echo "build_num=$BUILD_NUM" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Verify package version
+        run: |
+          node -e "const p=require('./package.json'); const a=require('./app.json'); console.log('HealthMate version:', p.version, '| Expo version:', a.expo.version, '| Android versionCode:', a.expo.android.versionCode)"
+
+      - name: TypeScript
+        run: npx tsc --noEmit
+
+      - name: Unit tests
+        run: npm test -- --runInBand
+
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android --clean
+
+      - name: Build x86 Release APK
+        working-directory: android
+        run: |
+          ./gradlew assembleRelease -PversionCode=${{ steps.build_number.outputs.build_num }} -PreactNativeArchitectures=x86 --no-daemon
+          APK_FILE=$(find app/build/outputs/apk/release -type f -name "*.apk" | head -n 1)
+          cp "$APK_FILE" "../healthmate-v${{ steps.build_number.outputs.version }}-x86.apk"
+
+      - name: Build x64 (x86_64) Release APK
+        working-directory: android
+        run: |
+          ./gradlew assembleRelease -PversionCode=${{ steps.build_number.outputs.build_num }} -PreactNativeArchitectures=x86_64 --no-daemon
+          APK_FILE=$(find app/build/outputs/apk/release -type f -name "*.apk" | head -n 1)
+          cp "$APK_FILE" "../healthmate-v${{ steps.build_number.outputs.version }}-x64.apk"
+
+      - name: Upload x86 and x64 APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: healthmate-android-apks
+          path: healthmate-v*.apk
+          if-no-files-found: error
+          retention-days: 30

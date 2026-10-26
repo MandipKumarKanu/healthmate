@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, View, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import { Colors } from '../../theme/colors';
 import { Radius, Spacing } from '../../theme/tokens';
 import { AppScreen } from '../../components/ui/AppScreen';
@@ -10,6 +11,7 @@ import { AppCard } from '../../components/ui/AppCard';
 
 export default function AboutScreen() {
   const router = useRouter();
+  const appVersion = Constants.expoConfig?.version ?? '1.3.1';
 
   return (
     <AppScreen scrollable contentContainerStyle={styles.scrollContent}>
@@ -28,7 +30,7 @@ export default function AboutScreen() {
             </View>
             <View style={styles.logoTextContainer}>
               <Text style={styles.appName}>HealthMate AI</Text>
-              <Text style={styles.versionText}>Version 1.0.0 (Release Build)</Text>
+              <Text style={styles.versionText}>Version {appVersion} (Release Build)</Text>
             </View>
           </View>
           <Text style={styles.description}>

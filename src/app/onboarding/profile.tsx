@@ -127,7 +127,7 @@ export default function OnboardingProfileScreen() {
       );
 
       // Step 3: explain and request device permissions after profile details.
-      router.replace('/onboarding/permissions');
+      router.replace('/onboarding/permissions' as any);
     } catch (err) {
       Alert.alert(
         'Save Error',

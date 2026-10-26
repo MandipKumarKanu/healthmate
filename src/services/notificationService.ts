@@ -57,16 +57,19 @@ export const notificationService = {
       if (!notificationGranted) return false;
 
       if (Platform.OS === 'android') {
-        let exactAlarm = await Notifications.getExactAlarmPermissionsAsync();
-        if (!exactAlarm.granted) {
-          try {
-            exactAlarm = await Notifications.requestExactAlarmPermissionsAsync();
-          } catch (error) {
-            console.warn('Exact-alarm access was not granted:', error);
-            return false;
+        const notificationsAny = Notifications as any;
+        if (typeof notificationsAny.getExactAlarmPermissionsAsync === 'function') {
+          let exactAlarm = await notificationsAny.getExactAlarmPermissionsAsync();
+          if (exactAlarm && !exactAlarm.granted && typeof notificationsAny.requestExactAlarmPermissionsAsync === 'function') {
+            try {
+              exactAlarm = await notificationsAny.requestExactAlarmPermissionsAsync();
+            } catch (error) {
+              console.warn('Exact-alarm access was not granted:', error);
+              return false;
+            }
           }
+          if (exactAlarm && !exactAlarm.granted) return false;
         }
-        if (!exactAlarm.granted) return false;
       }
 
       return true;
@@ -83,8 +86,12 @@ export const notificationService = {
         return false;
       }
       if (Platform.OS !== 'android') return true;
-      const exactAlarm = await Notifications.getExactAlarmPermissionsAsync();
-      return exactAlarm.granted;
+      const notificationsAny = Notifications as any;
+      if (typeof notificationsAny.getExactAlarmPermissionsAsync === 'function') {
+        const exactAlarm = await notificationsAny.getExactAlarmPermissionsAsync();
+        return Boolean(exactAlarm?.granted);
+      }
+      return true;
     } catch {
       return false;
     }

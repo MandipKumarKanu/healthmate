@@ -52,9 +52,14 @@ export default function OnboardingPermissionsScreen() {
 
       if (Platform.OS === 'android') {
         try {
-          const existing = await Notifications.getExactAlarmPermissionsAsync();
-          const exact = existing.granted ? existing : await Notifications.requestExactAlarmPermissionsAsync();
-          setExactAlarmState(exact.granted ? 'granted' : 'denied');
+          const notificationsAny = Notifications as any;
+          if (typeof notificationsAny.getExactAlarmPermissionsAsync === 'function') {
+            const existing = await notificationsAny.getExactAlarmPermissionsAsync();
+            const exact = existing?.granted ? existing : (typeof notificationsAny.requestExactAlarmPermissionsAsync === 'function' ? await notificationsAny.requestExactAlarmPermissionsAsync() : existing);
+            setExactAlarmState(exact?.granted ? 'granted' : 'denied');
+          } else {
+            setExactAlarmState('unavailable');
+          }
         } catch {
           setExactAlarmState('unavailable');
         }

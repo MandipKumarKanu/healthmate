@@ -22,10 +22,12 @@ import { SectionHeader } from '../../components/ui/SectionHeader';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useAppStore } from '../../store/appStore';
 import { notificationService } from '../../services/notificationService';
+import Constants from 'expo-constants';
 import { GenderOption, UnitSystem } from '../../types';
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const appVersion = Constants.expoConfig?.version ?? '1.3.1';
   const { profile, preferences, updateProfile, togglePreference, resetAllData, clearAllData } =
     useAppStore();
 
@@ -412,7 +414,7 @@ export default function ProfileScreen() {
               />
             </View>
             <Text style={styles.settingLabel}>About HealthMate AI</Text>
-            <Text style={styles.settingValue}>v1.0.0</Text>
+            <Text style={styles.settingValue}>v{appVersion}</Text>
             <Ionicons
               name="chevron-forward"
               size={16}
@@ -462,7 +464,7 @@ export default function ProfileScreen() {
         {/* App Footer */}
         <View style={styles.footerContainer}>
           <Text style={styles.footerText}>
-            HealthMate AI • Version 1.0.0 (Expo SDK 58)
+            HealthMate AI • Version {appVersion} (Expo SDK 58)
           </Text>
           <Text style={styles.footerSub}>
             All medication records stored locally on your device in encrypted SQLite.

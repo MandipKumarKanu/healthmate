@@ -31,8 +31,18 @@ concurrency:
 
 jobs:
   build:
-    name: 📱 Build & Publish APK
+    name: 📱 Build ${{ matrix.name }} APK
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86
+            name: "x86 (32-bit)"
+            gradle_arch: x86
+          - arch: x64
+            name: "x64 (64-bit)"
+            gradle_arch: x86_64
 
     steps:
       - name: ⬇️ Checkout Repository
@@ -58,6 +68,21 @@ jobs:
       - name: 📦 Install Dependencies
         run: npm ci || npm install
 
+      - name: 🔢 Auto-increment build number
+        id: build_number
+        run: |
+          BASE_CODE=$(node -p "require('./app.json').expo.android.versionCode || 1")
+          BUILD_NUM=$(( BASE_CODE + ${{ github.run_number }} ))
+          echo "Calculated build number (versionCode): $BUILD_NUM"
+          node -e "
+            const fs = require('fs');
+            const app = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+            app.expo.android.versionCode = $BUILD_NUM;
+            app.expo.ios.buildNumber = '$BUILD_NUM';
+            fs.writeFileSync('app.json', JSON.stringify(app, null, 2));
+          "
+          echo "build_num=$BUILD_NUM" >> "$GITHUB_OUTPUT"
+
       - name: 🛠️ Ensure Native Android Project Exists (Expo Prebuild)
         run: |
           if [ ! -d "android" ]; then
@@ -70,10 +95,10 @@ jobs:
       - name: 🔑 Set Gradle wrapper executable
         run: chmod +x android/gradlew
 
-      - name: 🚀 Build Release APK
+      - name: 🚀 Build Release APK for ${{ matrix.name }}
         run: |
           cd android
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleRelease -PversionCode=${{ steps.build_number.outputs.build_num }} -PreactNativeArchitectures=${{ matrix.gradle_arch }} --no-daemon
 
       - name: 🔍 Locate and Package Release APK
         id: prepare_apk
@@ -84,8 +109,8 @@ jobs:
             exit 1
           fi
 
-          VERSION=$(node -p "require('./package.json').version || '1.0.0'")
-          OUTPUT_APK="healthmate-v${VERSION}.apk"
+          VERSION=$(node -p "require('./package.json').version || '1.1.0'")
+          OUTPUT_APK="healthmate-v${VERSION}-${{ matrix.arch }}.apk"
 
           cp "$APK_FILE" "./$OUTPUT_APK"
           echo "Found APK at: $APK_FILE"
@@ -98,21 +123,41 @@ jobs:
       - name: 📤 Upload APK as Workflow Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: healthmate-apk
+          name: healthmate-apk-${{ matrix.arch }}
           path: ${{ steps.prepare_apk.outputs.apk_path }}
           if-no-files-found: error
           retention-days: 30
 
+  release:
+    name: 🎉 Publish GitHub Release
+    needs: build
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.create_release) }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: ⬇️ Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 📥 Download all APK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: healthmate-apk-*
+          path: release-apks
+          merge-multiple: true
+
+      - name: 🔍 List APKs to be published
+        run: |
+          ls -lh release-apks/
+
       - name: 🏷️ Resolve Release Metadata
         id: release_meta
-        if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.create_release) }}
         run: |
+          VERSION=$(node -p "require('./package.json').version || '1.1.0'")
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then
             RESOLVED_TAG="${GITHUB_REF#refs/tags/}"
           elif [ -n "${{ inputs.tag_name }}" ]; then
             RESOLVED_TAG="${{ inputs.tag_name }}"
           else
-            RESOLVED_TAG="v${{ steps.prepare_apk.outputs.version }}"
+            RESOLVED_TAG="v$VERSION"
           fi
 
           if [ -n "${{ inputs.release_name }}" ]; then
@@ -125,12 +170,11 @@ jobs:
           echo "name=$RESOLVED_NAME" >> "$GITHUB_OUTPUT"
 
       - name: 🎉 Publish GitHub Release
-        if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.create_release) }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.release_meta.outputs.tag }}
           name: ${{ steps.release_meta.outputs.name }}
-          files: ${{ steps.prepare_apk.outputs.apk_path }}
+          files: release-apks/*.apk
           draft: false
           prerelease: false
           generate_release_notes: true
