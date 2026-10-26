@@ -37,6 +37,7 @@ export default function SetReminderScreen() {
   ]);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [amount, setAmount] = useState('1 tablet');
+  const [medicineSearch, setMedicineSearch] = useState('');
 
   useEffect(() => {
     const list = medicineRepository.getAll();
@@ -65,6 +66,7 @@ export default function SetReminderScreen() {
       id: `t_${Date.now()}`,
       time: newTime,
       amount,
+      label: newTime < '11:00' ? 'Morning' : newTime < '14:00' ? 'Afternoon' : newTime < '19:00' ? 'Evening' : 'Night',
     };
     setTimes([...times, newEntry].sort((a, b) => a.time.localeCompare(b.time)));
   };
@@ -144,13 +146,21 @@ export default function SetReminderScreen() {
             <Text style={styles.noMedText}>No medicine selected</Text>
           )}
 
-          {/* Quick medicine switcher chips */}
+          <TextInput
+            style={styles.amountInput}
+            value={medicineSearch}
+            onChangeText={setMedicineSearch}
+            placeholder="Search medicines..."
+            placeholderTextColor={Colors.textTertiary}
+            accessibilityLabel="Search medicines"
+          />
+          {/* Searchable medicine switcher */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             style={styles.medChipsScroll}
           >
-            {medicines.map((m) => (
+            {medicines.filter((m) => `${m.name} ${m.strength}`.toLowerCase().includes(medicineSearch.trim().toLowerCase())).map((m) => (
               <TouchableOpacity
                 key={m.id}
                 style={[
@@ -202,8 +212,15 @@ export default function SetReminderScreen() {
           {times.map((t) => (
             <View key={t.id} style={styles.timeRow}>
               <View style={styles.timeCol}>
-                <Text style={styles.timeValue}>{t.time}</Text>
-                <Text style={styles.doseNote}>{t.amount}</Text>
+                <TextInput
+                  style={styles.timeValue}
+                  value={t.label ?? ''}
+                  onChangeText={(label) => setTimes(times.map((item) => item.id === t.id ? { ...item, label } : item))}
+                  placeholder="Dose name (e.g. Morning)"
+                  placeholderTextColor={Colors.textTertiary}
+                  accessibilityLabel={`Dose name for ${t.time}`}
+                />
+                <Text style={styles.doseNote}>{t.amount} · {t.time}</Text>
               </View>
 
               <TouchableOpacity
@@ -220,7 +237,7 @@ export default function SetReminderScreen() {
           ))}
 
           {/* Preset time buttons */}
-          <Text style={styles.presetsLabel}>Quick Add Time:</Text>
+          <Text style={styles.presetsLabel}>Add another dose time</Text>
           <View style={styles.presetRow}>
             {['08:00', '12:00', '18:00', '21:00'].map((preset) => (
               <TouchableOpacity
@@ -228,7 +245,7 @@ export default function SetReminderScreen() {
                 style={styles.presetChip}
                 onPress={() => addTime(preset)}
               >
-                <Text style={styles.presetChipText}>+{preset}</Text>
+                <Text style={styles.presetChipText}>+ {preset < '11:00' ? 'Morning' : preset < '14:00' ? 'Afternoon' : preset < '19:00' ? 'Evening' : 'Night'} · {preset}</Text>
               </TouchableOpacity>
             ))}
           </View>
