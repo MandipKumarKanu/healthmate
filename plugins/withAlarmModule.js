@@ -138,12 +138,16 @@ function withAlarmMainActivity(config) {
     }
   }
 `;
+      // Insert lockScreenCode before super.onCreate(null)
       contents = contents.replace(
         "super.onCreate(null)",
-        `${lockScreenCode}\n    super.onCreate(null)\n  }${onNewIntentCode}`,
+        `${lockScreenCode}\n    super.onCreate(null)`
       );
-      // clean up any duplicate closing brace if pattern replaced 'super.onCreate(null)'
-      contents = contents.replace("super.onCreate(null)\n  }\n  }", "super.onCreate(null)\n  }");
+      // Insert onNewIntent immediately after onCreate closing brace
+      contents = contents.replace(
+        /(super\.onCreate\(null\)\s*\n\s*\})/,
+        `$1\n\n${onNewIntentCode}`
+      );
       config.modResults.contents = contents;
     }
     return config;
