@@ -12,6 +12,7 @@ import {
 import { useRouter } from "expo-router";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
+import * as Clipboard from "expo-clipboard";
 import { Ionicons, Feather } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
 import { Radius, Spacing, Typography } from "../../theme/tokens";
@@ -19,21 +20,14 @@ import { AppScreen } from "../../components/ui/AppScreen";
 import { AppHeader } from "../../components/ui/AppHeader";
 import { AppCard } from "../../components/ui/AppCard";
 import { AppButton } from "../../components/ui/AppButton";
-import { ocrService, ExtractedMedicineData } from "../../services/ocrService";
+import { ExtractedMedicineData } from "../../services/ocrService";
+import {
+  LabelScanPassDebug,
+  processLabelImage,
+} from "../../services/ocrRecognition";
 import { scanHistoryRepository } from "../../database/repositories/scanHistoryRepository";
 import { useMedicineStore } from "../../store/medicineStore";
 import { DosageForm } from "../../types";
-
-let TextRecognitionModule: {
-  recognize: (uri: string) => Promise<{ text?: string }>;
-} | null = null;
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const mod = require("@react-native-ml-kit/text-recognition");
-  TextRecognitionModule = mod.default || mod;
-} catch {
-  // Native ML Kit not installed; fallback gracefully
-}
 
 export default function ScanScreen() {
   const router = useRouter();
@@ -45,6 +39,19 @@ export default function ScanScreen() {
   const [isScanning, setIsScanning] = useState(false);
   const [extractedData, setExtractedData] =
     useState<ExtractedMedicineData | null>(null);
+  // True when the demo text was used because the native engine is unavailable.
+  const [usedFallbackEngine, setUsedFallbackEngine] = useState(false);
+  // Dev only: per-pass OCR reads (color vs grayscale) for on-device comparison.
+  const [debugPasses, setDebugPasses] = useState<LabelScanPassDebug[] | null>(
+    null
+  );
+  const [expandedDebugPass, setExpandedDebugPass] = useState<string | null>(
+    null
+  );
+  const [copiedDebugPass, setCopiedDebugPass] = useState<string | null>(null);
+  // Full label text card visibility
+  const [showFullText, setShowFullText] = useState(false);
+  const [fullTextCopied, setFullTextCopied] = useState(false);
 
   // Editable fields for review
   const [medName, setMedName] = useState("");
@@ -57,27 +64,25 @@ export default function ScanScreen() {
   const processImage = async (imageUri: string) => {
     setIsScanning(true);
     setExtractedData(null);
+    setUsedFallbackEngine(false);
+    setShowFullText(false);
+    setDebugPasses(null);
+    setExpandedDebugPass(null);
+    setCopiedDebugPass(null);
     try {
-      let rawText = "";
-      if (
-        TextRecognitionModule &&
-        typeof TextRecognitionModule.recognize === "function"
-      ) {
-        const recognition = await TextRecognitionModule.recognize(imageUri);
-        rawText = recognition.text?.trim() ?? "";
-      } else {
-        // Fallback for demonstration when ML Kit module is not bundled
-        rawText =
-          "Metformin 500mg Tablets BP\nBatch: DEMO-MF0426\nExp: 12/2027\nMfg: Example Pharma";
+      const { rawText, extracted, usedFallbackEngine: isDemo, debugPasses } =
+        await processLabelImage(imageUri);
+      if (__DEV__ && debugPasses) {
+        setDebugPasses(debugPasses);
       }
       if (!rawText) {
         Alert.alert(
           "No text detected",
-          "Try a clearer, well-lit photo with the medicine label filling the frame.",
+          "Try a clearer, well-lit photo with the medicine label filling the frame."
         );
         return;
       }
-      const extracted = ocrService.extractMedicineData(rawText);
+      setUsedFallbackEngine(isDemo);
       setExtractedData(extracted);
       setMedName(extracted.medicineName || "");
       setMedStrength(extracted.detectedStrength || "");
@@ -89,7 +94,7 @@ export default function ScanScreen() {
       console.warn("Medicine label text recognition failed:", error);
       Alert.alert(
         "Could not read label",
-        "Please try another image or enter the medicine details manually.",
+        "Please try another image or enter the medicine details manually."
       );
     } finally {
       setIsScanning(false);
@@ -108,7 +113,7 @@ export default function ScanScreen() {
       }
     }
     try {
-      const photo = await cameraRef.current?.takePictureAsync({ quality: 0.8 });
+      const photo = await cameraRef.current?.takePictureAsync({ quality: 1.0 });
       if (!photo?.uri) {
         Alert.alert(
           "Camera unavailable",
@@ -132,7 +137,7 @@ export default function ScanScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
         allowsEditing: true,
-        quality: 0.8,
+        quality: 1,
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const imageUri = result.assets[0].uri;
@@ -145,15 +150,50 @@ export default function ScanScreen() {
     }
   };
 
+  const handleCopyDebugPass = async (pass: LabelScanPassDebug) => {
+    try {
+      await Clipboard.setStringAsync(pass.rawText);
+      setCopiedDebugPass(pass.label);
+      setTimeout(() => setCopiedDebugPass(null), 2000);
+    } catch (error) {
+      console.warn("Copy debug pass text failed:", error);
+    }
+  };
+
   const handleReset = () => {
     setCapturedImage(null);
     setExtractedData(null);
+    setUsedFallbackEngine(false);
+    setShowFullText(false);
+    setDebugPasses(null);
+    setExpandedDebugPass(null);
+    setCopiedDebugPass(null);
     setMedName("");
     setMedStrength("");
     setMedForm("tablet");
     setMedExpiry("");
     setMedBatch("");
     setMedMfg("");
+  };
+
+  const fullTextLines =
+    extractedData?.lines && extractedData.lines.length > 0
+      ? extractedData.lines
+      : extractedData?.rawText
+        ? extractedData.rawText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+        : [];
+
+  const handleCopyFullText = async () => {
+    const text = fullTextLines.join("\n");
+    if (!text) return;
+    try {
+      await Clipboard.setStringAsync(text);
+      setFullTextCopied(true);
+      setTimeout(() => setFullTextCopied(false), 2000);
+    } catch (error) {
+      console.warn("Copy label text failed:", error);
+      Alert.alert("Copy failed", "Long-press the text below to select and copy it.");
+    }
   };
 
   const handleSaveToHistory = () => {
@@ -341,8 +381,9 @@ export default function ScanScreen() {
                 color="#0788F5"
               />
               <Text style={styles.ocrAlertText}>
-                OCR results are automated. Review and correct text against your
-                physical prescription label before saving.
+                {usedFallbackEngine
+                  ? "Sample scan (OCR engine not bundled). Add the ML Kit dependency for real label scans — fields below are demo data."
+                  : "OCR results are automated. Review and correct text against your physical prescription label before saving."}
               </Text>
             </View>
 
@@ -350,9 +391,171 @@ export default function ScanScreen() {
               <View style={styles.ocrAlertBanner}>
                 <ActivityIndicator size="small" color={Colors.primary} />
                 <Text style={styles.ocrAlertText}>
-                  Reading text from the medicine label…
+                  Reading text from the medicine label… hold the package steady.
                 </Text>
               </View>
+            ) : null}
+
+            {extractedData && !isScanning ? (
+              <>
+                {!extractedData.isHighConfidence ? (
+                  <View style={styles.lowConfidenceChip}>
+                    <Ionicons
+                      name="alert-circle-outline"
+                      size={14}
+                      color="#B45309"
+                    />
+                    <Text style={styles.lowConfidenceText}>
+                      Low-confidence read — double-check the fields below
+                      against the package.
+                    </Text>
+                  </View>
+                ) : null}
+
+                {/* Full label text */}
+                <AppCard style={styles.fullTextCard}>
+                  <TouchableOpacity
+                    style={styles.fullTextHeader}
+                    onPress={() => setShowFullText((prev) => !prev)}
+                    activeOpacity={0.7}
+                  >
+                    <Feather name="file-text" size={15} color={Colors.primary} />
+                    <Text style={styles.fullTextTitle}>Full label text</Text>
+                    <Text style={styles.fullTextBadge}>
+                      {fullTextLines.length} lines
+                    </Text>
+                    {usedFallbackEngine ? (
+                      <Text style={styles.fullTextBadge}>sample</Text>
+                    ) : null}
+                    <Ionicons
+                      name={showFullText ? "chevron-up" : "chevron-down"}
+                      size={14}
+                      color={Colors.textTertiary}
+                    />
+                  </TouchableOpacity>
+
+                  {showFullText ? (
+                    <>
+                      <View style={styles.fullTextBody}>
+                        {fullTextLines.length > 0 ? (
+                          fullTextLines.map((line, index) => (
+                            <Text
+                              key={`label-line-${index}`}
+                              style={styles.fullTextLine}
+                              selectable
+                            >
+                              {line}
+                            </Text>
+                          ))
+                        ) : (
+                          <Text style={styles.fullTextLine}>—</Text>
+                        )}
+                      </View>
+                      <TouchableOpacity
+                        style={styles.copyButton}
+                        onPress={handleCopyFullText}
+                        activeOpacity={0.7}
+                      >
+                        <Feather
+                          name={fullTextCopied ? "check" : "copy"}
+                          size={13}
+                          color={fullTextCopied ? Colors.success : Colors.primary}
+                        />
+                        <Text
+                          style={[
+                            styles.copyButtonText,
+                            fullTextCopied && styles.copyButtonTextDone,
+                          ]}
+                        >
+                          {fullTextCopied ? "Copied!" : "Copy text"}
+                        </Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : null}
+                </AppCard>
+              </>
+            ) : null}
+
+            {/* Dev only: per-pass comparison of the color reads vs the
+                grayscale + contrast pass, for tuning low-light labels. */}
+            {__DEV__ && debugPasses && debugPasses.length > 0 ? (
+              <AppCard style={styles.debugCard}>
+                <Text style={styles.debugTitle}>
+                  OCR pass comparison (dev builds only)
+                </Text>
+                <Text style={styles.debugHint}>
+                  Same photo, different recognition passes. Compare a color pass
+                  (highres/compact) against the grayscale+contrast read.
+                </Text>
+                {debugPasses.map((pass) => (
+                  <View key={pass.label} style={styles.debugPassRow}>
+                    <TouchableOpacity
+                      style={styles.debugPassHeader}
+                      onPress={() =>
+                        setExpandedDebugPass((prev) =>
+                          prev === pass.label ? null : pass.label
+                        )
+                      }
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons
+                        name={
+                          expandedDebugPass === pass.label
+                            ? "chevron-down"
+                            : "chevron-forward"
+                        }
+                        size={13}
+                        color={Colors.textTertiary}
+                      />
+                      <Text style={styles.debugPassLabel} numberOfLines={1}>
+                        {pass.label}
+                      </Text>
+                      <Text style={styles.debugPassScore}>
+                        signals {pass.signals} · {pass.chars} chars
+                      </Text>
+                    </TouchableOpacity>
+
+                    {expandedDebugPass === pass.label ? (
+                      <>
+                        <View style={styles.debugPassBody}>
+                          {pass.rawText
+                            .split(/\r?\n/)
+                            .filter(Boolean)
+                            .map((line, index) => (
+                              <Text
+                                key={`debug-line-${pass.label}-${index}`}
+                                style={styles.debugPassLine}
+                                selectable
+                              >
+                                {line}
+                              </Text>
+                            ))}
+                        </View>
+                        <TouchableOpacity
+                          style={styles.debugCopyButton}
+                          onPress={() => handleCopyDebugPass(pass)}
+                          activeOpacity={0.7}
+                        >
+                          <Feather
+                            name={copiedDebugPass === pass.label ? "check" : "copy"}
+                            size={12}
+                            color={
+                              copiedDebugPass === pass.label
+                                ? Colors.success
+                                : Colors.primary
+                            }
+                          />
+                          <Text style={styles.debugCopyText}>
+                            {copiedDebugPass === pass.label
+                              ? "Copied!"
+                              : "Copy this read"}
+                          </Text>
+                        </TouchableOpacity>
+                      </>
+                    ) : null}
+                  </View>
+                ))}
+              </AppCard>
             ) : null}
 
             {/* Editable Fields */}
@@ -666,6 +869,79 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     marginLeft: 8,
   },
+  lowConfidenceChip: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#FEF6E9",
+    borderRadius: Radius.md,
+    padding: 10,
+    marginBottom: Spacing.md,
+  },
+  lowConfidenceText: {
+    flex: 1,
+    fontSize: 12,
+    color: "#B27623",
+    lineHeight: 17,
+    marginLeft: 6,
+  },
+  fullTextCard: {
+    marginBottom: Spacing.md,
+    padding: Spacing.cardPadding,
+  },
+  fullTextHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  fullTextTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: Colors.textPrimary,
+    flex: 1,
+  },
+  fullTextBadge: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: Colors.textTertiary,
+    backgroundColor: "#F1F5F9",
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+    borderRadius: Radius.pill,
+    overflow: "hidden",
+  },
+  fullTextBody: {
+    marginTop: 10,
+    backgroundColor: "#F8F8FC",
+    borderWidth: 1,
+    borderColor: "#F3F2F6",
+    borderRadius: Radius.sm,
+    padding: 10,
+    maxHeight: 200,
+  },
+  fullTextLine: {
+    fontSize: 13,
+    color: Colors.textPrimary,
+    lineHeight: 20,
+  },
+  copyButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-end",
+    marginTop: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: "#F1F5F9",
+    borderRadius: Radius.pill,
+  },
+  copyButtonText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: Colors.primary,
+    marginLeft: 6,
+  },
+  copyButtonTextDone: {
+    color: Colors.successDark,
+  },
   fieldsCard: {
     marginBottom: Spacing.lg,
     paddingVertical: 8,
@@ -688,6 +964,76 @@ const styles = StyleSheet.create({
   },
   actionButtonsContainer: {
     marginTop: Spacing.sm,
+  },
+  debugCard: {
+    marginBottom: Spacing.md,
+    padding: Spacing.cardPadding,
+    backgroundColor: "#FFFDF4",
+    borderWidth: 1,
+    borderColor: "#F1E8C8",
+  },
+  debugTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#8A6D1B",
+  },
+  debugHint: {
+    fontSize: 11,
+    color: "#A08C4A",
+    lineHeight: 15,
+    marginTop: 3,
+    marginBottom: 8,
+  },
+  debugPassRow: {
+    borderTopWidth: 1,
+    borderTopColor: "#F1E8C8",
+    paddingVertical: 6,
+  },
+  debugPassHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  debugPassLabel: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "700",
+    color: Colors.textPrimary,
+    textTransform: "none",
+  },
+  debugPassScore: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+  },
+  debugPassBody: {
+    marginTop: 6,
+    backgroundColor: "#F8F8FC",
+    borderWidth: 1,
+    borderColor: "#F3F2F6",
+    borderRadius: Radius.sm,
+    padding: 10,
+    maxHeight: 220,
+  },
+  debugPassLine: {
+    fontSize: 12,
+    color: Colors.textPrimary,
+    lineHeight: 18,
+  },
+  debugCopyButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-end",
+    marginTop: 6,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    backgroundColor: "#F1F5F9",
+    borderRadius: Radius.pill,
+  },
+  debugCopyText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: Colors.primary,
+    marginLeft: 5,
   },
   candidatesSection: {
     marginTop: 6,

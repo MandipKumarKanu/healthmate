@@ -1,18 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   StyleSheet,
   View,
   Text,
   TouchableOpacity,
   Alert,
+  ScrollView,
+  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons, Feather } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { Colors } from '../../theme/colors';
 import { Radius, Spacing, Typography } from '../../theme/tokens';
 import { AppScreen } from '../../components/ui/AppScreen';
 import { AppHeader } from '../../components/ui/AppHeader';
 import { AppCard } from '../../components/ui/AppCard';
+import { AppButton } from '../../components/ui/AppButton';
 import { MedicineIcon } from '../../components/ui/MedicineIcon';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { scanHistoryRepository } from '../../database/repositories/scanHistoryRepository';
@@ -24,6 +28,8 @@ export default function ScanHistoryScreen() {
   const { addMedicine } = useMedicineStore();
   const [scans, setScans] = useState<ScanHistoryEntry[]>([]);
   const [showClearModal, setShowClearModal] = useState(false);
+  const [selectedScan, setSelectedScan] = useState<ScanHistoryEntry | null>(null);
+  const [textCopied, setTextCopied] = useState(false);
 
   const loadScans = () => {
     const list = scanHistoryRepository.getAll();
@@ -34,47 +40,65 @@ export default function ScanHistoryScreen() {
     loadScans();
   }, []);
 
+  const closeSheet = () => {
+    setSelectedScan(null);
+    setTextCopied(false);
+  };
+
   const handleClearHistory = () => {
     scanHistoryRepository.clearAll();
     setShowClearModal(false);
     loadScans();
   };
 
+  const handleAddToCabinet = (scan: ScanHistoryEntry) => {
+    addMedicine({
+      id: `med_${Date.now()}`,
+      name: scan.medicineName,
+      strength: scan.detectedStrength || 'Standard',
+      dosageForm: scan.dosageForm || 'tablet',
+      category: 'Prescription',
+      packageDetails: {
+        manufacturer: scan.manufacturer,
+        expiryDate: scan.expiryDate,
+        batchNumber: scan.batchNumber,
+      },
+      isSample: false,
+    });
+    closeSheet();
+    Alert.alert('Added', `${scan.medicineName} added to your cabinet!`);
+  };
+
+  const handleDeleteScan = (scan: ScanHistoryEntry) => {
+    scanHistoryRepository.delete(scan.id);
+    closeSheet();
+    loadScans();
+  };
+
+  // Clean label lines for the sheet's full-text block
+  const selectedScanLines = useMemo(() => {
+    if (!selectedScan?.rawText) return [];
+    return selectedScan.rawText
+      .split(/\r?\n/)
+      .map((line) => line.replace(/\s+/g, ' ').trim())
+      .filter(Boolean);
+  }, [selectedScan]);
+
+  const handleCopyLabel = async () => {
+    const text = selectedScanLines.join('\n');
+    if (!text) return;
+    try {
+      await Clipboard.setStringAsync(text);
+      setTextCopied(true);
+      setTimeout(() => setTextCopied(false), 2000);
+    } catch (error) {
+      console.warn('Copy label text failed:', error);
+    }
+  };
+
   const handleItemPress = (scan: ScanHistoryEntry) => {
-    Alert.alert(
-      scan.medicineName,
-      `Scanned: ${scan.scannedAt.split('T')[0]}\nStrength: ${scan.detectedStrength ?? 'N/A'}\nBatch: ${scan.batchNumber ?? 'N/A'}`,
-      [
-        {
-          text: 'Add to Medicine Cabinet',
-          onPress: () => {
-            addMedicine({
-              id: `med_${Date.now()}`,
-              name: scan.medicineName,
-              strength: scan.detectedStrength || 'Standard',
-              dosageForm: scan.dosageForm || 'tablet',
-              category: 'Prescription',
-              packageDetails: {
-                manufacturer: scan.manufacturer,
-                expiryDate: scan.expiryDate,
-                batchNumber: scan.batchNumber,
-              },
-              isSample: false,
-            });
-            Alert.alert('Added', `${scan.medicineName} added to your cabinet!`);
-          },
-        },
-        {
-          text: 'Delete Scan',
-          style: 'destructive',
-          onPress: () => {
-            scanHistoryRepository.delete(scan.id);
-            loadScans();
-          },
-        },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
+    setSelectedScan(scan);
+    setTextCopied(false);
   };
 
   return (
@@ -127,6 +151,11 @@ export default function ScanHistoryScreen() {
                   <Text style={styles.detailsText}>
                     {scan.detectedStrength ?? 'Standard'} · {scan.dosageForm ?? 'Tablet'}
                   </Text>
+                  {scan.rawText ? (
+                    <Text style={styles.rawPreview} numberOfLines={1}>
+                      “{scan.rawText.split(/\r?\n/)[0]}”
+                    </Text>
+                  ) : null}
                   <Text style={styles.dateText}>
                     {new Date(scan.scannedAt).toLocaleDateString()} at{' '}
                     {new Date(scan.scannedAt).toLocaleTimeString([], {
@@ -156,6 +185,139 @@ export default function ScanHistoryScreen() {
         onConfirm={handleClearHistory}
         onCancel={() => setShowClearModal(false)}
       />
+
+      {/* Scan detail sheet: fields + full extracted label text */}
+      <Modal
+        visible={selectedScan !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={closeSheet}
+      >
+        <View style={styles.sheetBackdrop}>
+          <View style={styles.sheetContainer}>
+            <View style={styles.sheetGrabber} />
+
+            {selectedScan ? (
+              <ScrollView
+                style={styles.sheetScroll}
+                contentContainerStyle={styles.sheetScrollContent}
+                showsVerticalScrollIndicator
+              >
+                <Text style={styles.sheetTitle}>{selectedScan.medicineName}</Text>
+                <Text style={styles.sheetSubtitle}>
+                  Scanned on{' '}
+                  {new Date(selectedScan.scannedAt).toLocaleDateString()} at{' '}
+                  {new Date(selectedScan.scannedAt).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </Text>
+
+                <View style={styles.detailGrid}>
+                  <View style={styles.detailCell}>
+                    <Text style={styles.detailLabel}>Strength</Text>
+                    <Text style={styles.detailValue}>
+                      {selectedScan.detectedStrength ?? 'N/A'}
+                    </Text>
+                  </View>
+                  <View style={styles.detailCell}>
+                    <Text style={styles.detailLabel}>Form</Text>
+                    <Text style={styles.detailValue}>
+                      {selectedScan.dosageForm ?? 'tablet'}
+                    </Text>
+                  </View>
+                  <View style={styles.detailCell}>
+                    <Text style={styles.detailLabel}>Expiry</Text>
+                    <Text style={styles.detailValue}>
+                      {selectedScan.expiryDate ?? 'N/A'}
+                    </Text>
+                  </View>
+                  <View style={styles.detailCell}>
+                    <Text style={styles.detailLabel}>Batch / Lot</Text>
+                    <Text style={styles.detailValue} numberOfLines={1}>
+                      {selectedScan.batchNumber ?? 'N/A'}
+                    </Text>
+                  </View>
+                  <View style={styles.detailCellWide}>
+                    <Text style={styles.detailLabel}>Manufacturer</Text>
+                    <Text style={styles.detailValue} numberOfLines={2}>
+                      {selectedScan.manufacturer ?? 'N/A'}
+                    </Text>
+                  </View>
+                </View>
+
+                {selectedScanLines.length > 0 ? (
+                  <View style={styles.sheetTextSection}>
+                    <View style={styles.sheetTextHeader}>
+                      <Feather
+                        name="file-text"
+                        size={14}
+                        color={Colors.primary}
+                      />
+                      <Text style={styles.sheetTextTitle}>
+                        Full label text ({selectedScanLines.length} lines)
+                      </Text>
+                    </View>
+                    <View style={styles.sheetTextBody}>
+                      {selectedScanLines.map((line, index) => (
+                        <Text
+                          key={`scan-line-${index}`}
+                          style={styles.sheetTextLine}
+                          selectable
+                        >
+                          {line}
+                        </Text>
+                      ))}
+                    </View>
+                    <TouchableOpacity
+                      style={styles.sheetCopyButton}
+                      onPress={handleCopyLabel}
+                      activeOpacity={0.7}
+                    >
+                      <Feather
+                        name={textCopied ? 'check' : 'copy'}
+                        size={12}
+                        color={textCopied ? Colors.successDark : Colors.primary}
+                      />
+                      <Text
+                        style={[
+                          styles.sheetCopyText,
+                          textCopied && { color: Colors.successDark },
+                        ]}
+                      >
+                        {textCopied ? 'Copied!' : 'Copy text'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+
+                <View style={styles.sheetActions}>
+                  <AppButton
+                    title="Add to Medicine Cabinet"
+                    size="md"
+                    onPress={() => handleAddToCabinet(selectedScan)}
+                    style={{ flex: 1 }}
+                  />
+                  <AppButton
+                    title="Delete"
+                    variant="destructive"
+                    size="md"
+                    onPress={() => handleDeleteScan(selectedScan)}
+                    style={{ flexShrink: 0 }}
+                  />
+                </View>
+                <AppButton
+                  title="Close"
+                  variant="text"
+                  size="sm"
+                  onPress={closeSheet}
+                  style={{ marginTop: Spacing.xs, alignSelf: 'center' }}
+                />
+              </ScrollView>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </AppScreen>
   );
 }
@@ -204,6 +366,131 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textTertiary,
     marginTop: 4,
+  },
+  rawPreview: {
+    fontSize: 11,
+    fontStyle: 'italic',
+    color: Colors.textSecondary,
+    marginTop: 4,
+  },
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(17, 17, 22, 0.55)',
+    justifyContent: 'flex-end',
+  },
+  sheetContainer: {
+    backgroundColor: Colors.cardBackground,
+    borderTopLeftRadius: Radius.xxl,
+    borderTopRightRadius: Radius.xxl,
+    maxHeight: '85%',
+  },
+  sheetGrabber: {
+    alignSelf: 'center',
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.xs,
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.border,
+  },
+  sheetScroll: {
+    flexGrow: 0,
+  },
+  sheetScrollContent: {
+    paddingHorizontal: Spacing.screenPaddingHorizontal,
+    paddingBottom: Spacing.xl,
+  },
+  sheetTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    marginTop: Spacing.xs,
+  },
+  sheetSubtitle: {
+    fontSize: 12,
+    color: Colors.textTertiary,
+    marginTop: 2,
+    marginBottom: Spacing.md,
+  },
+  detailGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  detailCell: {
+    width: '30%',
+    minWidth: 100,
+    flexGrow: 1,
+    backgroundColor: Colors.cardBackgroundSecondary,
+    borderRadius: Radius.sm,
+    padding: 10,
+  },
+  detailCellWide: {
+    width: '100%',
+    backgroundColor: Colors.cardBackgroundSecondary,
+    borderRadius: Radius.sm,
+    padding: 10,
+  },
+  detailLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    color: Colors.textTertiary,
+  },
+  detailValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+    marginTop: 2,
+  },
+  sheetTextSection: {
+    marginBottom: Spacing.md,
+  },
+  sheetTextHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  sheetTextTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  sheetTextBody: {
+    backgroundColor: Colors.cardBackgroundSecondary,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    borderRadius: Radius.sm,
+    padding: 10,
+    maxHeight: 180,
+  },
+  sheetTextLine: {
+    fontSize: 13,
+    color: Colors.textPrimary,
+    lineHeight: 20,
+  },
+  sheetCopyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    marginTop: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: Colors.cardBackgroundSecondary,
+    borderRadius: Radius.pill,
+  },
+  sheetCopyText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.primary,
+    marginLeft: 6,
+  },
+  sheetActions: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginTop: Spacing.xs,
   },
   emptyContainer: {
     alignItems: 'center',

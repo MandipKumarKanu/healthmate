@@ -75,7 +75,7 @@ Exp: 10/2028
       const extracted = ocrService.extractMedicineData(rawText);
 
       expect(extracted.medicineName).toBe('Metformin');
-      expect(extracted.detectedStrength).toBe('500mg');
+      expect(extracted.detectedStrength).toBe('500 mg');
       expect(extracted.isHighConfidence).toBe(true);
       expect(extracted.confidenceScore).toBeGreaterThanOrEqual(0.85);
     });
@@ -140,6 +140,79 @@ Exp Date: 03/2027
       // No strength in raw text, should NOT fabricate a strength
       expect(extracted.medicineName).toBe('Metformin');
       expect(extracted.detectedStrength).toBeUndefined();
+    });
+  });
+
+  describe('Line-aware parsing & OCR noise repair', () => {
+    it('repairs digit confusions in dates and confusable keys on messy labels', () => {
+      const rawText = `
+Cetrizine 10 mg Tablets
+Batch N0: 8L0KK A1 203
+Use before: 08/2O27
+Mfg. by: Sun Pharma Laboratories Ltd.
+      `;
+
+      const extracted = ocrService.extractMedicineData(rawText);
+
+      expect(extracted.medicineName).toBe('Cetirizine');
+      expect(extracted.detectedStrength).toBe('10 mg');
+      // "N0" key fix + spaced code is compacted
+      expect(extracted.batchNumber).toBe('8L0KKA1203');
+      // "2O27" → 2027
+      expect(extracted.expiryDate).toBe('08/2027');
+      // manufacturer keeps only its own line
+      expect(extracted.manufacturer).toBe('Sun Pharma Laboratories Ltd.');
+    });
+
+    it('does not let the manufacturer swallow the expiry printed on the same line', () => {
+      const rawText = `
+Paracetamol 500 mg Tablets
+Mfg. by: Cipla Ltd. Exp: 03/2028
+Batch: PC-4521
+      `;
+
+      const extracted = ocrService.extractMedicineData(rawText);
+
+      expect(extracted.medicineName).toBe('Paracetamol');
+      expect(extracted.manufacturer).toBe('Cipla Ltd.');
+      expect(extracted.expiryDate).toBe('03/2028');
+      expect(extracted.batchNumber).toBe('PC-4521');
+    });
+
+    it('normalizes date variants found on packs', () => {
+      const extracted1 = ocrService.extractMedicineData('Salbutamol Inhaler\nExpiry: 2028-07');
+      expect(extracted1.expiryDate).toBe('07/2028');
+
+      const extracted2 = ocrService.extractMedicineData(
+        'Montelukast 10 mg\nUse before June 2028\nBatch: MN-2290'
+      );
+      expect(extracted2.expiryDate).toBe('Jun 2028');
+
+      const extracted3 = ocrService.extractMedicineData(
+        'Aspirin 75 mg\nExp. Date: 06/28\nLot: L-771'
+      );
+      expect(extracted3.expiryDate).toBe('06/2028');
+    });
+
+    it('does not fabricate dates from non-date words', () => {
+      const extracted = ocrService.extractMedicineData('Xylophytol Complex 100 mg\nDoes not expire');
+      expect(extracted.expiryDate).toBeUndefined();
+    });
+
+    it('rebuilds a clean name when the product is not in the dictionary', () => {
+      const extracted = ocrService.extractMedicineData('Rx ARESTON 80mg');
+      // "Rx" prefix and strength are stripped from the fallback name
+      expect(extracted.medicineName).toBe('ARESTON');
+      expect(extracted.isHighConfidence).toBe(false);
+    });
+
+    it('exposes the cleaned line list for the full-text display', () => {
+      const rawText = 'Metformin 500mg Tablets BP\n\nBatch:  DEMO-MF0426';
+      const extracted = ocrService.extractMedicineData(rawText);
+      expect(extracted.lines).toEqual([
+        'Metformin 500mg Tablets BP',
+        'Batch: DEMO-MF0426',
+      ]);
     });
   });
 });
