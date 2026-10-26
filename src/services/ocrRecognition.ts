@@ -20,8 +20,8 @@
  *
  * Each pass is scored (recognized lines + parsed label signals: dictionary
  * name match, strength, expiry, batch, manufacturer) and the best-scoring
- * pass wins. Falls back to demo text only when the native module is not
- * bundled (Expo Go).
+ * pass wins. If native OCR is unavailable or no text is detected, returns an
+ * empty result so the UI can ask the user to retry instead of inventing data.
  *
  * Kept separate from `ocrService.ts`, which stays a pure, unit-testable
  * parser with no native dependencies.
@@ -97,7 +97,7 @@ export interface LabelScanResult {
   rawText: string;
   /** Parsed + structured medicine fields. */
   extracted: ExtractedMedicineData;
-  /** True when the demo text was used because the engine is unavailable. */
+  /** Always false in production flows; scans never substitute fabricated label text. */
   usedFallbackEngine: boolean;
   /** True when the best read came from a retry pass, not the first one. */
   retried: boolean;
@@ -315,17 +315,6 @@ export async function processLabelImage(
         await attemptPass(cropped, 'crop');
       }
     }
-  }
-
-  if (!state.bestText && !mlKitAvailable) {
-    // Engine not bundled (Expo Go): demo text keeps the review flow testable.
-    return {
-      rawText: DEMO_LABEL_TEXT,
-      extracted: ocrService.extractMedicineData(DEMO_LABEL_TEXT),
-      usedFallbackEngine: true,
-      retried: state.passesUsed > 1,
-      debugPasses: devMode ? state.debugPasses : null,
-    };
   }
 
   const extracted = state.bestText
