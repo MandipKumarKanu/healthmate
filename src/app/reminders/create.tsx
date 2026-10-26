@@ -50,7 +50,10 @@ export default function SetReminderScreen() {
       const existingSched = scheduleRepository.getByMedicineId(medicineId);
       if (existingSched) {
         setRecurrence(existingSched.recurrence);
-        setTimes(existingSched.times);
+        setTimes(existingSched.times.map((t) => ({
+          ...t,
+          label: t.label || (t.time < '11:00' ? 'Morning' : t.time < '17:00' ? 'Afternoon' : t.time < '21:00' ? 'Evening' : 'Night'),
+        })));
         setNotificationsEnabled(existingSched.notificationsEnabled);
       }
     } else if (list.length > 0) {
@@ -83,6 +86,12 @@ export default function SetReminderScreen() {
   const handleSave = async () => {
     if (!selectedMed) {
       Alert.alert('Error', 'Please select a medicine first.');
+      return;
+    }
+
+    const invalidTime = times.find((t) => !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(t.time));
+    if (invalidTime) {
+      Alert.alert('Invalid time', 'Enter each dose time in 24-hour HH:mm format, for example 08:00 or 18:30.');
       return;
     }
 
