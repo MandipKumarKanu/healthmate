@@ -36,11 +36,10 @@ export default function ScanScreen() {
   const { addMedicine } = useMedicineStore();
 
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [packageType, setPackageType] = useState<"strip" | "box" | "bottle">("strip");
   const [isScanning, setIsScanning] = useState(false);
   const [extractedData, setExtractedData] =
     useState<ExtractedMedicineData | null>(null);
-  // True when the demo text was used because the native engine is unavailable.
-  const [usedFallbackEngine, setUsedFallbackEngine] = useState(false);
   // Dev only: per-pass OCR reads (color vs grayscale) for on-device comparison.
   const [debugPasses, setDebugPasses] = useState<LabelScanPassDebug[] | null>(
     null
@@ -64,13 +63,12 @@ export default function ScanScreen() {
   const processImage = async (imageUri: string) => {
     setIsScanning(true);
     setExtractedData(null);
-    setUsedFallbackEngine(false);
     setShowFullText(false);
     setDebugPasses(null);
     setExpandedDebugPass(null);
     setCopiedDebugPass(null);
     try {
-      const { rawText, extracted, usedFallbackEngine: isDemo, debugPasses } =
+      const { rawText, extracted, debugPasses } =
         await processLabelImage(imageUri);
       if (__DEV__ && debugPasses) {
         setDebugPasses(debugPasses);
@@ -82,7 +80,6 @@ export default function ScanScreen() {
         );
         return;
       }
-      setUsedFallbackEngine(isDemo);
       setExtractedData(extracted);
       setMedName(extracted.medicineName || "");
       setMedStrength(extracted.detectedStrength || "");
@@ -163,7 +160,6 @@ export default function ScanScreen() {
   const handleReset = () => {
     setCapturedImage(null);
     setExtractedData(null);
-    setUsedFallbackEngine(false);
     setShowFullText(false);
     setDebugPasses(null);
     setExpandedDebugPass(null);
@@ -249,7 +245,7 @@ export default function ScanScreen() {
         manufacturer: medMfg || undefined,
         expiryDate: medExpiry || undefined,
         batchNumber: medBatch || undefined,
-        packageDetailsText: "Captured via camera label scan",
+        packageDetailsText: `Scanned from medicine ${packageType} packaging. OCR fields were user-reviewed.`,
         // OCR extraction is not verification; keep this false until the user explicitly checks the original package.
         originalPackageChecked: false,
       },
@@ -290,7 +286,53 @@ export default function ScanScreen() {
 
       <View style={styles.body}>
         {!capturedImage ? (
-          // Camera Viewport & Capture Controls
+          <>
+          <View style={styles.packagePicker}>
+            <Text style={styles.packagePickerLabel}>What are you scanning?</Text>
+            <View style={styles.packageTypeRow}>
+              {([
+                { value: "strip", label: "Strip", icon: "medkit-outline" },
+                { value: "box", label: "Box", icon: "cube-outline" },
+                { value: "bottle", label: "Bottle", icon: "flask-outline" },
+              ] as const).map((option) => {
+                const selected = packageType === option.value;
+                return (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={[
+                      styles.packageTypeButton,
+                      selected && styles.packageTypeButtonActive,
+                    ]}
+                    onPress={() => setPackageType(option.value)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                  >
+                    <Ionicons
+                      name={option.icon}
+                      size={17}
+                      color={selected ? Colors.primary : Colors.textSecondary}
+                    />
+                    <Text
+                      style={[
+                        styles.packageTypeText,
+                        selected && styles.packageTypeTextActive,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={styles.packageHint}>
+              {packageType === "strip"
+                ? "For blister strips, capture the printed foil or the back of the strip. Tilt slightly to reduce glare."
+                : packageType === "box"
+                  ? "Keep the medicine name and strength sharp. Capture batch and expiry panels too if possible."
+                  : "Hold the bottle label straight-on. Include the batch and expiry text where available."}
+            </Text>
+          </View>
+          {/* Camera Viewport & Capture Controls */}
           <View style={styles.cameraContainer}>
             {permission?.granted ? (
               <CameraView
@@ -364,6 +406,7 @@ export default function ScanScreen() {
               </TouchableOpacity>
             </View>
           </View>
+          </>
         ) : (
           // Review & OCR Edit Form
           <View style={styles.reviewContainer}>
@@ -381,9 +424,7 @@ export default function ScanScreen() {
                 color="#0788F5"
               />
               <Text style={styles.ocrAlertText}>
-                {usedFallbackEngine
-                  ? "Sample scan (OCR engine not bundled). Add the ML Kit dependency for real label scans — fields below are demo data."
-                  : "OCR results are automated. Review and correct text against your physical prescription label before saving."}
+                OCR results are automated. Review and correct the extracted details against the actual medicine packaging before saving.
               </Text>
             </View>
 
@@ -424,9 +465,6 @@ export default function ScanScreen() {
                     <Text style={styles.fullTextBadge}>
                       {fullTextLines.length} lines
                     </Text>
-                    {usedFallbackEngine ? (
-                      <Text style={styles.fullTextBadge}>sample</Text>
-                    ) : null}
                     <Ionicons
                       name={showFullText ? "chevron-up" : "chevron-down"}
                       size={14}
@@ -693,6 +731,57 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: Colors.primary,
     marginLeft: 4,
+  },
+  packagePicker: {
+    width: "100%",
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.md,
+    padding: Spacing.md,
+    backgroundColor: "#FFFFFF",
+    borderRadius: Radius.card,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  packagePickerLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: Colors.textPrimary,
+    marginBottom: 10,
+  },
+  packageTypeRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  packageTypeButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    borderRadius: Radius.md,
+    backgroundColor: "#FFFFFF",
+  },
+  packageTypeButtonActive: {
+    backgroundColor: Colors.primaryLight,
+    borderColor: Colors.primary,
+  },
+  packageTypeText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: Colors.textSecondary,
+  },
+  packageTypeTextActive: {
+    color: Colors.primary,
+  },
+  packageHint: {
+    marginTop: 10,
+    fontSize: 12,
+    lineHeight: 17,
+    color: Colors.textSecondary,
   },
   cameraContainer: {
     alignItems: "center",
