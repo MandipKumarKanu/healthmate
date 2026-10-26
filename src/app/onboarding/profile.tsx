@@ -228,7 +228,7 @@ export default function OnboardingProfileScreen() {
     <AppScreen scrollable={false} contentContainerStyle={styles.container}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : Platform.OS === "android" ? "height" : undefined}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
