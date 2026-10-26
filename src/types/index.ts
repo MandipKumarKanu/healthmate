@@ -63,6 +63,7 @@ export interface ReminderTime {
   id: string;
   time: string; // 'HH:mm' e.g. '08:00'
   amount: string; // e.g. '1 tablet'
+  label?: string; // e.g. Morning, Afternoon, Evening, Night, or a custom dose name
 }
 
 export interface ReminderSchedule {
