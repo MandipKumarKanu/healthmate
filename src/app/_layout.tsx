@@ -24,6 +24,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" />
         <Stack.Screen name="onboarding/index" />
         <Stack.Screen name="onboarding/profile" />
+        <Stack.Screen name="onboarding/permissions" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="medicines/[id]" />
         <Stack.Screen name="medicines/add" />
