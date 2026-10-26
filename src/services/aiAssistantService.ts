@@ -134,7 +134,7 @@ export const aiAssistantService = {
    */
   async askGemini(
     prompt: string,
-    history: Pick<AIMessage, 'role' | 'content'>[],
+    history: Pick<AIMessage, 'role' | 'content'>[] = [],
     options: { apiKey?: string; model?: string; timeoutMs?: number } = {},
   ): Promise<GeminiAnswer> {
     const apiKey =
@@ -208,6 +208,11 @@ export const aiAssistantService = {
         throw Object.assign(new Error('Gemini request timed out.'), {
           code: 'TIMEOUT',
         });
+      }
+      if (!(error as { code?: string })?.code) {
+        // Transport-level failure (offline, DNS, TLS): categorize it so the
+        // screen can show its offline-guide fallback copy.
+        throw Object.assign(error as Error, { code: 'NETWORK' });
       }
       throw error;
     } finally {

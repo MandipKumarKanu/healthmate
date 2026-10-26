@@ -50,7 +50,7 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
             val snoozeMinutes = if (minutes > 0) minutes else 10
             val triggerAtMillis = System.currentTimeMillis() + (snoozeMinutes * 60 * 1000L)
 
-            scheduleAlarmInternal(scheduleId, medicineName, amount, time, label, triggerAtMillis)
+            scheduleAlarmInternal(scheduleId, medicineName, amount, time, label, "once", triggerAtMillis)
             promise.resolve(triggerAtMillis.toDouble())
         } catch (e: Exception) {
             promise.reject("SNOOZE_FAILED", e.message, e)
@@ -337,7 +337,7 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
         amount: String,
         time: String,
         label: String,
-        recurrence: String,
+        recurrence: String = "once",
         triggerAtMillis: Long
     ) {
         // Persist first so the alarm survives reboots, then arm it.

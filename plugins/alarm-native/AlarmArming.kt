@@ -22,7 +22,7 @@ import java.util.Calendar
  * with no app launch and no SQLite access.
  */
 object AlarmArming {
-    private const val PREFS_NAME = "healthmate_active_alarms"
+    const val PREFS_NAME = "healthmate_active_alarms"
     private const val KEY_PENDING = "pending_alarms"
 
     private const val J_SCHEDULE_ID = "scheduleId"

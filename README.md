@@ -42,9 +42,11 @@ The application faithfully reproduces the iOS-style reference design, offering a
    - Human-in-the-loop review allowing corrections before adding to cabinet or saving to history
 
 6. **AI Assistant (`/ai-assistant`)**:
-   - Plain-language explanations for pharmaceutical packaging terminology
+   - Live answers via the Google Gemini API (`gemini-2.5-flash`), enabled by pasting your own Gemini API key into the in-app "Connect AI" dialog (stored on-device with `expo-secure-store`)
    - Suggested prompts for mg vs. mL, active ingredients, batch/lot numbers, and medicine storage
-   - Clinical safety guardrails clarifying educational boundaries
+   - Clinical safety guardrails: a system prompt forbids personalized medical advice, and questions seeking it are refused with a pointer to the patient leaflet, pharmacist, or prescriber
+   - Offline fallback: with no key or no network, a fixed terminology guide answers instead, with a banner stating which mode is active
+   - Chat history persisted locally in `ai_conversations` / `ai_messages`
 
 7. **Profile & Local Security (`/(tabs)/profile`)**:
    - User profile management with editable name

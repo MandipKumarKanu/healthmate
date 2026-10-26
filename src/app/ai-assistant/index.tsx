@@ -8,6 +8,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Modal,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons, Feather } from '@expo/vector-icons';
@@ -164,20 +165,90 @@ export default function AIAssistantScreen() {
 
   return (
     <AppScreen contentContainerStyle={styles.container}>
+      <Modal
+        visible={keyModalVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setKeyModalVisible(false)}
+      >
+        <View style={styles.keyModalBackdrop}>
+          <View style={styles.keyModalCard}>
+            <Text style={styles.keyModalTitle}>Connect Gemini</Text>
+            <Text style={styles.keyModalCopy}>
+              Paste a Gemini API key from aistudio.google.com to enable live AI
+              answers. Stored only on this device. Leave blank to cancel.
+            </Text>
+            <TextInput
+              style={styles.keyModalInput}
+              placeholder="Gemini API key"
+              autoCapitalize="none"
+              autoCorrect={false}
+              secureTextEntry
+              value={keyDraft}
+              onChangeText={setKeyDraft}
+            />
+            {keyError ? (
+              <Text style={styles.keyModalError}>{keyError}</Text>
+            ) : null}
+            <View style={styles.keyModalActions}>
+              <TouchableOpacity
+                style={styles.keyModalSecondary}
+                onPress={() => {
+                  setKeyModalVisible(false);
+                  setKeyError(null);
+                }}
+              >
+                <Text style={styles.keyModalSecondaryText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.keyModalPrimary}
+                onPress={async () => {
+                  setKeyError(null);
+                  try {
+                    await aiAssistantService.saveApiKey(keyDraft.trim());
+                    setHasApiKey(true);
+                    setKeyModalVisible(false);
+                    setKeyDraft('');
+                  } catch (error) {
+                    setKeyError('Could not save the key. Try again.');
+                  }
+                }}
+              >
+                <Text style={styles.keyModalPrimaryText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <AppHeader
         title="Medication Guide"
-        subtitle="Offline medication terminology guide"
+        subtitle={hasApiKey ? 'Online medication guide' : 'Offline medication terminology guide'}
         brandText="HealthMate AI"
         onBackPress={() => router.back()}
         rightAction={
-          messages.length > 0 ? (
+          <View style={styles.headerActionsRow}>
             <TouchableOpacity
               style={styles.newChatButton}
-              onPress={handleNewChat}
+              onPress={() => {
+                setKeyDraft('');
+                setKeyError(null);
+                setKeyModalVisible(true);
+              }}
             >
-              <Text style={styles.newChatText}>New Chat</Text>
+              <Text style={styles.newChatText}>
+                {hasApiKey ? 'AI Key ✓' : 'Connect AI'}
+              </Text>
             </TouchableOpacity>
-          ) : null
+            {messages.length > 0 ? (
+              <TouchableOpacity
+                style={styles.newChatButton}
+                onPress={handleNewChat}
+              >
+                <Text style={styles.newChatText}>New Chat</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
         }
       />
 
@@ -185,7 +256,9 @@ export default function AIAssistantScreen() {
       <View style={styles.disclaimerBanner}>
         <Ionicons name="information-circle" size={18} color="#0788F5" />
         <Text style={styles.disclaimerText}>
-          Fixed offline responses, not a live AI or verified drug database. General education only; never replace advice from your doctor or pharmacist.
+          {hasApiKey
+            ? 'Live AI answers when the key accepts messages and the device is online; offline guide otherwise. General education only; never replace advice from your doctor or pharmacist.'
+            : 'Fixed offline responses, not a live AI or verified drug database. General education only; never replace advice from your doctor or pharmacist.'}
         </Text>
       </View>
 
@@ -321,6 +394,79 @@ const styles = StyleSheet.create({
     color: '#0369A1',
     marginLeft: 6,
     flex: 1,
+  },
+  headerActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  keyModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.screenPaddingHorizontal,
+  },
+  keyModalCard: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: Radius.card,
+    padding: 20,
+  },
+  keyModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+    marginBottom: 8,
+  },
+  keyModalCopy: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    lineHeight: 19,
+    marginBottom: 14,
+  },
+  keyModalInput: {
+    backgroundColor: '#F0EFEF',
+    borderRadius: Radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: Colors.textPrimary,
+    marginBottom: 6,
+  },
+  keyModalError: {
+    fontSize: 12,
+    color: Colors.error,
+    marginBottom: 6,
+  },
+  keyModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 12,
+  },
+  keyModalSecondary: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  keyModalSecondaryText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
+  keyModalPrimary: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.primary,
+  },
+  keyModalPrimaryText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   scrollArea: {
     flex: 1,
