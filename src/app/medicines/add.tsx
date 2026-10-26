@@ -6,7 +6,7 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  } from "react-native";
+} from "react-native";
 import { AppAlert as Alert } from "../../services/appAlert";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Colors } from "../../theme/colors";
