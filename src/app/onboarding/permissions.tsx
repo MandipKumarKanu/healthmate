@@ -6,12 +6,12 @@ import {
   TouchableOpacity,
   ScrollView,
   Platform,
-  Alert,
   ActivityIndicator,
   Linking,
   AppState,
   AppStateStatus,
 } from "react-native";
+import { AppAlert as Alert } from "../../services/appAlert";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Notifications from "expo-notifications";
