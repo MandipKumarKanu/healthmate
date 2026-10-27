@@ -816,6 +816,9 @@ export default function ProfileScreen() {
       <ConnectGeminiModal
         visible={showGeminiModal}
         onClose={() => setShowGeminiModal(false)}
+        onKeySaved={(key) => {
+          setGeminiKey(key);
+        }}
         onSuccess={() => {
           loadGeminiKey();
         }}
