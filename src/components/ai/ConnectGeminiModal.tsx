@@ -17,6 +17,7 @@ import * as Clipboard from 'expo-clipboard';
 import { Colors } from '../../theme/colors';
 import { Radius, Spacing, Typography } from '../../theme/tokens';
 import { aiAssistantService } from '../../services/aiAssistantService';
+import { useKeyboardAwareScroll } from '../../hooks/useKeyboardAwareScroll';
 
 interface ConnectGeminiModalProps {
   visible: boolean;
@@ -33,6 +34,10 @@ export function ConnectGeminiModal({
   onKeySaved,
   onDisconnected,
 }: ConnectGeminiModalProps) {
+  const {
+    scrollViewRef: modalScrollRef,
+    handleFocusCapture,
+  } = useKeyboardAwareScroll({ extraOffset: 40 });
   const [keyDraft, setKeyDraft] = useState('');
   const [isSecure, setIsSecure] = useState(true);
   const [isLoadingKey, setIsLoadingKey] = useState(false);
@@ -193,12 +198,14 @@ export function ConnectGeminiModal({
             </View>
 
             <ScrollView
+              ref={modalScrollRef}
               style={styles.modalScrollView}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.scrollContent}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
             >
+              <View style={{ flexGrow: 1 }} onFocusCapture={handleFocusCapture}>
               {showCelebration ? (
                 /* Celebration View (MCQ Choice 4) */
                 <View style={styles.celebrationContainer}>
@@ -459,6 +466,7 @@ export function ConnectGeminiModal({
                   </View>
                 </>
               )}
+              </View>
             </ScrollView>
           </View>
         </KeyboardAvoidingView>

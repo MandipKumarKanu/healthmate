@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useEffect, useCallback } from 'react';
+import { StyleSheet, View, BackHandler } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Spacing } from '../../theme/tokens';
 import { AppScreen } from '../../components/ui/AppScreen';
 import { HomeHeader } from '../../components/home/HomeHeader';
@@ -17,6 +17,21 @@ export default function HomeScreen() {
   const router = useRouter();
   const { profile, selectedDate, preferences } = useAppStore();
   const { doses, daySummary, loadDosesForDate, markDoseStatus } = useReminderStore();
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        BackHandler.exitApp();
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener(
+        'hardwareBackPress',
+        onBackPress
+      );
+      return () => subscription.remove();
+    }, [])
+  );
 
   useEffect(() => {
     loadDosesForDate(selectedDate);

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -12,11 +12,19 @@ import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { Radius, Spacing } from '../../theme/tokens';
 import { AppScreen } from '../../components/ui/AppScreen';
+import { useAppStore } from '../../store/appStore';
 
 const { width: screenWidth } = Dimensions.get('window');
 
 export default function OnboardingWelcomeScreen() {
   const router = useRouter();
+  const profile = useAppStore((state) => state.profile);
+
+  useEffect(() => {
+    if (profile?.onboardingCompleted) {
+      router.replace('/(tabs)/home');
+    }
+  }, [profile?.onboardingCompleted, router]);
 
   const handleNext = () => {
     router.push('/onboarding/profile');

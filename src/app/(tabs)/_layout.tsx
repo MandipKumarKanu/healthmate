@@ -5,6 +5,7 @@ import { CustomBottomTabBar, TabName } from '../../components/ui/CustomBottomTab
 export default function TabLayout() {
   return (
     <Tabs
+      backBehavior="initialRoute"
       tabBar={({ state, navigateToTab }) => {
         const currentRoute = state.routes[state.index].name as TabName;
         return (

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   StyleSheet,
   View,
@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   ScrollView,
   KeyboardAvoidingView,
-  Keyboard,
   Platform,
   Image,
   Modal,
@@ -20,6 +19,7 @@ import { AppScreen } from "../../components/ui/AppScreen";
 import { Radius, Spacing } from "../../theme/tokens";
 import { useAppStore } from "../../store/appStore";
 import { GenderOption, UnitSystem } from "../../types";
+import { useKeyboardAwareScroll } from "../../hooks/useKeyboardAwareScroll";
 
 const GENDER_OPTIONS: { label: string; value: GenderOption }[] = [
   { label: "Male", value: "Male" },
@@ -30,40 +30,11 @@ const GENDER_OPTIONS: { label: string; value: GenderOption }[] = [
 
 export default function OnboardingProfileScreen() {
   const router = useRouter();
-  const profileScrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
-  const focusedInputTagRef = useRef<number | null>(null);
-
-  const scrollFocusedInput = useCallback((target: number) => {
-    focusedInputTagRef.current = target;
-    requestAnimationFrame(() => {
-      const responder = profileScrollRef.current as unknown as {
-        scrollResponderScrollNativeHandleToKeyboard?: (
-          nodeHandle: number,
-          additionalOffset?: number,
-          preventNegativeScrollOffset?: boolean,
-        ) => void;
-      } | null;
-      responder?.scrollResponderScrollNativeHandleToKeyboard?.(target, 120, true);
-    });
-  }, []);
-
-  useEffect(() => {
-    const subscription = Keyboard.addListener("keyboardDidShow", () => {
-      const target = focusedInputTagRef.current;
-      if (target == null) return;
-      requestAnimationFrame(() => {
-        const responder = profileScrollRef.current as unknown as {
-          scrollResponderScrollNativeHandleToKeyboard?: (
-            nodeHandle: number,
-            additionalOffset?: number,
-            preventNegativeScrollOffset?: boolean,
-          ) => void;
-        } | null;
-        responder?.scrollResponderScrollNativeHandleToKeyboard?.(target, 120, true);
-      });
-    });
-    return () => subscription.remove();
-  }, []);
+  const {
+    scrollViewRef: profileScrollRef,
+    scrollToNode: scrollFocusedInput,
+    handleFocusCapture,
+  } = useKeyboardAwareScroll({ extraOffset: 80 });
 
   const {
     updateProfile,
@@ -72,6 +43,12 @@ export default function OnboardingProfileScreen() {
     onboardingDraft,
     setOnboardingDraft,
   } = useAppStore();
+
+  useEffect(() => {
+    if (profile?.onboardingCompleted) {
+      router.replace("/(tabs)/home");
+    }
+  }, [profile?.onboardingCompleted, router]);
 
   const [name, setName] = useState(onboardingDraft.name || profile?.name || "");
   const [age, setAge] = useState(
@@ -275,7 +252,8 @@ export default function OnboardingProfileScreen() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         >
-          {/* Top Bar: Back Button */}
+          <View style={{ flexGrow: 1 }} onFocusCapture={handleFocusCapture}>
+            {/* Top Bar: Back Button */}
           <View style={styles.topNavRow}>
             <TouchableOpacity
               onPress={() => router.back()}
@@ -630,6 +608,7 @@ export default function OnboardingProfileScreen() {
                 </View>
               )}
             </TouchableOpacity>
+          </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

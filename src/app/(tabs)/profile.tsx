@@ -29,6 +29,7 @@ import { GenderOption, UnitSystem, SnoozeIntervalMinutes } from '../../types';
 import { AlarmReliabilityCard } from '../../components/profile/AlarmReliabilityCard';
 import { aiAssistantService } from '../../services/aiAssistantService';
 import { ConnectGeminiModal } from '../../components/ai/ConnectGeminiModal';
+import { useKeyboardAwareScroll } from '../../hooks/useKeyboardAwareScroll';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -59,6 +60,10 @@ export default function ProfileScreen() {
 
   const [geminiKey, setGeminiKey] = useState<string | null>(null);
   const [showGeminiModal, setShowGeminiModal] = useState(false);
+  const {
+    scrollViewRef: editModalScrollRef,
+    handleFocusCapture: handleModalFocusCapture,
+  } = useKeyboardAwareScroll({ extraOffset: 60 });
 
   const loadGeminiKey = () => {
     aiAssistantService
@@ -639,12 +644,14 @@ export default function ProfileScreen() {
               <Text style={styles.modalTitle}>Edit Profile</Text>
 
               <ScrollView
+                ref={editModalScrollRef}
                 style={{ maxHeight: 380, flexShrink: 1 }}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
                 keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
               >
-                {/* Full Name */}
+                <View style={{ flexGrow: 1 }} onFocusCapture={handleModalFocusCapture}>
+                  {/* Full Name */}
                 <View style={styles.modalFieldGroup}>
                   <Text style={styles.modalFieldLabel}>Full Name *</Text>
                   <TextInput
@@ -776,6 +783,7 @@ export default function ProfileScreen() {
                       </Text>
                     </TouchableOpacity>
                   </View>
+                </View>
                 </View>
               </ScrollView>
 

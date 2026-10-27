@@ -11,12 +11,14 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../theme/colors';
+import { useKeyboardAwareScroll } from '../../hooks/useKeyboardAwareScroll';
 
 interface AppScreenProps {
   children: React.ReactNode;
   scrollable?: boolean;
   style?: StyleProp<ViewStyle>;
   contentContainerStyle?: StyleProp<ViewStyle>;
+  extraScrollHeight?: number;
 }
 
 export function AppScreen({
@@ -24,8 +26,12 @@ export function AppScreen({
   scrollable = false,
   style,
   contentContainerStyle,
+  extraScrollHeight = 80,
 }: AppScreenProps) {
   const insets = useSafeAreaInsets();
+  const { scrollViewRef, handleFocusCapture } = useKeyboardAwareScroll({
+    extraOffset: extraScrollHeight,
+  });
 
   return (
     <View
@@ -45,6 +51,7 @@ export function AppScreen({
           keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
         >
           <ScrollView
+            ref={scrollViewRef}
             style={styles.scroll}
             contentContainerStyle={[styles.contentContainer, contentContainerStyle]}
             showsVerticalScrollIndicator={false}
@@ -52,7 +59,9 @@ export function AppScreen({
             keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
             automaticallyAdjustKeyboardInsets={false}
           >
-            {children}
+            <View style={styles.focusCaptureWrapper} onFocusCapture={handleFocusCapture}>
+              {children}
+            </View>
           </ScrollView>
         </KeyboardAvoidingView>
       ) : (
@@ -76,6 +85,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
+    flexGrow: 1,
+  },
+  focusCaptureWrapper: {
     flexGrow: 1,
   },
 });
