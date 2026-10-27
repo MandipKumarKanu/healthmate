@@ -74,8 +74,8 @@ export default function SetReminderScreen() {
   // Time picker state and snap wheels for quick, precise minute selection.
   const [pickerTarget, setPickerTarget] = useState<{ id: string | 'new'; date: Date } | null>(null);
   const [tempPickerDate, setTempPickerDate] = useState<Date>(new Date());
-  const hourWheelRef = useRef<ScrollView | null>(null);
-  const minuteWheelRef = useRef<ScrollView | null>(null);
+  const hourWheelRef = useRef<React.ElementRef<typeof ScrollView>>(null);
+  const minuteWheelRef = useRef<React.ElementRef<typeof ScrollView>>(null);
 
   useEffect(() => {
     if (!pickerTarget) return;
