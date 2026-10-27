@@ -9,7 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { Radius, Spacing, Typography } from '../../theme/tokens';
@@ -51,29 +51,32 @@ export default function AIAssistantScreen() {
   const [isOnline, setIsOnline] = useState(true);
   const [keyModalVisible, setKeyModalVisible] = useState(false);
   const scrollViewRef = useRef<React.ElementRef<typeof ScrollView>>(null);
+  const lastAutoQueryRef = useRef<string | null>(null);
 
   const checkConnectivityAndKey = useCallback(async () => {
-    try {
-      const [online, key] = await Promise.all([
-        networkService.checkInternet(),
-        aiAssistantService.getApiKey(),
-      ]);
-      setIsOnline(online);
-      setHasApiKey(Boolean(key));
-    } catch {
-      setIsOnline(false);
-    }
+    const [online, key] = await Promise.all([
+      networkService.checkInternet().catch(() => false),
+      aiAssistantService.getApiKey().catch(() => null),
+    ]);
+    setIsOnline(online);
+    setHasApiKey(Boolean(key));
   }, []);
 
-  // Load latest conversation from SQLite on mount
+  // Load the saved conversation once. Re-check the key and network on every focus
+  // so reconnecting or a rejected key cannot leave the header in a stale state.
   useEffect(() => {
     const latest = aiRepository.getLatestConversation();
     if (latest && latest.messages.length > 0) {
       setConversationId(latest.id);
       setMessages(latest.messages);
     }
-    checkConnectivityAndKey();
-  }, [checkConnectivityAndKey]);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void checkConnectivityAndKey();
+    }, [checkConnectivityAndKey]),
+  );
 
   /** Offline fallback: fixed terminology guide, unchanged behavior. */
   const generateOfflineReply = useCallback((text: string): string => {
@@ -94,7 +97,11 @@ export default function AIAssistantScreen() {
     const code = (error as { code?: string })?.code;
     switch (code) {
       case 'BAD_KEY':
-        return 'Your Gemini API key was rejected, so the offline guide answered below. Reconnect a valid key from the AI key screen.\n\n';
+        return 'Google rejected the saved Gemini API key. HealthMate disconnected it, and the offline guide answered below. Connect a new key to use live AI again.\n\n';
+      case 'ACCESS_DENIED':
+        return 'Google denied this project access to Gemini, so the offline guide answered below. Check the project status, API access, and key restrictions in Google AI Studio.\n\n';
+      case 'MODEL_UNAVAILABLE':
+        return 'The configured Gemini models are unavailable for this key, so the offline guide answered below. Check the available models and project access in Google AI Studio.\n\n';
       case 'RATE_LIMIT':
         return 'Gemini’s free-tier limit was just reached, so the offline guide answered below.\n\n';
       case 'TIMEOUT':
@@ -145,6 +152,10 @@ export default function AIAssistantScreen() {
         usedNetwork = true;
       } catch (error) {
         console.warn('Gemini request failed, falling back to offline guide:', error);
+        if ((error as { code?: string })?.code === 'BAD_KEY') {
+          setHasApiKey(false);
+          setKeyModalVisible(true);
+        }
         reply = `${offlinePrefixForError(error)}${generateOfflineReply(text)}`;
       }
     } else {
@@ -167,9 +178,15 @@ export default function AIAssistantScreen() {
   }, [conversationId, messages, hasApiKey, generateOfflineReply, offlinePrefixForError]);
 
   useEffect(() => {
-    if (query) {
-      sendMessage(query);
+    if (!query) {
+      lastAutoQueryRef.current = null;
+      return;
     }
+    // sendMessage depends on chat state. Track the query to avoid re-sending the
+    // same deep-link prompt whenever the message list or key status changes.
+    if (lastAutoQueryRef.current === query) return;
+    lastAutoQueryRef.current = query;
+    void sendMessage(query);
   }, [query, sendMessage]);
 
   const handleNewChat = () => {
