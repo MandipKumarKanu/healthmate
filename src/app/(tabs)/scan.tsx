@@ -56,8 +56,10 @@ export default function ScanScreen() {
       ]);
       setIsOnline(online);
       setHasApiKey(Boolean(key));
-    } catch {
+    } catch (error) {
+      console.warn('Could not check scan prerequisites:', error);
       setIsOnline(false);
+      setHasApiKey(false);
     } finally {
       setIsCheckingPrerequisites(false);
     }
