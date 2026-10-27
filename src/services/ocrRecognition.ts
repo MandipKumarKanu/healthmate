@@ -114,6 +114,8 @@ export interface LabelScanResult {
    * pass for low-light labels. Null outside __DEV__.
    */
   debugPasses: LabelScanPassDebug[] | null;
+  /** Explains when OCR succeeded but Gemini interpretation had to fall back. */
+  aiWarning?: string;
 }
 
 export interface LabelScanPassDebug {
@@ -237,6 +239,7 @@ export async function processLabelImage(
 
   const rawText = remoteResult.text || "";
   let extracted = ocrService.extractMedicineData(rawText);
+  let aiWarning: string | undefined;
   try {
     const aiParsed = await aiAssistantService.parseMedicinePackagingWithAI(rawText);
     if (aiParsed) {
@@ -244,6 +247,9 @@ export async function processLabelImage(
     }
   } catch (aiErr) {
     console.warn("AI medication packaging interpretation fallback:", aiErr);
+    aiWarning =
+      (aiErr as { message?: string })?.message ||
+      "Personal AI interpretation failed. Review all extracted medicine fields manually.";
   }
 
   return {
@@ -251,6 +257,7 @@ export async function processLabelImage(
     extracted,
     usedFallbackEngine: false,
     retried: false,
+    aiWarning,
     debugPasses: devMode
       ? [
           {
