@@ -110,8 +110,13 @@ export default function ScanScreen() {
     setCopiedDebugPass(null);
     try {
       setScanStepMessage("Step 2/2: Personal AI analyzing medicine details…");
-      const { rawText, extracted, usedFallbackEngine: isDemo, debugPasses } =
-        await processLabelImage(imageUri);
+      const {
+        rawText,
+        extracted,
+        usedFallbackEngine: isDemo,
+        debugPasses,
+        aiWarning,
+      } = await processLabelImage(imageUri);
       // Packaging interpretation can invalidate and clear a rejected Gemini key
       // while still returning the local OCR extraction. Keep the scan gate in sync.
       let persistedKey: string | null = null;
@@ -131,6 +136,12 @@ export default function ScanScreen() {
             { text: 'Reconnect AI', onPress: () => setShowConnectModal(true) },
             { text: 'Review OCR results', style: 'cancel' },
           ],
+        );
+      } else if (aiWarning) {
+        Alert.alert(
+          'AI interpretation unavailable',
+          `${aiWarning}\n\nThe OCR extraction is still available for review. Check every field against the original medicine packaging before saving.`,
+          [{ text: 'Continue reviewing OCR', style: 'cancel' }],
         );
       }
       if (__DEV__ && debugPasses) {
