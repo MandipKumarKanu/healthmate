@@ -84,10 +84,13 @@ export function AppButton({
       activeOpacity={0.75}
     >
       {loading ? (
-        <ActivityIndicator
-          size="small"
-          color={variant === 'primary' ? Colors.textInverse : Colors.primary}
-        />
+        <>
+          <ActivityIndicator
+            size="small"
+            color={variant === 'primary' ? Colors.textInverse : Colors.primary}
+          />
+          <Text style={[getTextStyles(), styles.loadingLabel]}>{title}</Text>
+        </>
       ) : (
         <>
           {icon ? <>{icon}</> : null}
@@ -138,6 +141,9 @@ const styles = StyleSheet.create({
   },
   disabled: {
     opacity: 0.5,
+  },
+  loadingLabel: {
+    marginLeft: 8,
   },
   baseText: {
     fontWeight: '600',
