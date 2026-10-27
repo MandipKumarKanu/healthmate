@@ -65,32 +65,34 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
 
     const medicine = medicineRepository.getById(schedule.medicineId);
     const medicineName = medicine?.name ?? "Medicine";
-    const scheduledIds: string[] = [];
 
-    for (const dose of schedule.times) {
-      const identifier = await notificationService.scheduleDoseReminder(
-        schedule.id,
-        medicineName,
-        dose.amount,
-        dose.time,
-        dose.label,
-        {
-          recurrence: schedule.recurrence,
-          startDate: schedule.startDate,
-          endDate: schedule.endDate,
-        },
-      );
+    // A schedule can contain multiple dose times. Schedule those dose chains
+    // concurrently; each native chain is keyed by scheduleId + time, and each
+    // trigger list is internally batched by notificationService.
+    const scheduledIds = await Promise.all(
+      schedule.times.map((dose) =>
+        notificationService.scheduleDoseReminder(
+          schedule.id,
+          medicineName,
+          dose.amount,
+          dose.time,
+          dose.label,
+          {
+            recurrence: schedule.recurrence,
+            startDate: schedule.startDate,
+            endDate: schedule.endDate,
+          },
+        ),
+      ),
+    );
 
-      if (!identifier) {
-        // Never leave a schedule marked notification-enabled when only some
-        // of its alarms were scheduled. Refresh the UI after the rollback too.
-        await notificationService.cancelForSchedule(schedule.id);
-        scheduleRepository.save({ ...schedule, notificationsEnabled: false });
-        refreshVisibleDate();
-        return false;
-      }
-
-      scheduledIds.push(identifier);
+    if (scheduledIds.some((identifier) => !identifier)) {
+      // Never leave a schedule marked notification-enabled when only some
+      // of its alarms were scheduled. Cancel any partial OS/native work.
+      await notificationService.cancelForSchedule(schedule.id);
+      scheduleRepository.save({ ...schedule, notificationsEnabled: false });
+      refreshVisibleDate();
+      return false;
     }
 
     refreshVisibleDate();
