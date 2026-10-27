@@ -413,6 +413,7 @@ export const aiAssistantService = {
 
     const modelsToTry = GEMINI_MODELS_TO_TRY;
     let lastPackagingParseError: unknown = null;
+    let lastModelError = '';
 
     for (const model of modelsToTry) {
       try {
@@ -469,7 +470,10 @@ export const aiAssistantService = {
 
         if (!response.ok) {
           const detail = await readGeminiErrorMessage(response);
-          if (response.status === 404) continue;
+          if (response.status === 404) {
+            lastModelError = detail;
+            continue;
+          }
           const mapped = classifyGeminiError(response.status, detail);
           if (mapped.code === 'BAD_KEY') {
             await this._clearRejectedApiKey();
@@ -536,6 +540,16 @@ export const aiAssistantService = {
       throw Object.assign(
         new Error('Gemini could not return a reliable structured interpretation. Review the OCR fields manually.'),
         { code: 'AI_PARSE' },
+      );
+    }
+    if (lastModelError || modelsToTry.length > 0) {
+      throw Object.assign(
+        new Error(
+          lastModelError
+            ? `No configured Gemini model was available: ${lastModelError}`
+            : 'No configured Gemini model was available for packaging interpretation.',
+        ),
+        { code: 'MODEL_UNAVAILABLE' },
       );
     }
 
