@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   StyleSheet,
   View,
@@ -10,26 +10,25 @@ import {
   AppState,
   AppStateStatus,
   ActivityIndicator,
-} from "react-native";
-import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { Colors } from "../../theme/colors";
-import { Radius, Spacing } from "../../theme/tokens";
-import { AppCard } from "../ui/AppCard";
+} from 'react-native';
+import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { Colors } from '../../theme/colors';
+import { Radius, Spacing } from '../../theme/tokens';
+import { AppCard } from '../ui/AppCard';
 import {
   batteryOptimizationService,
   ReliabilityStatus,
   OEMGuide,
-} from "../../services/batteryOptimizationService";
+} from '../../services/batteryOptimizationService';
 
 export function AlarmReliabilityCard() {
   const router = useRouter();
   const [status, setStatus] = useState<ReliabilityStatus | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [isGuideModalVisible, setIsGuideModalVisible] =
-    useState<boolean>(false);
-  const [selectedOemId, setSelectedOemId] = useState<string>("stock");
+  const [isGuideModalVisible, setIsGuideModalVisible] = useState<boolean>(false);
+  const [selectedOemId, setSelectedOemId] = useState<string>('stock');
 
   const checkStatus = useCallback(async () => {
     try {
@@ -37,7 +36,7 @@ export function AlarmReliabilityCard() {
       setStatus(result);
       setSelectedOemId(result.detectedOemId);
     } catch (e) {
-      console.warn("AlarmReliabilityCard checkStatus error:", e);
+      console.warn('AlarmReliabilityCard checkStatus error:', e);
     } finally {
       setLoading(false);
     }
@@ -47,22 +46,19 @@ export function AlarmReliabilityCard() {
     checkStatus();
 
     const handleAppStateChange = (nextState: AppStateStatus) => {
-      if (nextState === "active") {
+      if (nextState === 'active') {
         checkStatus();
       }
     };
 
-    const subscription = AppState.addEventListener(
-      "change",
-      handleAppStateChange,
-    );
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => {
       subscription.remove();
     };
   }, [checkStatus]);
 
   const handleRequestBatteryIgnore = async () => {
-    setActionLoading("battery");
+    setActionLoading('battery');
     try {
       await batteryOptimizationService.requestIgnoreBatteryOptimizations();
       // Recheck after a slight delay to allow system prompt handling
@@ -73,7 +69,7 @@ export function AlarmReliabilityCard() {
   };
 
   const handleOpenExactAlarm = async () => {
-    setActionLoading("exact");
+    setActionLoading('exact');
     try {
       await batteryOptimizationService.openExactAlarmSettings();
       setTimeout(checkStatus, 1500);
@@ -83,7 +79,7 @@ export function AlarmReliabilityCard() {
   };
 
   const handleOpenOemSettings = async () => {
-    setActionLoading("oem");
+    setActionLoading('oem');
     try {
       await batteryOptimizationService.openOemAutoStartSettings();
     } finally {
@@ -92,7 +88,7 @@ export function AlarmReliabilityCard() {
   };
 
   const handleOpenAppBattery = async () => {
-    setActionLoading("appBattery");
+    setActionLoading('appBattery');
     try {
       await batteryOptimizationService.openAppBatterySettings();
     } finally {
@@ -106,7 +102,7 @@ export function AlarmReliabilityCard() {
     guides.find((g) => g.id === status?.detectedOemId) ||
     guides[0];
 
-  const isAndroid = Platform.OS === "android";
+  const isAndroid = Platform.OS === 'android';
   const isBatteryOptimal = status?.isIgnoringBatteryOptimizations ?? true;
   const isExactOptimal = status?.canScheduleExactAlarms ?? true;
   const isOverallOptimal = isBatteryOptimal && isExactOptimal;
@@ -121,25 +117,19 @@ export function AlarmReliabilityCard() {
               style={[
                 styles.iconBadge,
                 {
-                  backgroundColor: isOverallOptimal
-                    ? Colors.successLight
-                    : Colors.warningLight,
+                  backgroundColor: isOverallOptimal ? Colors.successLight : Colors.warningLight,
                 },
               ]}
             >
               <MaterialCommunityIcons
-                name={isOverallOptimal ? "shield-check" : "shield-alert"}
+                name={isOverallOptimal ? 'shield-check' : 'shield-alert'}
                 size={22}
-                color={
-                  isOverallOptimal ? Colors.successDark : Colors.warningDark
-                }
+                color={isOverallOptimal ? Colors.successDark : Colors.warningDark}
               />
             </View>
             <View style={styles.headerTexts}>
               <Text style={styles.title}>Optimize Alarm Reliability</Text>
-              <Text style={styles.subtitle}>
-                Keep alarms ringing on time during deep sleep
-              </Text>
+              <Text style={styles.subtitle}>Keep alarms ringing on time during deep sleep</Text>
             </View>
           </View>
 
@@ -153,24 +143,17 @@ export function AlarmReliabilityCard() {
             {loading ? (
               <ActivityIndicator size="small" color={Colors.primary} />
             ) : (
-              <Feather
-                name="refresh-cw"
-                size={16}
-                color={Colors.textSecondary}
-              />
+              <Feather name="refresh-cw" size={16} color={Colors.textSecondary} />
             )}
           </TouchableOpacity>
         </View>
 
         {/* Overall Status Banner */}
         <View
-          style={[
-            styles.banner,
-            isOverallOptimal ? styles.bannerOptimal : styles.bannerWarning,
-          ]}
+          style={[styles.banner, isOverallOptimal ? styles.bannerOptimal : styles.bannerWarning]}
         >
           <Ionicons
-            name={isOverallOptimal ? "checkmark-circle" : "warning"}
+            name={isOverallOptimal ? 'checkmark-circle' : 'warning'}
             size={18}
             color={isOverallOptimal ? Colors.successDark : Colors.warningDark}
           />
@@ -178,15 +161,13 @@ export function AlarmReliabilityCard() {
             style={[
               styles.bannerText,
               {
-                color: isOverallOptimal
-                  ? Colors.successDark
-                  : Colors.warningDark,
+                color: isOverallOptimal ? Colors.successDark : Colors.warningDark,
               },
             ]}
           >
             {isOverallOptimal
-              ? "Reliability status: Unrestricted & Optimal"
-              : "Attention: Device battery restrictions may delay or kill alarms"}
+              ? 'Reliability status: Unrestricted & Optimal'
+              : 'Attention: Device battery restrictions may delay or kill alarms'}
           </Text>
         </View>
 
@@ -212,36 +193,32 @@ export function AlarmReliabilityCard() {
                 <Text
                   style={[
                     styles.statusPillText,
-                    isBatteryOptimal
-                      ? styles.pillOptimalText
-                      : styles.pillRestrictedText,
+                    isBatteryOptimal ? styles.pillOptimalText : styles.pillRestrictedText,
                   ]}
                 >
-                  {isBatteryOptimal ? "Unrestricted" : "Restricted"}
+                  {isBatteryOptimal ? 'Unrestricted' : 'Restricted'}
                 </Text>
               </View>
             </View>
 
             <Text style={styles.itemDescription}>
               {isBatteryOptimal
-                ? "HealthMate is exempt from Android Doze and sleep restrictions."
-                : "Aggressive battery savers can sleep background alarm triggers when locked."}
+                ? 'HealthMate is exempt from Android Doze and sleep restrictions.'
+                : 'Aggressive battery savers can sleep background alarm triggers when locked.'}
             </Text>
 
             {!isBatteryOptimal && isAndroid && (
               <TouchableOpacity
                 style={styles.actionButton}
                 onPress={handleRequestBatteryIgnore}
-                disabled={actionLoading === "battery"}
+                disabled={actionLoading === 'battery'}
               >
-                {actionLoading === "battery" ? (
+                {actionLoading === 'battery' ? (
                   <ActivityIndicator size="small" color={Colors.textInverse} />
                 ) : (
                   <>
                     <Feather name="zap" size={14} color={Colors.textInverse} />
-                    <Text style={styles.actionButtonText}>
-                      Disable Battery Restrictions
-                    </Text>
+                    <Text style={styles.actionButtonText}>Disable Battery Restrictions</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -270,43 +247,32 @@ export function AlarmReliabilityCard() {
                 <Text
                   style={[
                     styles.statusPillText,
-                    isExactOptimal
-                      ? styles.pillOptimalText
-                      : styles.pillRestrictedText,
+                    isExactOptimal ? styles.pillOptimalText : styles.pillRestrictedText,
                   ]}
                 >
-                  {isExactOptimal ? "Granted" : "Limited"}
+                  {isExactOptimal ? 'Granted' : 'Limited'}
                 </Text>
               </View>
             </View>
 
             <Text style={styles.itemDescription}>
               {isExactOptimal
-                ? "Exact alarm hardware triggers are enabled for zero-latency reminders."
-                : "Android requires permission to wake the screen for critical medications."}
+                ? 'Exact alarm hardware triggers are enabled for zero-latency reminders.'
+                : 'Android requires permission to wake the screen for critical medications.'}
             </Text>
 
             {!isExactOptimal && isAndroid && (
               <TouchableOpacity
                 style={[styles.actionButton, styles.actionButtonSecondary]}
                 onPress={handleOpenExactAlarm}
-                disabled={actionLoading === "exact"}
+                disabled={actionLoading === 'exact'}
               >
-                {actionLoading === "exact" ? (
+                {actionLoading === 'exact' ? (
                   <ActivityIndicator size="small" color={Colors.primary} />
                 ) : (
                   <>
-                    <Ionicons
-                      name="settings-outline"
-                      size={14}
-                      color={Colors.primary}
-                    />
-                    <Text
-                      style={[
-                        styles.actionButtonText,
-                        styles.actionButtonTextSecondary,
-                      ]}
-                    >
+                    <Ionicons name="settings-outline" size={14} color={Colors.primary} />
+                    <Text style={[styles.actionButtonText, styles.actionButtonTextSecondary]}>
                       Enable Exact Alarms
                     </Text>
                   </>
@@ -320,36 +286,32 @@ export function AlarmReliabilityCard() {
         {isAndroid && (
           <TouchableOpacity
             style={styles.guideButton}
-            onPress={() => router.push("/settings/battery-optimization" as any)}
+            onPress={() => router.push('/settings/battery-optimization' as any)}
           >
             <View style={styles.guideButtonContent}>
-              <MaterialCommunityIcons
-                name="cellphone-cog"
-                size={20}
-                color={Colors.primary}
-              />
+              <MaterialCommunityIcons name="cellphone-cog" size={20} color={Colors.primary} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.guideButtonTitle}>
-                  OEM Process Killer Assistant
-                </Text>
+                <Text style={styles.guideButtonTitle}>OEM Process Killer Assistant</Text>
                 <Text style={styles.guideButtonSubtitle}>
                   {status?.manufacturer
                     ? `Detected: ${status.manufacturer.toUpperCase()} • View step-by-step fix`
-                    : "Configure Samsung, Xiaomi, Huawei, Oppo settings"}
+                    : 'Configure Samsung, Xiaomi, Huawei, Oppo settings'}
                 </Text>
               </View>
-              <Ionicons
-                name="chevron-forward"
-                size={18}
-                color={Colors.textTertiary}
-              />
+              <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
             </View>
           </TouchableOpacity>
         )}
       </AppCard>
 
       {/* OEM Assistant Guide Modal */}
-      <Modal visible={isGuideModalVisible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setIsGuideModalVisible(false)}>
+      <Modal
+        visible={isGuideModalVisible}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setIsGuideModalVisible(false)}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             {/* Modal Header */}
@@ -381,20 +343,12 @@ export function AlarmReliabilityCard() {
                 return (
                   <TouchableOpacity
                     key={g.id}
-                    style={[
-                      styles.tabPill,
-                      isSelected && styles.tabPillSelected,
-                    ]}
+                    style={[styles.tabPill, isSelected && styles.tabPillSelected]}
                     onPress={() => setSelectedOemId(g.id)}
                   >
-                    <Text
-                      style={[
-                        styles.tabPillText,
-                        isSelected && styles.tabPillTextSelected,
-                      ]}
-                    >
+                    <Text style={[styles.tabPillText, isSelected && styles.tabPillTextSelected]}>
                       {g.name}
-                      {isDetected ? " ★" : ""}
+                      {isDetected ? ' ★' : ''}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -402,30 +356,20 @@ export function AlarmReliabilityCard() {
             </ScrollView>
 
             {/* Guide Content */}
-            <ScrollView
-              style={styles.guideScroll}
-              showsVerticalScrollIndicator={false}
-            >
+            <ScrollView style={styles.guideScroll} showsVerticalScrollIndicator={false}>
               <View style={styles.guideInfoBanner}>
                 <View
-                  style={[
-                    styles.guideBrandDot,
-                    { backgroundColor: currentGuide.badgeColor },
-                  ]}
+                  style={[styles.guideBrandDot, { backgroundColor: currentGuide.badgeColor }]}
                 />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.guideBrandName}>
                     {currentGuide.name} ({currentGuide.subname})
                   </Text>
-                  <Text style={styles.guideBrandDescription}>
-                    {currentGuide.description}
-                  </Text>
+                  <Text style={styles.guideBrandDescription}>{currentGuide.description}</Text>
                 </View>
               </View>
 
-              <Text style={styles.stepsHeading}>
-                Recommended Configuration:
-              </Text>
+              <Text style={styles.stepsHeading}>Recommended Configuration:</Text>
 
               {currentGuide.steps.map((s, index) => (
                 <View key={index} style={styles.stepCard}>
@@ -440,27 +384,19 @@ export function AlarmReliabilityCard() {
               ))}
 
               <View style={styles.quickLaunchSection}>
-                <Text style={styles.quickLaunchTitle}>
-                  Quick Settings Shortcuts:
-                </Text>
+                <Text style={styles.quickLaunchTitle}>Quick Settings Shortcuts:</Text>
                 <View style={styles.quickLaunchButtons}>
                   <TouchableOpacity
                     style={styles.quickButton}
                     onPress={handleOpenOemSettings}
-                    disabled={actionLoading === "oem"}
+                    disabled={actionLoading === 'oem'}
                   >
-                    {actionLoading === "oem" ? (
+                    {actionLoading === 'oem' ? (
                       <ActivityIndicator size="small" color={Colors.primary} />
                     ) : (
                       <>
-                        <MaterialCommunityIcons
-                          name="auto-fix"
-                          size={16}
-                          color={Colors.primary}
-                        />
-                        <Text style={styles.quickButtonText}>
-                          Open Auto-Start
-                        </Text>
+                        <MaterialCommunityIcons name="auto-fix" size={16} color={Colors.primary} />
+                        <Text style={styles.quickButtonText}>Open Auto-Start</Text>
                       </>
                     )}
                   </TouchableOpacity>
@@ -468,9 +404,9 @@ export function AlarmReliabilityCard() {
                   <TouchableOpacity
                     style={styles.quickButton}
                     onPress={handleOpenAppBattery}
-                    disabled={actionLoading === "appBattery"}
+                    disabled={actionLoading === 'appBattery'}
                   >
-                    {actionLoading === "appBattery" ? (
+                    {actionLoading === 'appBattery' ? (
                       <ActivityIndicator size="small" color={Colors.primary} />
                     ) : (
                       <>
@@ -479,9 +415,7 @@ export function AlarmReliabilityCard() {
                           size={16}
                           color={Colors.primary}
                         />
-                        <Text style={styles.quickButtonText}>
-                          App Battery Info
-                        </Text>
+                        <Text style={styles.quickButtonText}>App Battery Info</Text>
                       </>
                     )}
                   </TouchableOpacity>
@@ -518,14 +452,14 @@ const styles = StyleSheet.create({
     borderRadius: Radius.card,
   },
   headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: Spacing.md,
   },
   titleWithIcon: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
     gap: Spacing.md,
   },
@@ -533,15 +467,15 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTexts: {
     flex: 1,
   },
   title: {
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: '700',
     color: Colors.textPrimary,
   },
   subtitle: {
@@ -553,8 +487,8 @@ const styles = StyleSheet.create({
     padding: Spacing.xs,
   },
   banner: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: Spacing.sm,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
@@ -569,7 +503,7 @@ const styles = StyleSheet.create({
   },
   bannerText: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: '600',
     flex: 1,
   },
   statusList: {
@@ -579,19 +513,19 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xs,
   },
   itemHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 4,
   },
   itemLabelGroup: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: Spacing.xs,
   },
   itemTitle: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
     color: Colors.textPrimary,
   },
   statusPill: {
@@ -607,7 +541,7 @@ const styles = StyleSheet.create({
   },
   statusPillText: {
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: '700',
   },
   pillOptimalText: {
     color: Colors.successDark,
@@ -621,20 +555,20 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   actionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     backgroundColor: Colors.primary,
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: Radius.md,
     marginTop: Spacing.sm,
-    alignSelf: "flex-start",
+    alignSelf: 'flex-start',
   },
   actionButtonText: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: '600',
     color: Colors.textInverse,
   },
   actionButtonSecondary: {
@@ -655,13 +589,13 @@ const styles = StyleSheet.create({
     borderTopColor: Colors.borderLight,
   },
   guideButtonContent: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: Spacing.sm,
   },
   guideButtonTitle: {
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: '600',
     color: Colors.primary,
   },
   guideButtonSubtitle: {
@@ -695,14 +629,14 @@ const styles = StyleSheet.create({
     elevation: 12,
   },
   modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     marginBottom: Spacing.md,
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: "700",
+    fontWeight: '700',
     color: Colors.textPrimary,
   },
   modalSubtitle: {
@@ -732,7 +666,7 @@ const styles = StyleSheet.create({
   },
   tabPillText: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: '600',
     color: Colors.textSecondary,
   },
   tabPillTextSelected: {
@@ -742,8 +676,8 @@ const styles = StyleSheet.create({
     maxHeight: 360,
   },
   guideInfoBanner: {
-    flexDirection: "row",
-    alignItems: "flex-start",
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     gap: Spacing.sm,
     backgroundColor: Colors.cardBackgroundSecondary,
     padding: Spacing.md,
@@ -758,7 +692,7 @@ const styles = StyleSheet.create({
   },
   guideBrandName: {
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: '700',
     color: Colors.textPrimary,
   },
   guideBrandDescription: {
@@ -769,12 +703,12 @@ const styles = StyleSheet.create({
   },
   stepsHeading: {
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: '700',
     color: Colors.textPrimary,
     marginBottom: Spacing.sm,
   },
   stepCard: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: Spacing.sm,
     backgroundColor: Colors.cardBackgroundSecondary,
     padding: Spacing.md,
@@ -786,12 +720,12 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     backgroundColor: Colors.primaryLight,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   stepNumberText: {
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: '700',
     color: Colors.primary,
   },
   stepTexts: {
@@ -799,7 +733,7 @@ const styles = StyleSheet.create({
   },
   stepTitle: {
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: '600',
     color: Colors.textPrimary,
   },
   stepDesc: {
@@ -814,19 +748,19 @@ const styles = StyleSheet.create({
   },
   quickLaunchTitle: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: '600',
     color: Colors.textPrimary,
     marginBottom: Spacing.xs,
   },
   quickLaunchButtons: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: Spacing.sm,
   },
   quickButton: {
     flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     backgroundColor: Colors.primaryLight,
     paddingVertical: 8,
@@ -834,7 +768,7 @@ const styles = StyleSheet.create({
   },
   quickButtonText: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: '600',
     color: Colors.primary,
   },
   modalFooter: {
@@ -844,11 +778,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     paddingVertical: 12,
     borderRadius: Radius.md,
-    alignItems: "center",
+    alignItems: 'center',
   },
   doneButtonText: {
     color: Colors.textInverse,
-    fontWeight: "700",
+    fontWeight: '700',
     fontSize: 14,
   },
 });

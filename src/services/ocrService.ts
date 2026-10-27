@@ -13,10 +13,7 @@
  */
 
 import { DosageForm } from '../types';
-import {
-  extractAndMatchMedicineName,
-  MedicineMatchCandidate,
-} from './pharmaceuticalDictionary';
+import { extractAndMatchMedicineName, MedicineMatchCandidate } from './pharmaceuticalDictionary';
 
 export interface ExtractedMedicineData {
   medicineName?: string;
@@ -138,7 +135,7 @@ function parseDateToken(token: string): string | null {
 /** Where the next label key starts inside a shared line (ML Kit joins blocks). */
 function findNextLabelIndex(value: string): number {
   return value.search(
-    /\b(?:exp(?:iry)?|expires?|use\s+(?:by|before)|best\s+before|batch|lot|b\.?\s*n[o0]\b|mfg|mfd|manufactured|mrp|price|m\.r\.p|net\s+(?:wt|qty|quantity)|storage|store|reg(?:d)?.?\s*no|licence|license|regd|country|imported|mktd)\b/i
+    /\b(?:exp(?:iry)?|expires?|use\s+(?:by|before)|best\s+before|batch|lot|b\.?\s*n[o0]\b|mfg|mfd|manufactured|mrp|price|m\.r\.p|net\s+(?:wt|qty|quantity)|storage|store|reg(?:d)?.?\s*no|licence|license|regd|country|imported|mktd)\b/i,
   );
 }
 
@@ -223,7 +220,7 @@ function parseManufacturerValue(value: string): string | null {
 function extractKeyedField(
   lines: string[],
   keyRegex: RegExp,
-  parseValue: (value: string) => string | null
+  parseValue: (value: string) => string | null,
 ): string | null {
   for (const line of lines) {
     const keyMatch = line.match(keyRegex);
@@ -239,8 +236,7 @@ function extractKeyedField(
 // Strength & dosage form
 // ---------------------------------------------------------------------------
 
-const STRENGTH_PATTERN =
-  /\b(\d+(?:,\d{3})*(?:\.\d+)?)\s*(mg|mcg|iu|g|%|ml)(?![A-Za-z])/i;
+const STRENGTH_PATTERN = /\b(\d+(?:,\d{3})*(?:\.\d+)?)\s*(mg|mcg|iu|g|%|ml)(?![A-Za-z])/i;
 
 function normalizeStrengthUnit(unit: string): string {
   return unit.toLowerCase() === 'iu' ? 'IU' : unit.toLowerCase();
@@ -251,10 +247,7 @@ function normalizeStrengthUnit(unit: string): string {
  * match (labels usually print strength right under the name), then other
  * lines top-down.
  */
-function extractStrength(
-  lines: string[],
-  anchorLineIndex: number | null
-): string | null {
+function extractStrength(lines: string[], anchorLineIndex: number | null): string | null {
   const ordered =
     anchorLineIndex !== null && anchorLineIndex > 0
       ? [lines[anchorLineIndex], ...lines.filter((_, i) => i !== anchorLineIndex)]
@@ -354,7 +347,7 @@ export const ocrService = {
     let anchorLineIndex: number | null = null;
     if (result.originalMatchText) {
       anchorLineIndex = lines.findIndex((line) =>
-        line.toLowerCase().includes(result.originalMatchText!.toLowerCase())
+        line.toLowerCase().includes(result.originalMatchText!.toLowerCase()),
       );
     }
 

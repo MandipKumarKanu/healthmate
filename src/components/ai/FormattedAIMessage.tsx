@@ -24,9 +24,7 @@ export function FormattedAIMessage({ content }: FormattedAIMessageProps) {
           return (
             <View key={idx} style={styles.listItemRow}>
               <Text style={styles.bullet}>{block.bullet || '•'}</Text>
-              <Text style={styles.listItemText}>
-                {renderInlineSpans(block.text)}
-              </Text>
+              <Text style={styles.listItemText}>{renderInlineSpans(block.text)}</Text>
             </View>
           );
         }

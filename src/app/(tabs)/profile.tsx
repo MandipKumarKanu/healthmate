@@ -11,7 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { AppAlert as Alert } from "../../services/appAlert";
+import { AppAlert as Alert } from '../../services/appAlert';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
@@ -48,22 +48,27 @@ export default function ProfileScreen() {
   const [nameInput, setNameInput] = useState(profile?.name || 'Alex');
   const [ageInput, setAgeInput] = useState(profile?.age ? String(profile.age) : '');
   const [genderInput, setGenderInput] = useState<GenderOption | null>(
-    (profile?.gender as GenderOption) || null
+    (profile?.gender as GenderOption) || null,
   );
   const [heightInput, setHeightInput] = useState(profile?.height ? String(profile.height) : '');
   const [weightInput, setWeightInput] = useState(profile?.weight ? String(profile.weight) : '');
-  const [unitSystemInput, setUnitSystemInput] = useState<UnitSystem>(profile?.unitSystem || 'metric');
-  const [editErrors, setEditErrors] = useState<{ name?: string; age?: string; height?: string; weight?: string }>({});
+  const [unitSystemInput, setUnitSystemInput] = useState<UnitSystem>(
+    profile?.unitSystem || 'metric',
+  );
+  const [editErrors, setEditErrors] = useState<{
+    name?: string;
+    age?: string;
+    height?: string;
+    weight?: string;
+  }>({});
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const [geminiKey, setGeminiKey] = useState<string | null>(null);
   const [showGeminiModal, setShowGeminiModal] = useState(false);
-  const {
-    scrollViewRef: editModalScrollRef,
-    handleFocusCapture: handleModalFocusCapture,
-  } = useKeyboardAwareScroll({ extraOffset: 60 });
+  const { scrollViewRef: editModalScrollRef, handleFocusCapture: handleModalFocusCapture } =
+    useKeyboardAwareScroll({ extraOffset: 60 });
 
   const loadGeminiKey = () => {
     aiAssistantService
@@ -78,7 +83,7 @@ export default function ProfileScreen() {
   useFocusEffect(
     React.useCallback(() => {
       loadGeminiKey();
-    }, [])
+    }, []),
   );
 
   const maskKey = (key: string) => {
@@ -175,7 +180,10 @@ export default function ProfileScreen() {
       await notificationService.cancelAll();
       resetAllData();
       setShowResetConfirm(false);
-      Alert.alert('Reset Complete', 'All local records were replaced with fictional demonstration data.');
+      Alert.alert(
+        'Reset Complete',
+        'All local records were replaced with fictional demonstration data.',
+      );
     } catch (error) {
       console.error('Could not reset demonstration data:', error);
       Alert.alert('Reset failed', 'Your data could not be reset. Please try again.');
@@ -190,7 +198,7 @@ export default function ProfileScreen() {
       Alert.alert(
         'Data Cleared',
         'All local profile data, medicines, schedules, adherence logs, scan history, and preferences have been cleared.',
-        [{ text: 'OK', onPress: () => router.replace('/onboarding') }]
+        [{ text: 'OK', onPress: () => router.replace('/onboarding') }],
       );
     } catch (error) {
       console.error('Could not clear local data:', error);
@@ -205,10 +213,7 @@ export default function ProfileScreen() {
         subtitle="Manage your personal preferences"
         brandText="HealthMate AI"
         rightAction={
-          <TouchableOpacity
-            style={styles.editButton}
-            onPress={openEditModal}
-          >
+          <TouchableOpacity style={styles.editButton} onPress={openEditModal}>
             <Text style={styles.editButtonText}>Edit</Text>
           </TouchableOpacity>
         }
@@ -223,40 +228,26 @@ export default function ProfileScreen() {
 
           <View style={styles.profileDetails}>
             <Text style={styles.profileName}>{userName}</Text>
-            <Text style={styles.profileEmail}>
-              {profile?.email || 'alex.m@example.com'}
-            </Text>
-            <Text style={styles.profileBadge}>
-              HealthMate member since April 2026
-            </Text>
+            <Text style={styles.profileEmail}>{profile?.email || 'alex.m@example.com'}</Text>
+            <Text style={styles.profileBadge}>HealthMate member since April 2026</Text>
           </View>
         </AppCard>
 
         {/* Section: Personal Information */}
         <SectionHeader title="Personal Information" />
         <AppCard style={styles.settingsGroup}>
-          <TouchableOpacity
-            style={styles.settingRow}
-            onPress={openEditModal}
-          >
+          <TouchableOpacity style={styles.settingRow} onPress={openEditModal}>
             <View style={styles.settingIconContainer}>
               <Feather name="user" size={18} color={Colors.primary} />
             </View>
             <Text style={styles.settingLabel}>Your Name</Text>
             <Text style={styles.settingValue}>{userName}</Text>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={Colors.textTertiary}
-            />
+            <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
           </TouchableOpacity>
 
           <View style={styles.rowDivider} />
 
-          <TouchableOpacity
-            style={styles.settingRow}
-            onPress={openEditModal}
-          >
+          <TouchableOpacity style={styles.settingRow} onPress={openEditModal}>
             <View style={styles.settingIconContainer}>
               <Feather name="calendar" size={18} color={Colors.primary} />
             </View>
@@ -264,39 +255,23 @@ export default function ProfileScreen() {
             <Text style={styles.settingValue}>
               {profile?.age ? `${profile.age} yrs` : 'Not set'}
             </Text>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={Colors.textTertiary}
-            />
+            <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
           </TouchableOpacity>
 
           <View style={styles.rowDivider} />
 
-          <TouchableOpacity
-            style={styles.settingRow}
-            onPress={openEditModal}
-          >
+          <TouchableOpacity style={styles.settingRow} onPress={openEditModal}>
             <View style={styles.settingIconContainer}>
               <Ionicons name="person-outline" size={18} color={Colors.primary} />
             </View>
             <Text style={styles.settingLabel}>Gender</Text>
-            <Text style={styles.settingValue}>
-              {profile?.gender || 'Not set'}
-            </Text>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={Colors.textTertiary}
-            />
+            <Text style={styles.settingValue}>{profile?.gender || 'Not set'}</Text>
+            <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
           </TouchableOpacity>
 
           <View style={styles.rowDivider} />
 
-          <TouchableOpacity
-            style={styles.settingRow}
-            onPress={openEditModal}
-          >
+          <TouchableOpacity style={styles.settingRow} onPress={openEditModal}>
             <View style={styles.settingIconContainer}>
               <MaterialCommunityIcons name="human-male-height" size={18} color={Colors.primary} />
             </View>
@@ -306,19 +281,12 @@ export default function ProfileScreen() {
                 ? `${profile.height} ${profile.unitSystem === 'imperial' ? 'ft' : 'cm'}`
                 : 'Not set'}
             </Text>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={Colors.textTertiary}
-            />
+            <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
           </TouchableOpacity>
 
           <View style={styles.rowDivider} />
 
-          <TouchableOpacity
-            style={styles.settingRow}
-            onPress={openEditModal}
-          >
+          <TouchableOpacity style={styles.settingRow} onPress={openEditModal}>
             <View style={styles.settingIconContainer}>
               <MaterialCommunityIcons name="scale-bathroom" size={18} color={Colors.primary} />
             </View>
@@ -328,19 +296,12 @@ export default function ProfileScreen() {
                 ? `${profile.weight} ${profile.unitSystem === 'imperial' ? 'lb' : 'kg'}`
                 : 'Not set'}
             </Text>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={Colors.textTertiary}
-            />
+            <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
           </TouchableOpacity>
 
           <View style={styles.rowDivider} />
 
-          <TouchableOpacity
-            style={styles.settingRow}
-            onPress={openEditModal}
-          >
+          <TouchableOpacity style={styles.settingRow} onPress={openEditModal}>
             <View style={styles.settingIconContainer}>
               <Feather name="sliders" size={18} color={Colors.primary} />
             </View>
@@ -348,11 +309,7 @@ export default function ProfileScreen() {
             <Text style={styles.settingValue}>
               {profile?.unitSystem === 'imperial' ? 'Imperial (ft, lb)' : 'Metric (cm, kg)'}
             </Text>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={Colors.textTertiary}
-            />
+            <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
           </TouchableOpacity>
         </AppCard>
 
@@ -377,7 +334,14 @@ export default function ProfileScreen() {
           <View style={styles.rowDivider} />
 
           <View style={[styles.settingRow, { alignItems: 'flex-start', flexDirection: 'column' }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 10 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                width: '100%',
+                marginBottom: 10,
+              }}
+            >
               <View style={styles.settingIconContainer}>
                 <Ionicons name="alarm-outline" size={18} color={Colors.primary} />
               </View>
@@ -396,10 +360,7 @@ export default function ProfileScreen() {
                 return (
                   <TouchableOpacity
                     key={mins}
-                    style={[
-                      styles.snoozePill,
-                      isSelected && styles.snoozePillActive,
-                    ]}
+                    style={[styles.snoozePill, isSelected && styles.snoozePillActive]}
                     onPress={() => setSnoozeInterval(mins)}
                     activeOpacity={0.7}
                     accessibilityRole="button"
@@ -407,10 +368,7 @@ export default function ProfileScreen() {
                     accessibilityLabel={`${mins} minutes snooze`}
                   >
                     <Text
-                      style={[
-                        styles.snoozePillText,
-                        isSelected && styles.snoozePillTextActive,
-                      ]}
+                      style={[styles.snoozePillText, isSelected && styles.snoozePillTextActive]}
                     >
                       {mins}m
                     </Text>
@@ -458,62 +416,40 @@ export default function ProfileScreen() {
             <View
               style={[
                 styles.geminiBadgeStatus,
-                geminiKey
-                  ? styles.geminiBadgeConnected
-                  : styles.geminiBadgeDisconnected,
+                geminiKey ? styles.geminiBadgeConnected : styles.geminiBadgeDisconnected,
               ]}
             >
               <Text
                 style={[
                   styles.geminiBadgeText,
-                  geminiKey
-                    ? styles.geminiBadgeTextConnected
-                    : styles.geminiBadgeTextDisconnected,
+                  geminiKey ? styles.geminiBadgeTextConnected : styles.geminiBadgeTextDisconnected,
                 ]}
               >
                 {geminiKey ? 'Connected' : 'Setup AI'}
               </Text>
             </View>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={Colors.textTertiary}
-            />
+            <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
           </TouchableOpacity>
 
           <View style={styles.rowDivider} />
 
-          <TouchableOpacity
-            style={styles.settingRow}
-            onPress={() => router.push('/scan-history')}
-          >
+          <TouchableOpacity style={styles.settingRow} onPress={() => router.push('/scan-history')}>
             <View style={styles.settingIconContainer}>
               <Feather name="clock" size={18} color={Colors.primary} />
             </View>
             <Text style={styles.settingLabel}>AI Scan History</Text>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={Colors.textTertiary}
-            />
+            <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
           </TouchableOpacity>
 
           <View style={styles.rowDivider} />
 
-          <TouchableOpacity
-            style={styles.settingRow}
-            onPress={() => router.push('/(tabs)/scan')}
-          >
+          <TouchableOpacity style={styles.settingRow} onPress={() => router.push('/(tabs)/scan')}>
             <View style={styles.settingIconContainer}>
               <Ionicons name="camera-outline" size={18} color={Colors.primary} />
             </View>
             <Text style={styles.settingLabel}>Camera Permissions</Text>
             <Text style={styles.settingValue}>Allowed</Text>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={Colors.textTertiary}
-            />
+            <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
           </TouchableOpacity>
 
           <View style={styles.rowDivider} />
@@ -526,11 +462,7 @@ export default function ProfileScreen() {
               <Feather name="shield" size={18} color={Colors.primary} />
             </View>
             <Text style={styles.settingLabel}>Privacy & User Data Isolation</Text>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={Colors.textTertiary}
-            />
+            <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
           </TouchableOpacity>
 
           <View style={styles.rowDivider} />
@@ -543,11 +475,7 @@ export default function ProfileScreen() {
               <Ionicons name="save-outline" size={18} color={Colors.primary} />
             </View>
             <Text style={styles.settingLabel}>Backup & Restore</Text>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={Colors.textTertiary}
-            />
+            <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
           </TouchableOpacity>
         </AppCard>
 
@@ -563,18 +491,10 @@ export default function ProfileScreen() {
             onPress={() => router.push('/settings/disclaimer')}
           >
             <View style={styles.settingIconContainer}>
-              <Ionicons
-                name="alert-circle-outline"
-                size={18}
-                color={Colors.warning}
-              />
+              <Ionicons name="alert-circle-outline" size={18} color={Colors.warning} />
             </View>
             <Text style={styles.settingLabel}>Full Medical Disclaimer</Text>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={Colors.textTertiary}
-            />
+            <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
           </TouchableOpacity>
 
           <View style={styles.rowDivider} />
@@ -584,65 +504,39 @@ export default function ProfileScreen() {
             onPress={() => router.push('/settings/about')}
           >
             <View style={styles.settingIconContainer}>
-              <Ionicons
-                name="information-circle-outline"
-                size={18}
-                color={Colors.primary}
-              />
+              <Ionicons name="information-circle-outline" size={18} color={Colors.primary} />
             </View>
             <Text style={styles.settingLabel}>About HealthMate AI</Text>
             <Text style={styles.settingValue}>v{appVersion}</Text>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={Colors.textTertiary}
-            />
+            <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
           </TouchableOpacity>
         </AppCard>
 
         {/* Section: Data Management */}
         <SectionHeader title="Data Management" />
         <AppCard style={styles.settingsGroup}>
-          <TouchableOpacity
-            style={styles.settingRow}
-            onPress={() => setShowResetConfirm(true)}
-          >
+          <TouchableOpacity style={styles.settingRow} onPress={() => setShowResetConfirm(true)}>
             <View style={styles.settingIconContainer}>
               <Feather name="refresh-cw" size={18} color={Colors.primary} />
             </View>
             <Text style={styles.settingLabel}>Reset Sample Records</Text>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={Colors.textTertiary}
-            />
+            <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
           </TouchableOpacity>
 
           <View style={styles.rowDivider} />
 
-          <TouchableOpacity
-            style={styles.settingRow}
-            onPress={() => setShowClearConfirm(true)}
-          >
+          <TouchableOpacity style={styles.settingRow} onPress={() => setShowClearConfirm(true)}>
             <View style={[styles.settingIconContainer, { backgroundColor: '#FEECEE' }]}>
               <Feather name="trash-2" size={18} color={Colors.error} />
             </View>
-            <Text style={[styles.settingLabel, { color: Colors.error }]}>
-              Clear Personal Data
-            </Text>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={Colors.textTertiary}
-            />
+            <Text style={[styles.settingLabel, { color: Colors.error }]}>Clear Personal Data</Text>
+            <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
           </TouchableOpacity>
         </AppCard>
 
         {/* App Footer */}
         <View style={styles.footerContainer}>
-          <Text style={styles.footerText}>
-            HealthMate AI • Version {appVersion} (Expo SDK 58)
-          </Text>
+          <Text style={styles.footerText}>HealthMate AI • Version {appVersion} (Expo SDK 58)</Text>
           <Text style={styles.footerSub}>
             All medication records stored locally on your device in encrypted SQLite.
           </Text>
@@ -669,138 +563,160 @@ export default function ProfileScreen() {
               >
                 <View style={{ flexGrow: 1 }} onFocusCapture={handleModalFocusCapture}>
                   {/* Full Name */}
-                <View style={styles.modalFieldGroup}>
-                  <Text style={styles.modalFieldLabel}>Full Name *</Text>
-                  <TextInput
-                    style={[styles.modalInputBox, editErrors.name ? styles.inputErrorBorder : null]}
-                    value={nameInput}
-                    onChangeText={(t) => {
-                      setNameInput(t);
-                      if (editErrors.name) setEditErrors((p) => ({ ...p, name: undefined }));
-                    }}
-                    placeholder="Full name"
-                  />
-                  {editErrors.name ? <Text style={styles.errorText}>{editErrors.name}</Text> : null}
-                </View>
+                  <View style={styles.modalFieldGroup}>
+                    <Text style={styles.modalFieldLabel}>Full Name *</Text>
+                    <TextInput
+                      style={[
+                        styles.modalInputBox,
+                        editErrors.name ? styles.inputErrorBorder : null,
+                      ]}
+                      value={nameInput}
+                      onChangeText={(t) => {
+                        setNameInput(t);
+                        if (editErrors.name) setEditErrors((p) => ({ ...p, name: undefined }));
+                      }}
+                      placeholder="Full name"
+                    />
+                    {editErrors.name ? (
+                      <Text style={styles.errorText}>{editErrors.name}</Text>
+                    ) : null}
+                  </View>
 
-                {/* Age */}
-                <View style={styles.modalFieldGroup}>
-                  <Text style={styles.modalFieldLabel}>Age (optional)</Text>
-                  <TextInput
-                    style={[styles.modalInputBox, editErrors.age ? styles.inputErrorBorder : null]}
-                    value={ageInput}
-                    onChangeText={(t) => {
-                      setAgeInput(t.replace(/[^0-9]/g, ''));
-                      if (editErrors.age) setEditErrors((p) => ({ ...p, age: undefined }));
-                    }}
-                    placeholder="e.g. 25"
-                    keyboardType="number-pad"
-                    maxLength={3}
-                  />
-                  {editErrors.age ? <Text style={styles.errorText}>{editErrors.age}</Text> : null}
-                </View>
+                  {/* Age */}
+                  <View style={styles.modalFieldGroup}>
+                    <Text style={styles.modalFieldLabel}>Age (optional)</Text>
+                    <TextInput
+                      style={[
+                        styles.modalInputBox,
+                        editErrors.age ? styles.inputErrorBorder : null,
+                      ]}
+                      value={ageInput}
+                      onChangeText={(t) => {
+                        setAgeInput(t.replace(/[^0-9]/g, ''));
+                        if (editErrors.age) setEditErrors((p) => ({ ...p, age: undefined }));
+                      }}
+                      placeholder="e.g. 25"
+                      keyboardType="number-pad"
+                      maxLength={3}
+                    />
+                    {editErrors.age ? <Text style={styles.errorText}>{editErrors.age}</Text> : null}
+                  </View>
 
-                {/* Gender */}
-                <View style={styles.modalFieldGroup}>
-                  <Text style={styles.modalFieldLabel}>Gender (optional)</Text>
-                  <View style={styles.genderPillsRow}>
-                    {(['Male', 'Female', 'Other', 'Prefer not to say'] as GenderOption[]).map((g) => (
-                      <TouchableOpacity
-                        key={g}
+                  {/* Gender */}
+                  <View style={styles.modalFieldGroup}>
+                    <Text style={styles.modalFieldLabel}>Gender (optional)</Text>
+                    <View style={styles.genderPillsRow}>
+                      {(['Male', 'Female', 'Other', 'Prefer not to say'] as GenderOption[]).map(
+                        (g) => (
+                          <TouchableOpacity
+                            key={g}
+                            style={[
+                              styles.genderPill,
+                              genderInput === g && styles.genderPillSelected,
+                            ]}
+                            onPress={() => setGenderInput(genderInput === g ? null : g)}
+                          >
+                            <Text
+                              style={[
+                                styles.genderPillText,
+                                genderInput === g && styles.genderPillTextSelected,
+                              ]}
+                            >
+                              {g}
+                            </Text>
+                          </TouchableOpacity>
+                        ),
+                      )}
+                    </View>
+                  </View>
+
+                  {/* Height & Weight */}
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <View style={[styles.modalFieldGroup, { flex: 1 }]}>
+                      <Text style={styles.modalFieldLabel}>
+                        Height ({unitSystemInput === 'metric' ? 'cm' : 'ft'})
+                      </Text>
+                      <TextInput
                         style={[
-                          styles.genderPill,
-                          genderInput === g && styles.genderPillSelected,
+                          styles.modalInputBox,
+                          editErrors.height ? styles.inputErrorBorder : null,
                         ]}
-                        onPress={() => setGenderInput(genderInput === g ? null : g)}
+                        value={heightInput}
+                        onChangeText={(t) => {
+                          setHeightInput(t);
+                          if (editErrors.height)
+                            setEditErrors((p) => ({ ...p, height: undefined }));
+                        }}
+                        placeholder={unitSystemInput === 'metric' ? 'e.g. 170' : 'e.g. 5.8'}
+                        keyboardType="numeric"
+                      />
+                      {editErrors.height ? (
+                        <Text style={styles.errorText}>{editErrors.height}</Text>
+                      ) : null}
+                    </View>
+
+                    <View style={[styles.modalFieldGroup, { flex: 1 }]}>
+                      <Text style={styles.modalFieldLabel}>
+                        Weight ({unitSystemInput === 'metric' ? 'kg' : 'lb'})
+                      </Text>
+                      <TextInput
+                        style={[
+                          styles.modalInputBox,
+                          editErrors.weight ? styles.inputErrorBorder : null,
+                        ]}
+                        value={weightInput}
+                        onChangeText={(t) => {
+                          setWeightInput(t);
+                          if (editErrors.weight)
+                            setEditErrors((p) => ({ ...p, weight: undefined }));
+                        }}
+                        placeholder={unitSystemInput === 'metric' ? 'e.g. 65' : 'e.g. 145'}
+                        keyboardType="numeric"
+                      />
+                      {editErrors.weight ? (
+                        <Text style={styles.errorText}>{editErrors.weight}</Text>
+                      ) : null}
+                    </View>
+                  </View>
+
+                  {/* Units */}
+                  <View style={styles.modalFieldGroup}>
+                    <Text style={styles.modalFieldLabel}>Units</Text>
+                    <View style={styles.unitsSegmentRow}>
+                      <TouchableOpacity
+                        style={[
+                          styles.unitSegBtn,
+                          unitSystemInput === 'metric' && styles.unitSegBtnSelected,
+                        ]}
+                        onPress={() => toggleUnitSystem('metric')}
                       >
                         <Text
                           style={[
-                            styles.genderPillText,
-                            genderInput === g && styles.genderPillTextSelected,
+                            styles.unitSegText,
+                            unitSystemInput === 'metric' && styles.unitSegTextSelected,
                           ]}
                         >
-                          {g}
+                          Metric (cm, kg)
                         </Text>
                       </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
-                {/* Height & Weight */}
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <View style={[styles.modalFieldGroup, { flex: 1 }]}>
-                    <Text style={styles.modalFieldLabel}>
-                      Height ({unitSystemInput === 'metric' ? 'cm' : 'ft'})
-                    </Text>
-                    <TextInput
-                      style={[styles.modalInputBox, editErrors.height ? styles.inputErrorBorder : null]}
-                      value={heightInput}
-                      onChangeText={(t) => {
-                        setHeightInput(t);
-                        if (editErrors.height) setEditErrors((p) => ({ ...p, height: undefined }));
-                      }}
-                      placeholder={unitSystemInput === 'metric' ? 'e.g. 170' : 'e.g. 5.8'}
-                      keyboardType="numeric"
-                    />
-                    {editErrors.height ? <Text style={styles.errorText}>{editErrors.height}</Text> : null}
-                  </View>
-
-                  <View style={[styles.modalFieldGroup, { flex: 1 }]}>
-                    <Text style={styles.modalFieldLabel}>
-                      Weight ({unitSystemInput === 'metric' ? 'kg' : 'lb'})
-                    </Text>
-                    <TextInput
-                      style={[styles.modalInputBox, editErrors.weight ? styles.inputErrorBorder : null]}
-                      value={weightInput}
-                      onChangeText={(t) => {
-                        setWeightInput(t);
-                        if (editErrors.weight) setEditErrors((p) => ({ ...p, weight: undefined }));
-                      }}
-                      placeholder={unitSystemInput === 'metric' ? 'e.g. 65' : 'e.g. 145'}
-                      keyboardType="numeric"
-                    />
-                    {editErrors.weight ? <Text style={styles.errorText}>{editErrors.weight}</Text> : null}
-                  </View>
-                </View>
-
-                {/* Units */}
-                <View style={styles.modalFieldGroup}>
-                  <Text style={styles.modalFieldLabel}>Units</Text>
-                  <View style={styles.unitsSegmentRow}>
-                    <TouchableOpacity
-                      style={[
-                        styles.unitSegBtn,
-                        unitSystemInput === 'metric' && styles.unitSegBtnSelected,
-                      ]}
-                      onPress={() => toggleUnitSystem('metric')}
-                    >
-                      <Text
+                      <TouchableOpacity
                         style={[
-                          styles.unitSegText,
-                          unitSystemInput === 'metric' && styles.unitSegTextSelected,
+                          styles.unitSegBtn,
+                          unitSystemInput === 'imperial' && styles.unitSegBtnSelected,
                         ]}
+                        onPress={() => toggleUnitSystem('imperial')}
                       >
-                        Metric (cm, kg)
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.unitSegBtn,
-                        unitSystemInput === 'imperial' && styles.unitSegBtnSelected,
-                      ]}
-                      onPress={() => toggleUnitSystem('imperial')}
-                    >
-                      <Text
-                        style={[
-                          styles.unitSegText,
-                          unitSystemInput === 'imperial' && styles.unitSegTextSelected,
-                        ]}
-                      >
-                        Imperial (ft, lb)
-                      </Text>
-                    </TouchableOpacity>
+                        <Text
+                          style={[
+                            styles.unitSegText,
+                            unitSystemInput === 'imperial' && styles.unitSegTextSelected,
+                          ]}
+                        >
+                          Imperial (ft, lb)
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                </View>
                 </View>
               </ScrollView>
 

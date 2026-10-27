@@ -5,6 +5,7 @@ Use this checklist as the release gate for PR #5. Do not check an item until its
 Verification pass: 2026-10-26. Local checks: `npx tsc --noEmit` (0 errors), `npx jest --silent` (18 suites / 185 tests green), `npx expo lint` (clean), `npx expo-doctor` (20/20 checks passed). Boxes that need a physical Android device or CI are marked **[device-only]** / **[CI-only]** and stay unchecked here on purpose.
 
 ## Calendar behavior
+
 - [x] Remove hardcoded reminder dots on dates 19 and later.
 - [x] Parse YYYY-MM-DD as a local calendar date to avoid timezone shifts.
 - [x] Build calendar dot dates from actual enabled schedules and/or actual dose records, not a decorative default.
@@ -13,6 +14,7 @@ Verification pass: 2026-10-26. Local checks: `npx tsc --noEmit` (0 errors), `npx
 - [x] Confirm changing month and tapping dates works across month/year boundaries and does not change the selected date unexpectedly. (Code-verified: month arrows mutate view state only, so they cannot change `selectedDate`; `CalendarGrid` now re-syncs the visible month when `selectedDate` changes from outside. Selection is set only by day-cell taps. Visual confirmation still belongs in the device pass below.)
 
 ## Reminder editor
+
 - [x] Add medicine search to the medicine selector.
 - [x] Add an editable label for each dose.
 - [x] Add Reminder Times heading with Edit action, readable AM/PM time pills in view mode, dose rows, divider, and prominent Add Another Time control (final visual/device review still recommended).
@@ -23,6 +25,7 @@ Verification pass: 2026-10-26. Local checks: `npx tsc --noEmit` (0 errors), `npx
 - [x] Search results include medicine name and strength; handle no results and empty medicine list. (Search filters name+strength+category and rows render `strength · dosageForm`; dedicated no-match and empty-cabinet states with an "Add Medicine" action.)
 
 ## Android alarm and permissions
+
 - [x] Request native notification permission when user saves an enabled reminder.
 - [x] Request notification permission during onboarding/setup; onboarding continues if permission is denied. (A pre-prompt rationale screen can still improve clarity.)
 - [x] Configure Android notification channel with high importance, sound, and vibration; add Expo Notifications config plugin.
@@ -31,6 +34,7 @@ Verification pass: 2026-10-26. Local checks: `npx tsc --noEmit` (0 errors), `npx
 - [x] If Android blocks exact alarms or notifications, explain the limitation and provide a route to system settings; never claim an alarm is active when scheduling failed. (`handleSave` shows a "Schedule saved without alarms" alert with the exact Settings path when `saveSchedule` returns false; success copy is conditional on granted access; `scheduleDoseReminder` gates on `canScheduleExactAlarms`.)
 
 ## Automated and device validation
+
 - [x] Add regression tests for false calendar dots and date routing/selection. (`calendarConsistency.test.ts`: dot consistency incl. clamping/disabled schedules + `getDateTapAction` routing.)
 - [x] Add tests for dose label defaults, custom labels, and schedule persistence.
 - [x] TypeScript passes. (`npx tsc --noEmit`, 0 errors, 2026-10-26)
@@ -41,6 +45,7 @@ Verification pass: 2026-10-26. Local checks: `npx tsc --noEmit` (0 errors), `npx
 - [ ] **[device-only]** Install and test on a physical Android device: first-run permissions, notification delivery, sound/vibration, exact timing, app closed, reboot, edit, and delete flows.
 
 ## Release gate
+
 - [ ] All applicable checklist items above are complete or explicitly documented as device-only checks. (Two device-only/CI-only items remain open above; this gate stays open until they land.)
 - [ ] Review final diff and CI results.
 - [ ] Only then mark PR ready for review; do not merge while alarm behavior is unverified.

@@ -47,11 +47,7 @@ export function AppHeader({
           {rightAction ? (
             rightAction
           ) : onAddPress ? (
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={onAddPress}
-              activeOpacity={0.7}
-            >
+            <TouchableOpacity style={styles.addButton} onPress={onAddPress} activeOpacity={0.7}>
               <Text style={styles.addButtonText}>+ Add</Text>
             </TouchableOpacity>
           ) : avatarText ? (
@@ -59,16 +55,8 @@ export function AppHeader({
               <Text style={styles.avatarText}>{avatarText}</Text>
             </View>
           ) : onMenuPress ? (
-            <TouchableOpacity
-              style={styles.menuButton}
-              onPress={onMenuPress}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name="ellipsis-horizontal"
-                size={18}
-                color={Colors.textPrimary}
-              />
+            <TouchableOpacity style={styles.menuButton} onPress={onMenuPress} activeOpacity={0.7}>
+              <Ionicons name="ellipsis-horizontal" size={18} color={Colors.textPrimary} />
             </TouchableOpacity>
           ) : null}
         </View>

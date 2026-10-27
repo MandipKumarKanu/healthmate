@@ -1,12 +1,5 @@
 import React from 'react';
-import {
-  StyleSheet,
-  View,
-  Text,
-  TextInput,
-  TextInputProps,
-  TouchableOpacity,
-} from 'react-native';
+import { StyleSheet, View, Text, TextInput, TextInputProps, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { Radius, Spacing, Typography } from '../../theme/tokens';
@@ -34,12 +27,7 @@ export function AppInput({
   return (
     <View style={styles.container}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
-      <View
-        style={[
-          styles.inputContainer,
-          error ? styles.inputError : undefined,
-        ]}
-      >
+      <View style={[styles.inputContainer, error ? styles.inputError : undefined]}>
         {leftIcon ? <View style={styles.leftIcon}>{leftIcon}</View> : null}
         <TextInput
           style={[styles.input, style]}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -9,29 +9,29 @@ import {
   Vibration,
   Platform,
   useColorScheme,
-} from "react-native";
-import { StatusBar } from "expo-status-bar";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import { nativeAlarmService } from "../services/nativeAlarmService";
-import { adherenceRepository } from "../database/repositories/adherenceRepository";
-import { scheduleRepository } from "../database/repositories/scheduleRepository";
-import { medicineRepository } from "../database/repositories/medicineRepository";
-import { useAppStore } from "../store/appStore";
-import { Colors } from "../theme/colors";
-import { Radius, Spacing, Typography } from "../theme/tokens";
+} from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { nativeAlarmService } from '../services/nativeAlarmService';
+import { adherenceRepository } from '../database/repositories/adherenceRepository';
+import { scheduleRepository } from '../database/repositories/scheduleRepository';
+import { medicineRepository } from '../database/repositories/medicineRepository';
+import { useAppStore } from '../store/appStore';
+import { Colors } from '../theme/colors';
+import { Radius, Spacing, Typography } from '../theme/tokens';
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SLIDER_WIDTH = Math.min(SCREEN_WIDTH - 44, 350);
 const PUCK_SIZE = 58;
 const MAX_DRAG = (SLIDER_WIDTH - PUCK_SIZE) / 2 - 6;
-const SWIPE_THRESHOLD = MAX_DRAG * 0.70;
+const SWIPE_THRESHOLD = MAX_DRAG * 0.7;
 
 export default function FullScreenAlarmScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+  const isDark = colorScheme === 'dark';
 
   const params = useLocalSearchParams<{
     scheduleId?: string;
@@ -44,21 +44,21 @@ export default function FullScreenAlarmScreen() {
   const { preferences } = useAppStore();
   const snoozeMinutes = preferences?.snoozeIntervalMinutes || 10;
 
-  const [currentTime, setCurrentTime] = useState<string>("");
-  const [currentDate, setCurrentDate] = useState<string>("");
-  const [completedAction, setCompletedAction] = useState<"taken" | "snooze" | null>(null);
+  const [currentTime, setCurrentTime] = useState<string>('');
+  const [currentDate, setCurrentDate] = useState<string>('');
+  const [completedAction, setCompletedAction] = useState<'taken' | 'snooze' | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
   // Resolve medication and schedule details safely via useMemo
   const medDetails = useMemo(() => {
-    const sId = params.scheduleId ?? "";
-    let mName = params.medicineName ?? "Medication";
-    let amt = params.amount ?? "1 dose";
-    let dTime = params.time ?? "";
-    let dLabel = params.label ?? "";
-    let mId = "";
-    let dForm = "";
+    const sId = params.scheduleId ?? '';
+    let mName = params.medicineName ?? 'Medication';
+    let amt = params.amount ?? '1 dose';
+    let dTime = params.time ?? '';
+    let dLabel = params.label ?? '';
+    let mId = '';
+    let dForm = '';
 
     if (sId) {
       const sched = scheduleRepository.getById(sId);
@@ -67,7 +67,7 @@ export default function FullScreenAlarmScreen() {
         const med = medicineRepository.getById(sched.medicineId);
         if (med) {
           mName = med.name;
-          dForm = med.dosageForm || "";
+          dForm = med.dosageForm || '';
           if (med.strength) amt = `${med.strength} · ${amt}`;
         }
         if (!dTime && sched.times.length > 0) {
@@ -78,10 +78,12 @@ export default function FullScreenAlarmScreen() {
     }
 
     if (!mId && mName) {
-      const matched = medicineRepository.getAll().find((m) => m.name.toLowerCase() === mName.toLowerCase());
+      const matched = medicineRepository
+        .getAll()
+        .find((m) => m.name.toLowerCase() === mName.toLowerCase());
       if (matched) {
         mId = matched.id;
-        if (!dForm) dForm = matched.dosageForm || "";
+        if (!dForm) dForm = matched.dosageForm || '';
       }
     }
 
@@ -96,7 +98,8 @@ export default function FullScreenAlarmScreen() {
     };
   }, [params.scheduleId, params.medicineName, params.amount, params.time, params.label]);
 
-  const { scheduleId, medicineId, medicineName, amount, doseTime, doseLabel, dosageForm } = medDetails;
+  const { scheduleId, medicineId, medicineName, amount, doseTime, doseLabel, dosageForm } =
+    medDetails;
 
   // Animation values
   const [panX] = useState(() => new Animated.Value(0));
@@ -111,17 +114,17 @@ export default function FullScreenAlarmScreen() {
       const now = new Date();
       setCurrentTime(
         now.toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        })
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        }),
       );
       setCurrentDate(
         now.toLocaleDateString([], {
-          weekday: "long",
-          month: "short",
-          day: "numeric",
-        })
+          weekday: 'long',
+          month: 'short',
+          day: 'numeric',
+        }),
       );
     };
 
@@ -144,7 +147,7 @@ export default function FullScreenAlarmScreen() {
           duration: 1400,
           useNativeDriver: true,
         }),
-      ])
+      ]),
     );
 
     const tiltAnim = Animated.loop(
@@ -175,7 +178,7 @@ export default function FullScreenAlarmScreen() {
           useNativeDriver: true,
         }),
         Animated.delay(1800),
-      ])
+      ]),
     );
 
     pulseAnim.start();
@@ -202,39 +205,35 @@ export default function FullScreenAlarmScreen() {
     }).start();
 
     try {
-      Vibration.vibrate(Platform.OS === "android" ? [0, 60, 40, 60] : 100);
-      setCompletedAction("taken");
+      Vibration.vibrate(Platform.OS === 'android' ? [0, 60, 40, 60] : 100);
+      setCompletedAction('taken');
       await nativeAlarmService.stopAlarm();
 
       if (scheduleId && medicineId) {
         const now = new Date();
         const todayStr = [
           now.getFullYear(),
-          String(now.getMonth() + 1).padStart(2, "0"),
-          String(now.getDate()).padStart(2, "0"),
-        ].join("-");
+          String(now.getMonth() + 1).padStart(2, '0'),
+          String(now.getDate()).padStart(2, '0'),
+        ].join('-');
 
-        const targetTime = doseTime || `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+        const targetTime =
+          doseTime ||
+          `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
         try {
-          adherenceRepository.logDoseStatus(
-            scheduleId,
-            medicineId,
-            todayStr,
-            targetTime,
-            "taken"
-          );
+          adherenceRepository.logDoseStatus(scheduleId, medicineId, todayStr, targetTime, 'taken');
         } catch (logErr) {
-          console.warn("Could not record dose adherence log:", logErr);
+          console.warn('Could not record dose adherence log:', logErr);
         }
       }
 
       setTimeout(() => {
-        router.replace("/(tabs)/home");
+        router.replace('/(tabs)/home');
       }, 750);
     } catch (e) {
-      console.warn("Failed to record taken dose:", e);
-      setErrorMessage("Could not complete action. Please try again.");
+      console.warn('Failed to record taken dose:', e);
+      setErrorMessage('Could not complete action. Please try again.');
       setIsProcessing(false);
       setCompletedAction(null);
       Animated.spring(panX, {
@@ -259,8 +258,8 @@ export default function FullScreenAlarmScreen() {
     }).start();
 
     try {
-      Vibration.vibrate(Platform.OS === "android" ? [0, 40, 40, 80] : 100);
-      setCompletedAction("snooze");
+      Vibration.vibrate(Platform.OS === 'android' ? [0, 40, 40, 80] : 100);
+      setCompletedAction('snooze');
 
       await nativeAlarmService.snoozeAlarm({
         scheduleId,
@@ -272,11 +271,11 @@ export default function FullScreenAlarmScreen() {
       });
 
       setTimeout(() => {
-        router.replace("/(tabs)/home");
+        router.replace('/(tabs)/home');
       }, 750);
     } catch (e) {
-      console.warn("Failed to snooze alarm:", e);
-      setErrorMessage("Could not snooze alarm. Please try again.");
+      console.warn('Failed to snooze alarm:', e);
+      setErrorMessage('Could not snooze alarm. Please try again.');
       setIsProcessing(false);
       setCompletedAction(null);
       Animated.spring(panX, {
@@ -285,7 +284,17 @@ export default function FullScreenAlarmScreen() {
         bounciness: 8,
       }).start();
     }
-  }, [isProcessing, panX, scheduleId, medicineName, amount, doseTime, doseLabel, snoozeMinutes, router]);
+  }, [
+    isProcessing,
+    panX,
+    scheduleId,
+    medicineName,
+    amount,
+    doseTime,
+    doseLabel,
+    snoozeMinutes,
+    router,
+  ]);
 
   // Tactile PanResponder for the single physical slider
   const panResponder = useMemo(
@@ -310,7 +319,7 @@ export default function FullScreenAlarmScreen() {
           if (Math.abs(dx) >= SWIPE_THRESHOLD && !gs.hasTriggeredHaptic) {
             gs.hasTriggeredHaptic = true;
             try {
-              Vibration.vibrate(Platform.OS === "android" ? 25 : 40);
+              Vibration.vibrate(Platform.OS === 'android' ? 25 : 40);
             } catch (_) {}
           } else if (Math.abs(dx) < SWIPE_THRESHOLD && gs.hasTriggeredHaptic) {
             gs.hasTriggeredHaptic = false;
@@ -343,41 +352,41 @@ export default function FullScreenAlarmScreen() {
           }
         },
       }),
-    [isProcessing, panX, executeTakeDose, executeSnooze]
+    [isProcessing, panX, executeTakeDose, executeSnooze],
   );
 
   const bellRotation = chimeTilt.interpolate({
     inputRange: [-10, 10],
-    outputRange: ["-10deg", "10deg"],
+    outputRange: ['-10deg', '10deg'],
   });
 
   const greenFillOpacity = panX.interpolate({
     inputRange: [0, MAX_DRAG],
     outputRange: [0, 1],
-    extrapolate: "clamp",
+    extrapolate: 'clamp',
   });
 
   const amberFillOpacity = panX.interpolate({
     inputRange: [-MAX_DRAG, 0],
     outputRange: [1, 0],
-    extrapolate: "clamp",
+    extrapolate: 'clamp',
   });
 
   const themeColors = {
-    bg: isDark ? "#121217" : Colors.background,
-    cardBg: isDark ? "#1C1C24" : Colors.cardBackground,
-    cardBorder: isDark ? "#2A2A36" : Colors.border,
-    textPrimary: isDark ? "#F4F4F6" : Colors.textPrimary,
-    textSecondary: isDark ? "#9E9EA8" : Colors.textSecondary,
-    trackBg: isDark ? "#242430" : "#E8E7ED",
-    trackBorder: isDark ? "#323242" : "#DDDCDE",
-    puckBg: isDark ? "#2E2E3C" : "#FFFFFF",
-    puckBorder: isDark ? "#3E3E50" : "#D4D3D8",
+    bg: isDark ? '#121217' : Colors.background,
+    cardBg: isDark ? '#1C1C24' : Colors.cardBackground,
+    cardBorder: isDark ? '#2A2A36' : Colors.border,
+    textPrimary: isDark ? '#F4F4F6' : Colors.textPrimary,
+    textSecondary: isDark ? '#9E9EA8' : Colors.textSecondary,
+    trackBg: isDark ? '#242430' : '#E8E7ED',
+    trackBorder: isDark ? '#323242' : '#DDDCDE',
+    puckBg: isDark ? '#2E2E3C' : '#FFFFFF',
+    puckBorder: isDark ? '#3E3E50' : '#D4D3D8',
   };
 
   return (
     <View style={[styles.container, { backgroundColor: themeColors.bg }]}>
-      <StatusBar style={isDark ? "light" : "dark"} />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <SafeAreaView style={styles.safeArea}>
         {/* Top Brand Tag & Live Clock Header */}
         <View style={styles.header}>
@@ -403,7 +412,11 @@ export default function FullScreenAlarmScreen() {
           <View style={styles.scheduleChip}>
             <Ionicons name="time" size={14} color={Colors.primary} />
             <Text style={styles.scheduleChipText}>
-              {doseLabel ? `${doseLabel} · ${doseTime}` : doseTime ? `Scheduled at ${doseTime}` : "Medication Due"}
+              {doseLabel
+                ? `${doseLabel} · ${doseTime}`
+                : doseTime
+                  ? `Scheduled at ${doseTime}`
+                  : 'Medication Due'}
             </Text>
           </View>
 
@@ -438,16 +451,18 @@ export default function FullScreenAlarmScreen() {
           <View
             style={[
               styles.actionToast,
-              completedAction === "taken" ? styles.actionToastTaken : styles.actionToastSnooze,
+              completedAction === 'taken' ? styles.actionToastTaken : styles.actionToastSnooze,
             ]}
           >
             <Ionicons
-              name={completedAction === "taken" ? "checkmark-circle" : "alarm"}
+              name={completedAction === 'taken' ? 'checkmark-circle' : 'alarm'}
               size={20}
               color="#FFFFFF"
             />
             <Text style={styles.actionToastText}>
-              {completedAction === "taken" ? "Dose Recorded as Taken" : `Snoozed for ${snoozeMinutes} Minutes`}
+              {completedAction === 'taken'
+                ? 'Dose Recorded as Taken'
+                : `Snoozed for ${snoozeMinutes} Minutes`}
             </Text>
           </View>
         )}
@@ -473,19 +488,11 @@ export default function FullScreenAlarmScreen() {
           >
             {/* Left Amber Snooze Fill */}
             <Animated.View
-              style={[
-                styles.sliderFill,
-                styles.sliderFillAmber,
-                { opacity: amberFillOpacity },
-              ]}
+              style={[styles.sliderFill, styles.sliderFillAmber, { opacity: amberFillOpacity }]}
             />
             {/* Right Green Take Fill */}
             <Animated.View
-              style={[
-                styles.sliderFill,
-                styles.sliderFillGreen,
-                { opacity: greenFillOpacity },
-              ]}
+              style={[styles.sliderFill, styles.sliderFillGreen, { opacity: greenFillOpacity }]}
             />
 
             {/* Left and Right Target Labels */}
@@ -512,11 +519,7 @@ export default function FullScreenAlarmScreen() {
                 },
               ]}
             >
-              <Ionicons
-                name="swap-horizontal"
-                size={26}
-                color={Colors.primary}
-              />
+              <Ionicons name="swap-horizontal" size={26} color={Colors.primary} />
             </Animated.View>
           </View>
 
@@ -536,19 +539,19 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "space-between",
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: Spacing.screenPaddingHorizontal,
     paddingTop: Spacing.md,
     paddingBottom: Spacing.xl,
   },
   header: {
-    alignItems: "center",
+    alignItems: 'center',
     marginTop: Spacing.xs,
   },
   brandBadge: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
     backgroundColor: Colors.primaryLight,
     paddingHorizontal: 12,
@@ -558,29 +561,29 @@ const styles = StyleSheet.create({
   },
   brandBadgeText: {
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: '700',
     color: Colors.primaryDark,
     letterSpacing: 0.2,
   },
   clockText: {
     fontSize: 44,
-    fontWeight: "800",
+    fontWeight: '800',
     letterSpacing: 0.5,
-    fontVariant: ["tabular-nums"],
+    fontVariant: ['tabular-nums'],
   },
   dateText: {
     fontSize: 14,
-    fontWeight: "500",
+    fontWeight: '500',
     marginTop: 2,
   },
   heroCard: {
-    width: "100%",
+    width: '100%',
     borderRadius: Radius.card,
     paddingVertical: 24,
     paddingHorizontal: 20,
-    alignItems: "center",
+    alignItems: 'center',
     borderWidth: 1,
-    shadowColor: "#000000",
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 16,
@@ -588,8 +591,8 @@ const styles = StyleSheet.create({
     marginVertical: Spacing.sm,
   },
   scheduleChip: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
     backgroundColor: Colors.primaryLight,
     paddingHorizontal: 14,
@@ -599,18 +602,18 @@ const styles = StyleSheet.create({
   },
   scheduleChipText: {
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: '600',
     color: Colors.primaryDark,
   },
   chimeArea: {
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     width: 88,
     height: 88,
     marginVertical: 4,
   },
   chimeHalo: {
-    position: "absolute",
+    position: 'absolute',
     width: 88,
     height: 88,
     borderRadius: 44,
@@ -621,27 +624,27 @@ const styles = StyleSheet.create({
     height: 72,
     borderRadius: 36,
     backgroundColor: Colors.primaryLight,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: "rgba(7, 136, 245, 0.25)",
+    borderColor: 'rgba(7, 136, 245, 0.25)',
   },
   medName: {
     fontSize: 24,
-    fontWeight: "700",
-    textAlign: "center",
+    fontWeight: '700',
+    textAlign: 'center',
     marginTop: 14,
     marginBottom: 4,
     lineHeight: 30,
   },
   medAmount: {
     fontSize: 15,
-    fontWeight: "500",
-    textAlign: "center",
+    fontWeight: '500',
+    textAlign: 'center',
   },
   actionToast: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
     paddingHorizontal: 20,
     paddingVertical: 10,
@@ -656,12 +659,12 @@ const styles = StyleSheet.create({
   },
   actionToastText: {
     fontSize: 14,
-    fontWeight: "700",
-    color: "#FFFFFF",
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   errorToast: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
     backgroundColor: Colors.errorLight,
     paddingHorizontal: 16,
@@ -671,12 +674,12 @@ const styles = StyleSheet.create({
   },
   errorToastText: {
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: '600',
     color: Colors.errorDark,
   },
   sliderContainer: {
-    width: "100%",
-    alignItems: "center",
+    width: '100%',
+    alignItems: 'center',
     marginBottom: Spacing.sm,
   },
   sliderTrack: {
@@ -684,65 +687,65 @@ const styles = StyleSheet.create({
     height: 66,
     borderRadius: Radius.pill,
     borderWidth: 1.5,
-    justifyContent: "center",
-    overflow: "hidden",
-    position: "relative",
+    justifyContent: 'center',
+    overflow: 'hidden',
+    position: 'relative',
   },
   sliderFill: {
-    position: "absolute",
+    position: 'absolute',
     top: 0,
     bottom: 0,
-    width: "50%",
+    width: '50%',
   },
   sliderFillAmber: {
     left: 0,
-    backgroundColor: "#FEF3C7",
+    backgroundColor: '#FEF3C7',
   },
   sliderFillGreen: {
     right: 0,
-    backgroundColor: "#D1FAE5",
+    backgroundColor: '#D1FAE5',
   },
   sliderLabelsLayer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 16,
-    position: "absolute",
+    position: 'absolute',
     left: 0,
     right: 0,
     top: 0,
     bottom: 0,
   },
   sliderLabelGroupLeft: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
   },
   sliderLabelLeftText: {
     fontSize: 13,
-    fontWeight: "700",
-    color: "#B45309",
+    fontWeight: '700',
+    color: '#B45309',
   },
   sliderLabelGroupRight: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
   },
   sliderLabelRightText: {
     fontSize: 13,
-    fontWeight: "700",
-    color: "#047857",
+    fontWeight: '700',
+    color: '#047857',
   },
   sliderPuck: {
     width: PUCK_SIZE,
     height: PUCK_SIZE,
     borderRadius: PUCK_SIZE / 2,
-    position: "absolute",
+    position: 'absolute',
     left: (SLIDER_WIDTH - PUCK_SIZE) / 2,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
-    shadowColor: "#000000",
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.16,
     shadowRadius: 6,
@@ -750,7 +753,7 @@ const styles = StyleSheet.create({
   },
   sliderHint: {
     fontSize: 13,
-    fontWeight: "500",
+    fontWeight: '500',
     marginTop: 10,
     letterSpacing: 0.1,
   },

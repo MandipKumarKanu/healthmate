@@ -32,9 +32,7 @@ function mapRowToScan(row: ScanRow): ScanHistoryEntry {
 export const scanHistoryRepository = {
   getAll(): ScanHistoryEntry[] {
     const db = getDatabase();
-    const rows = db.getAllSync<ScanRow>(
-      'SELECT * FROM scan_history ORDER BY scanned_at DESC;'
-    );
+    const rows = db.getAllSync<ScanRow>('SELECT * FROM scan_history ORDER BY scanned_at DESC;');
     return rows.map(mapRowToScan);
   },
 
@@ -65,7 +63,7 @@ export const scanHistoryRepository = {
         entry.rawText ?? null,
         entry.imageUri ?? null,
         entry.scannedAt,
-      ]
+      ],
     );
 
     return entry;

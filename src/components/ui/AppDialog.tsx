@@ -1,11 +1,5 @@
 import React, { type ComponentProps } from 'react';
-import {
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { Radius, Spacing, Typography } from '../../theme/tokens';
@@ -67,12 +61,7 @@ export function AppDialog({
 
           {!!message && <Text style={styles.message}>{message}</Text>}
 
-          <View
-            style={[
-              styles.actions,
-              buttons.length > 2 && styles.stackedActions,
-            ]}
-          >
+          <View style={[styles.actions, buttons.length > 2 && styles.stackedActions]}>
             {buttons.map((button, index) => {
               const intent =
                 button.style ?? (buttons.length === 2 && index === 0 ? 'cancel' : 'default');

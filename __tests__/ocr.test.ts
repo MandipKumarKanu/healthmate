@@ -184,18 +184,20 @@ Batch: PC-4521
       expect(extracted1.expiryDate).toBe('07/2028');
 
       const extracted2 = ocrService.extractMedicineData(
-        'Montelukast 10 mg\nUse before June 2028\nBatch: MN-2290'
+        'Montelukast 10 mg\nUse before June 2028\nBatch: MN-2290',
       );
       expect(extracted2.expiryDate).toBe('Jun 2028');
 
       const extracted3 = ocrService.extractMedicineData(
-        'Aspirin 75 mg\nExp. Date: 06/28\nLot: L-771'
+        'Aspirin 75 mg\nExp. Date: 06/28\nLot: L-771',
       );
       expect(extracted3.expiryDate).toBe('06/2028');
     });
 
     it('does not fabricate dates from non-date words', () => {
-      const extracted = ocrService.extractMedicineData('Xylophytol Complex 100 mg\nDoes not expire');
+      const extracted = ocrService.extractMedicineData(
+        'Xylophytol Complex 100 mg\nDoes not expire',
+      );
       expect(extracted.expiryDate).toBeUndefined();
     });
 
@@ -209,10 +211,7 @@ Batch: PC-4521
     it('exposes the cleaned line list for the full-text display', () => {
       const rawText = 'Metformin 500mg Tablets BP\n\nBatch:  DEMO-MF0426';
       const extracted = ocrService.extractMedicineData(rawText);
-      expect(extracted.lines).toEqual([
-        'Metformin 500mg Tablets BP',
-        'Batch: DEMO-MF0426',
-      ]);
+      expect(extracted.lines).toEqual(['Metformin 500mg Tablets BP', 'Batch: DEMO-MF0426']);
     });
   });
 });

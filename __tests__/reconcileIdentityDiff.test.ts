@@ -1,22 +1,22 @@
-import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import * as Notifications from "expo-notifications";
-import { resetDatabase } from "../src/database/client";
-import { medicineRepository } from "../src/database/repositories/medicineRepository";
-import { scheduleRepository } from "../src/database/repositories/scheduleRepository";
-import { notificationService } from "../src/services/notificationService";
-import type { Medicine, ReminderSchedule } from "../src/types";
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import * as Notifications from 'expo-notifications';
+import { resetDatabase } from '../src/database/client';
+import { medicineRepository } from '../src/database/repositories/medicineRepository';
+import { scheduleRepository } from '../src/database/repositories/scheduleRepository';
+import { notificationService } from '../src/services/notificationService';
+import type { Medicine, ReminderSchedule } from '../src/types';
 
-const MEDICINE_ID = "med_identity_diff";
-const SCHEDULE_ID = "sched_identity_diff";
-const DOSE_TIME = "08:00";
+const MEDICINE_ID = 'med_identity_diff';
+const SCHEDULE_ID = 'sched_identity_diff';
+const DOSE_TIME = '08:00';
 
 function makeMedicine(name: string): Medicine {
   return {
     id: MEDICINE_ID,
     name,
-    strength: "500 mg",
-    dosageForm: "tablet",
-    category: "Generic",
+    strength: '500 mg',
+    dosageForm: 'tablet',
+    category: 'Generic',
     packageDetails: {},
     isSample: false,
     createdAt: new Date().toISOString(),
@@ -28,9 +28,9 @@ function makeSchedule(): ReminderSchedule {
   return {
     id: SCHEDULE_ID,
     medicineId: MEDICINE_ID,
-    recurrence: "daily",
+    recurrence: 'daily',
     startDate: new Date().toISOString().slice(0, 10),
-    times: [{ id: "t1", time: DOSE_TIME, amount: "1 tablet" }],
+    times: [{ id: 't1', time: DOSE_TIME, amount: '1 tablet' }],
     enabled: true,
     notificationsEnabled: true,
     createdAt: new Date().toISOString(),
@@ -40,9 +40,7 @@ function makeSchedule(): ReminderSchedule {
 
 async function scheduledForSchedule() {
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-  return scheduled.filter(
-    (n) => n.content.data?.scheduleId === SCHEDULE_ID,
-  );
+  return scheduled.filter((n) => n.content.data?.scheduleId === SCHEDULE_ID);
 }
 
 async function cancelAll() {
@@ -51,7 +49,7 @@ async function cancelAll() {
 
 beforeEach(() => {
   resetDatabase();
-  medicineRepository.create(makeMedicine("Renamed Medicine"));
+  medicineRepository.create(makeMedicine('Renamed Medicine'));
   scheduleRepository.save(makeSchedule());
 });
 
@@ -60,8 +58,8 @@ afterEach(async () => {
   jest.restoreAllMocks();
 });
 
-describe("reconcile diff-based identity", () => {
-  it("replaces an OS notification whose stored identity no longer matches", async () => {
+describe('reconcile diff-based identity', () => {
+  it('replaces an OS notification whose stored identity no longer matches', async () => {
     // Seed an OS notification carrying a stale identity (old medicine name and
     // an amount that no longer matches the DB dose). Its trigger sits at the
     // required horizon (today + 60 for daily) so the window-extension
@@ -70,14 +68,14 @@ describe("reconcile diff-based identity", () => {
     horizon.setHours(8, 0, 0, 0);
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: "Time to take Old Medicine",
-        body: "Scheduled dose: 9 tablets",
+        title: 'Time to take Old Medicine',
+        body: 'Scheduled dose: 9 tablets',
         data: {
           scheduleId: SCHEDULE_ID,
           time: DOSE_TIME,
-          medicineName: "Old Medicine",
-          amount: "9 tablets",
-          doseLabel: "",
+          medicineName: 'Old Medicine',
+          amount: '9 tablets',
+          doseLabel: '',
         },
       },
       trigger: {
@@ -92,27 +90,25 @@ describe("reconcile diff-based identity", () => {
 
     const remaining = await scheduledForSchedule();
     expect(remaining.length).toBeGreaterThanOrEqual(1);
-    const hasStale = remaining.some(
-      (n) => n.content.data?.amount === "9 tablets",
-    );
+    const hasStale = remaining.some((n) => n.content.data?.amount === '9 tablets');
     expect(hasStale).toBe(false);
     const hasFresh = remaining.some(
       (n) =>
-        n.content.data?.amount === "1 tablet" &&
-        n.content.data?.medicineName === "Renamed Medicine",
+        n.content.data?.amount === '1 tablet' &&
+        n.content.data?.medicineName === 'Renamed Medicine',
     );
     expect(hasFresh).toBe(true);
   });
 
-  it("leaves notifications alone when the stored identity matches", async () => {
+  it('leaves notifications alone when the stored identity matches', async () => {
     const id = await notificationService.scheduleDoseReminder(
       SCHEDULE_ID,
-      "Renamed Medicine",
-      "1 tablet",
+      'Renamed Medicine',
+      '1 tablet',
       DOSE_TIME,
       undefined,
       {
-        recurrence: "daily",
+        recurrence: 'daily',
         startDate: new Date().toISOString().slice(0, 10),
       },
     );
@@ -130,7 +126,7 @@ describe("reconcile diff-based identity", () => {
     expect(after.length).toBe(before.length);
   });
 
-  it("leaves legacy notifications without identity fields untouched", async () => {
+  it('leaves legacy notifications without identity fields untouched', async () => {
     // Pre-reconcile notifications carry only scheduleId/time — no mismatch possible.
     // The trigger sits at the required horizon so the window-extension logic
     // also stays quiet: any rescheduling would come from a false
@@ -139,8 +135,8 @@ describe("reconcile diff-based identity", () => {
     horizon.setHours(8, 0, 0, 0);
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: "Time to take Renamed Medicine",
-        body: "Scheduled dose: 1 tablet",
+        title: 'Time to take Renamed Medicine',
+        body: 'Scheduled dose: 1 tablet',
         data: { scheduleId: SCHEDULE_ID, time: DOSE_TIME },
       },
       trigger: {
@@ -157,9 +153,9 @@ describe("reconcile diff-based identity", () => {
     expect(await scheduledForSchedule()).toHaveLength(1);
   });
 
-  it("coalesces concurrent reconcile calls into a single pass", async () => {
+  it('coalesces concurrent reconcile calls into a single pass', async () => {
     const getAllSpy = jest
-      .spyOn(Notifications, "getAllScheduledNotificationsAsync")
+      .spyOn(Notifications, 'getAllScheduledNotificationsAsync')
       .mockResolvedValue([]);
     // The mock module reuses one jest.fn across the file, so earlier tests'
     // calls are already in its history — start counting from zero here.

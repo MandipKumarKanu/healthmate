@@ -16,26 +16,20 @@ export const networkService = {
 
     try {
       // Android / Chromium standard captive portal / connectivity endpoint
-      const res = await fetch(
-        'https://connectivitycheck.gstatic.com/generate_204',
-        {
-          method: 'GET',
-          signal: controller.signal,
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            Pragma: 'no-cache',
-          },
-        }
-      );
+      const res = await fetch('https://connectivitycheck.gstatic.com/generate_204', {
+        method: 'GET',
+        signal: controller.signal,
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+        },
+      });
       return res.status === 204 || res.ok;
     } catch {
       // Fallback ping to google.com HEAD
       try {
         const fallbackController = new AbortController();
-        const fallbackTimer = setTimeout(
-          () => fallbackController.abort(),
-          2500
-        );
+        const fallbackTimer = setTimeout(() => fallbackController.abort(), 2500);
         const res = await fetch('https://www.google.com', {
           method: 'HEAD',
           signal: fallbackController.signal,

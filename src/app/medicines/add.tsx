@@ -1,24 +1,17 @@
-import React, { useState, useEffect } from "react";
-import {
-  StyleSheet,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-} from "react-native";
-import { AppAlert as Alert } from "../../services/appAlert";
-import { useRouter, useLocalSearchParams } from "expo-router";
-import { Colors } from "../../theme/colors";
-import { Radius, Spacing, Typography } from "../../theme/tokens";
-import { AppScreen } from "../../components/ui/AppScreen";
-import { AppHeader } from "../../components/ui/AppHeader";
-import { AppCard } from "../../components/ui/AppCard";
-import { AppButton } from "../../components/ui/AppButton";
-import { SectionHeader } from "../../components/ui/SectionHeader";
-import { useMedicineStore } from "../../store/medicineStore";
-import { medicineRepository } from "../../database/repositories/medicineRepository";
-import { DosageForm, Medicine } from "../../types";
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Text, TextInput, TouchableOpacity, ScrollView } from 'react-native';
+import { AppAlert as Alert } from '../../services/appAlert';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { Colors } from '../../theme/colors';
+import { Radius, Spacing, Typography } from '../../theme/tokens';
+import { AppScreen } from '../../components/ui/AppScreen';
+import { AppHeader } from '../../components/ui/AppHeader';
+import { AppCard } from '../../components/ui/AppCard';
+import { AppButton } from '../../components/ui/AppButton';
+import { SectionHeader } from '../../components/ui/SectionHeader';
+import { useMedicineStore } from '../../store/medicineStore';
+import { medicineRepository } from '../../database/repositories/medicineRepository';
+import { DosageForm, Medicine } from '../../types';
 
 export default function AddMedicineScreen() {
   const router = useRouter();
@@ -36,51 +29,40 @@ export default function AddMedicineScreen() {
   const isEditing = Boolean(params.editId);
   const { addMedicine, updateMedicine } = useMedicineStore();
 
-  const [name, setName] = useState(params.name || "");
-  const [ingredient, setIngredient] = useState(params.ingredient || "");
-  const [strength, setStrength] = useState(params.strength || "");
-  const [dosageForm, setDosageForm] = useState<DosageForm>(
-    (params.form as DosageForm) || "tablet",
-  );
-  const [category, setCategory] = useState("Generic");
-  const [expiryDate, setExpiryDate] = useState(params.expiry || "");
-  const [batchNumber, setBatchNumber] = useState(params.batch || "");
-  const [manufacturer, setManufacturer] = useState(params.manufacturer || "");
-  const [instructions, setInstructions] = useState("");
-  const [currentStock, setCurrentStock] = useState("");
-  const [refillThreshold, setRefillThreshold] = useState("");
+  const [name, setName] = useState(params.name || '');
+  const [ingredient, setIngredient] = useState(params.ingredient || '');
+  const [strength, setStrength] = useState(params.strength || '');
+  const [dosageForm, setDosageForm] = useState<DosageForm>((params.form as DosageForm) || 'tablet');
+  const [category, setCategory] = useState('Generic');
+  const [expiryDate, setExpiryDate] = useState(params.expiry || '');
+  const [batchNumber, setBatchNumber] = useState(params.batch || '');
+  const [manufacturer, setManufacturer] = useState(params.manufacturer || '');
+  const [instructions, setInstructions] = useState('');
+  const [currentStock, setCurrentStock] = useState('');
+  const [refillThreshold, setRefillThreshold] = useState('');
 
   useEffect(() => {
     if (params.editId) {
       const existing = medicineRepository.getById(params.editId);
       if (existing) {
         setName(existing.name);
-        setIngredient(existing.ingredient || "");
+        setIngredient(existing.ingredient || '');
         setStrength(existing.strength);
         setDosageForm(existing.dosageForm);
-        setCategory(existing.category || "Generic");
-        setExpiryDate(existing.packageDetails?.expiryDate || "");
-        setBatchNumber(existing.packageDetails?.batchNumber || "");
-        setManufacturer(existing.packageDetails?.manufacturer || "");
-        setInstructions(existing.packageDetails?.packageDetailsText || "");
-        setCurrentStock(
-          existing.currentInventory != null ? String(existing.currentInventory) : "",
-        );
+        setCategory(existing.category || 'Generic');
+        setExpiryDate(existing.packageDetails?.expiryDate || '');
+        setBatchNumber(existing.packageDetails?.batchNumber || '');
+        setManufacturer(existing.packageDetails?.manufacturer || '');
+        setInstructions(existing.packageDetails?.packageDetailsText || '');
+        setCurrentStock(existing.currentInventory != null ? String(existing.currentInventory) : '');
         setRefillThreshold(
-          existing.refillThreshold != null ? String(existing.refillThreshold) : "",
+          existing.refillThreshold != null ? String(existing.refillThreshold) : '',
         );
       }
     }
   }, [params.editId]);
 
-  const forms: DosageForm[] = [
-    "tablet",
-    "capsule",
-    "softgel",
-    "eye_drop",
-    "syrup",
-    "cream",
-  ];
+  const forms: DosageForm[] = ['tablet', 'capsule', 'softgel', 'eye_drop', 'syrup', 'cream'];
 
   const parseOptionalInt = (value: string): number | undefined => {
     const trimmed = value.trim();
@@ -92,7 +74,7 @@ export default function AddMedicineScreen() {
   const handleSave = () => {
     const trimmedName = name.trim();
     if (!trimmedName) {
-      Alert.alert("Validation Error", "Please enter a medicine name.");
+      Alert.alert('Validation Error', 'Please enter a medicine name.');
       return;
     }
 
@@ -100,7 +82,7 @@ export default function AddMedicineScreen() {
       updateMedicine(params.editId, {
         name: trimmedName,
         ingredient: ingredient.trim() || undefined,
-        strength: strength.trim() || "Standard dose",
+        strength: strength.trim() || 'Standard dose',
         dosageForm,
         category,
         packageDetails: {
@@ -113,15 +95,15 @@ export default function AddMedicineScreen() {
         refillThreshold: parseOptionalInt(refillThreshold),
       });
 
-      Alert.alert("Success", `${trimmedName} updated successfully!`, [
-        { text: "OK", onPress: () => router.back() },
+      Alert.alert('Success', `${trimmedName} updated successfully!`, [
+        { text: 'OK', onPress: () => router.back() },
       ]);
     } else {
       const newMed = addMedicine({
         id: `med_${Date.now()}`,
         name: trimmedName,
         ingredient: ingredient.trim() || undefined,
-        strength: strength.trim() || "Standard dose",
+        strength: strength.trim() || 'Standard dose',
         dosageForm,
         category,
         packageDetails: {
@@ -131,14 +113,14 @@ export default function AddMedicineScreen() {
           packageDetailsText: instructions.trim() || undefined,
           originalPackageChecked: false,
         },
-        informationSource: "User-entered medication record.",
+        informationSource: 'User-entered medication record.',
         isSample: false,
         currentInventory: parseOptionalInt(currentStock),
         refillThreshold: parseOptionalInt(refillThreshold),
       });
 
-      Alert.alert("Success", `${newMed.name} added to your cabinet!`, [
-        { text: "OK", onPress: () => router.back() },
+      Alert.alert('Success', `${newMed.name} added to your cabinet!`, [
+        { text: 'OK', onPress: () => router.back() },
       ]);
     }
   };
@@ -146,11 +128,11 @@ export default function AddMedicineScreen() {
   return (
     <AppScreen scrollable contentContainerStyle={styles.scrollContent}>
       <AppHeader
-        title={isEditing ? "Edit Medicine" : "Add Medicine"}
+        title={isEditing ? 'Edit Medicine' : 'Add Medicine'}
         subtitle={
           isEditing
-            ? "Update medication details in your cabinet"
-            : "Record a new medication in your cabinet"
+            ? 'Update medication details in your cabinet'
+            : 'Record a new medication in your cabinet'
         }
         brandText="HealthMate AI"
         onBackPress={() => router.back()}
@@ -194,27 +176,15 @@ export default function AddMedicineScreen() {
 
         {/* Dosage Form Selector */}
         <SectionHeader title="Dosage Form" />
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.formScroll}
-        >
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.formScroll}>
           {forms.map((f) => (
             <TouchableOpacity
               key={f}
-              style={[
-                styles.formChip,
-                dosageForm === f && styles.formChipActive,
-              ]}
+              style={[styles.formChip, dosageForm === f && styles.formChipActive]}
               onPress={() => setDosageForm(f)}
             >
-              <Text
-                style={[
-                  styles.formChipText,
-                  dosageForm === f && styles.formChipTextActive,
-                ]}
-              >
-                {f.replace("_", " ").toUpperCase()}
+              <Text style={[styles.formChipText, dosageForm === f && styles.formChipTextActive]}>
+                {f.replace('_', ' ').toUpperCase()}
               </Text>
             </TouchableOpacity>
           ))}
@@ -294,16 +264,15 @@ export default function AddMedicineScreen() {
           />
 
           <Text style={styles.trackingHint}>
-            Each logged &quot;taken&quot; dose decrements your stock. When stock
-            reaches the threshold you get a refill nudge. Only the two fields
-            you fill in are tracked.
+            Each logged &quot;taken&quot; dose decrements your stock. When stock reaches the
+            threshold you get a refill nudge. Only the two fields you fill in are tracked.
           </Text>
         </AppCard>
 
         {/* Save Button */}
         <View style={styles.saveContainer}>
           <AppButton
-            title={isEditing ? "Save Changes" : "Save to Medicine Cabinet"}
+            title={isEditing ? 'Save Changes' : 'Save to Medicine Cabinet'}
             onPress={handleSave}
             variant="primary"
             size="lg"
@@ -327,7 +296,7 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: '600',
     color: Colors.textSecondary,
     marginBottom: 4,
   },
@@ -342,7 +311,7 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
   formScroll: {
-    flexDirection: "row",
+    flexDirection: 'row',
     marginBottom: Spacing.lg,
   },
   trackingHint: {
@@ -366,7 +335,7 @@ const styles = StyleSheet.create({
   },
   formChipText: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: '600',
     color: Colors.textPrimary,
   },
   formChipTextActive: {

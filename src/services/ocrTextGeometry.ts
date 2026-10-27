@@ -47,21 +47,15 @@ export interface FramedLineLike {
   frame?: LineFrame | null;
 }
 
-function hasUsableFrame<T extends FramedLineLike>(
-  line: T
-): line is T & { frame: LineFrame } {
-  return (
-    !!line.frame &&
-    line.frame.width > 0 &&
-    line.frame.height > 0
-  );
+function hasUsableFrame<T extends FramedLineLike>(line: T): line is T & { frame: LineFrame } {
+  return !!line.frame && line.frame.width > 0 && line.frame.height > 0;
 }
 
 function verticalOverlapRatio(
   aTop: number,
   aBottom: number,
   bTop: number,
-  bBottom: number
+  bBottom: number,
 ): number {
   const overlap = Math.min(aBottom, bBottom) - Math.max(aTop, bTop);
   const smaller = Math.min(aBottom - aTop, bBottom - bTop);
@@ -96,7 +90,7 @@ export function dedupeLines<T extends FramedLine>(lines: T[]): T[] {
         normalizeLineText(other.text) === text &&
         line.frame &&
         other.frame &&
-        centersClose(line.frame, other.frame)
+        centersClose(line.frame, other.frame),
     );
     if (!duplicateOfExisting) kept.push({ ...line, text });
   }
@@ -109,12 +103,9 @@ interface Row {
   bottom: number;
 }
 
-function groupIntoRows(
-  lines: Array<FramedLine & { frame: LineFrame }>
-): Row[] {
+function groupIntoRows(lines: Array<FramedLine & { frame: LineFrame }>): Row[] {
   const sorted = [...lines].sort(
-    (a, b) =>
-      a.frame.top - b.frame.top || a.frame.left - b.frame.left
+    (a, b) => a.frame.top - b.frame.top || a.frame.left - b.frame.left,
   );
   const rows: Row[] = [];
 
@@ -147,9 +138,7 @@ function median(values: number[]): number {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 1
-    ? sorted[mid]
-    : (sorted[mid - 1] + sorted[mid]) / 2;
+  return sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
 /**
@@ -157,23 +146,17 @@ function median(values: number[]): number {
  * Fragments separated by a wide horizontal gap come from separate label
  * columns/panels; each group of contiguous fragments becomes its own line.
  */
-export function stitchRow(
-  row: Array<FramedLine & { frame: LineFrame }>
-): string[] {
+export function stitchRow(row: Array<FramedLine & { frame: LineFrame }>): string[] {
   if (row.length === 0) return [];
-  const fragments = [...row].sort(
-    (a, b) => a.frame.left - b.frame.left
-  );
-  const lineHeight =
-    median(row.map((line) => line.frame.height)) || 1;
+  const fragments = [...row].sort((a, b) => a.frame.left - b.frame.left);
+  const lineHeight = median(row.map((line) => line.frame.height)) || 1;
 
   const groups: Array<Array<FramedLine & { frame: LineFrame }>> = [];
   for (const fragment of fragments) {
     const previousGroup = groups[groups.length - 1];
     if (previousGroup) {
       const previous = previousGroup[previousGroup.length - 1];
-      const gap =
-        fragment.frame.left - (previous.frame.left + previous.frame.width);
+      const gap = fragment.frame.left - (previous.frame.left + previous.frame.width);
       if (gap < COLUMN_GAP_FACTOR * lineHeight) {
         previousGroup.push(fragment);
         continue;
@@ -183,7 +166,13 @@ export function stitchRow(
   }
 
   return groups
-    .map((group) => group.map((line) => line.text).join(' ').replace(/\s+/g, ' ').trim())
+    .map((group) =>
+      group
+        .map((line) => line.text)
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim(),
+    )
     .filter(Boolean);
 }
 
@@ -233,7 +222,7 @@ const REGION_MARGIN_FRACTION = 0.1;
 export function computeTextRegion(
   frames: readonly LineFrame[],
   imageWidth: number,
-  imageHeight: number
+  imageHeight: number,
 ): TextRegion | null {
   if (imageWidth <= 0 || imageHeight <= 0) return null;
   const usable = frames.filter((f) => f.width > 0 && f.height > 0);

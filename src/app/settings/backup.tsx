@@ -1,12 +1,5 @@
 import React, { useState } from 'react';
-import {
-  StyleSheet,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  Share,
-} from 'react-native';
+import { StyleSheet, View, Text, TextInput, TouchableOpacity, Share } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -125,9 +118,9 @@ export default function BackupScreen() {
           </View>
           <Text style={styles.heading}>Export a JSON snapshot</Text>
           <Text style={styles.paragraph}>
-            Copies everything — profile, medicines, schedules, adherence
-            history, scans and AI chats — as one JSON file. Share it to notes,
-            files or email; nothing leaves your device until you share it.
+            Copies everything — profile, medicines, schedules, adherence history, scans and AI chats
+            — as one JSON file. Share it to notes, files or email; nothing leaves your device until
+            you share it.
           </Text>
           <TouchableOpacity
             style={[styles.actionButton, isBusy && styles.actionButtonDisabled]}
@@ -145,12 +138,12 @@ export default function BackupScreen() {
           </View>
           <Text style={styles.heading}>Restore from JSON</Text>
           <Text style={styles.paragraph}>
-            Paste a backup below. Restoring replaces ALL data on this device
-            with the backup — medicines, schedules, doses, scans and AI chats.
+            Paste a backup below. Restoring replaces ALL data on this device with the backup —
+            medicines, schedules, doses, scans and AI chats.
           </Text>
           <TextInput
             style={styles.jsonInput}
-            placeholder='Paste backup JSON here…'
+            placeholder="Paste backup JSON here…"
             placeholderTextColor={Colors.textTertiary}
             value={importJson}
             onChangeText={setImportJson}

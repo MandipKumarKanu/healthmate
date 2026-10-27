@@ -50,9 +50,9 @@ export function useKeyboardAwareScroll(options?: UseKeyboardAwareScrollOptions) 
                 (scrollView as any)?.scrollResponderScrollNativeHandleToKeyboard?.(
                   nodeOrTag,
                   extraOffset,
-                  true
+                  true,
                 );
-              }
+              },
             );
             return;
           }
@@ -66,13 +66,13 @@ export function useKeyboardAwareScroll(options?: UseKeyboardAwareScrollOptions) 
                 (scrollView as any)?.scrollResponderScrollNativeHandleToKeyboard?.(
                   nodeOrTag,
                   extraOffset,
-                  true
+                  true,
                 );
               },
               (_left: number, top: number) => {
                 const targetY = Math.max(0, top - extraOffset);
                 scrollView.scrollTo({ y: targetY, animated: true });
-              }
+              },
             );
             return;
           }
@@ -81,14 +81,14 @@ export function useKeyboardAwareScroll(options?: UseKeyboardAwareScrollOptions) 
           (scrollView as any)?.scrollResponderScrollNativeHandleToKeyboard?.(
             nodeOrTag,
             extraOffset,
-            true
+            true,
           );
         } catch {
           // Gracefully ignore layout errors
         }
       }, 50);
     },
-    [extraOffset]
+    [extraOffset],
   );
 
   const handleFocusCapture = useCallback(
@@ -98,7 +98,7 @@ export function useKeyboardAwareScroll(options?: UseKeyboardAwareScrollOptions) 
         scrollToNode(target);
       }
     },
-    [scrollToNode]
+    [scrollToNode],
   );
 
   // When keyboard opens, make sure the currently focused input is in full view

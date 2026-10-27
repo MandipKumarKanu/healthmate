@@ -1,17 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import {
-  StyleSheet,
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  Modal,
-} from 'react-native';
-import { AppAlert as Alert } from "../../services/appAlert";
-import {
-  deleteAllScanImages,
-  deleteScanImage,
-} from "../../services/scanImageStorage";
+import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Modal } from 'react-native';
+import { AppAlert as Alert } from '../../services/appAlert';
+import { deleteAllScanImages, deleteScanImage } from '../../services/scanImageStorage';
 import { useRouter } from 'expo-router';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -118,10 +108,7 @@ export default function ScanHistoryScreen() {
         onBackPress={() => router.back()}
         rightAction={
           scans.length > 0 ? (
-            <TouchableOpacity
-              style={styles.clearButton}
-              onPress={() => setShowClearModal(true)}
-            >
+            <TouchableOpacity style={styles.clearButton} onPress={() => setShowClearModal(true)}>
               <Text style={styles.clearButtonText}>Clear</Text>
             </TouchableOpacity>
           ) : null
@@ -131,11 +118,7 @@ export default function ScanHistoryScreen() {
       <View style={styles.body}>
         {scans.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Ionicons
-              name="scan-circle-outline"
-              size={56}
-              color={Colors.textTertiary}
-            />
+            <Ionicons name="scan-circle-outline" size={56} color={Colors.textTertiary} />
             <Text style={styles.emptyTitle}>No scan history yet</Text>
             <Text style={styles.emptySubtitle}>
               Packages you scan with the camera will appear here for review.
@@ -173,11 +156,7 @@ export default function ScanHistoryScreen() {
                   </Text>
                 </View>
 
-                <Ionicons
-                  name="ellipsis-horizontal"
-                  size={18}
-                  color={Colors.textTertiary}
-                />
+                <Ionicons name="ellipsis-horizontal" size={18} color={Colors.textTertiary} />
               </TouchableOpacity>
             </AppCard>
           ))
@@ -212,8 +191,7 @@ export default function ScanHistoryScreen() {
               >
                 <Text style={styles.sheetTitle}>{selectedScan.medicineName}</Text>
                 <Text style={styles.sheetSubtitle}>
-                  Scanned on{' '}
-                  {new Date(selectedScan.scannedAt).toLocaleDateString()} at{' '}
+                  Scanned on {new Date(selectedScan.scannedAt).toLocaleDateString()} at{' '}
                   {new Date(selectedScan.scannedAt).toLocaleTimeString([], {
                     hour: '2-digit',
                     minute: '2-digit',
@@ -223,21 +201,15 @@ export default function ScanHistoryScreen() {
                 <View style={styles.detailGrid}>
                   <View style={styles.detailCell}>
                     <Text style={styles.detailLabel}>Strength</Text>
-                    <Text style={styles.detailValue}>
-                      {selectedScan.detectedStrength ?? 'N/A'}
-                    </Text>
+                    <Text style={styles.detailValue}>{selectedScan.detectedStrength ?? 'N/A'}</Text>
                   </View>
                   <View style={styles.detailCell}>
                     <Text style={styles.detailLabel}>Form</Text>
-                    <Text style={styles.detailValue}>
-                      {selectedScan.dosageForm ?? 'tablet'}
-                    </Text>
+                    <Text style={styles.detailValue}>{selectedScan.dosageForm ?? 'tablet'}</Text>
                   </View>
                   <View style={styles.detailCell}>
                     <Text style={styles.detailLabel}>Expiry</Text>
-                    <Text style={styles.detailValue}>
-                      {selectedScan.expiryDate ?? 'N/A'}
-                    </Text>
+                    <Text style={styles.detailValue}>{selectedScan.expiryDate ?? 'N/A'}</Text>
                   </View>
                   <View style={styles.detailCell}>
                     <Text style={styles.detailLabel}>Batch / Lot</Text>
@@ -256,22 +228,14 @@ export default function ScanHistoryScreen() {
                 {selectedScanLines.length > 0 ? (
                   <View style={styles.sheetTextSection}>
                     <View style={styles.sheetTextHeader}>
-                      <Feather
-                        name="file-text"
-                        size={14}
-                        color={Colors.primary}
-                      />
+                      <Feather name="file-text" size={14} color={Colors.primary} />
                       <Text style={styles.sheetTextTitle}>
                         Full label text ({selectedScanLines.length} lines)
                       </Text>
                     </View>
                     <View style={styles.sheetTextBody}>
                       {selectedScanLines.map((line, index) => (
-                        <Text
-                          key={`scan-line-${index}`}
-                          style={styles.sheetTextLine}
-                          selectable
-                        >
+                        <Text key={`scan-line-${index}`} style={styles.sheetTextLine} selectable>
                           {line}
                         </Text>
                       ))}
@@ -287,10 +251,7 @@ export default function ScanHistoryScreen() {
                         color={textCopied ? Colors.successDark : Colors.primary}
                       />
                       <Text
-                        style={[
-                          styles.sheetCopyText,
-                          textCopied && { color: Colors.successDark },
-                        ]}
+                        style={[styles.sheetCopyText, textCopied && { color: Colors.successDark }]}
                       >
                         {textCopied ? 'Copied!' : 'Copy text'}
                       </Text>

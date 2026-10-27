@@ -21,16 +21,22 @@ export function seedInitialDataIfNeeded(force: boolean = false): void {
   const today = getTodayDateString();
 
   const existingProfile = db.getFirstSync<{ onboarding_completed: number }>(
-    'SELECT onboarding_completed FROM profiles LIMIT 1;'
+    'SELECT onboarding_completed FROM profiles LIMIT 1;',
   );
-  const isCompleted = force ? 1 : (existingProfile ? existingProfile.onboarding_completed : 0);
-  const defaultName = force ? 'Alex' : (existingProfile ? '' : '');
+  const isCompleted = force ? 1 : existingProfile ? existingProfile.onboarding_completed : 0;
+  const defaultName = force ? 'Alex' : existingProfile ? '' : '';
 
   // 1. Initial Profile
   db.runSync(
     `INSERT OR REPLACE INTO profiles (id, name, email, created_at, onboarding_completed)
      VALUES (?, ?, ?, ?, ?);`,
-    ['default-user', defaultName, force ? 'alex.m@example.com' : null, new Date().toISOString(), isCompleted]
+    [
+      'default-user',
+      defaultName,
+      force ? 'alex.m@example.com' : null,
+      new Date().toISOString(),
+      isCompleted,
+    ],
   );
 
   // 2. Preferences
@@ -168,7 +174,7 @@ export function seedInitialDataIfNeeded(force: boolean = false): void {
         m.createdAt,
         m.updatedAt,
         m.isSample ? 1 : 0,
-      ]
+      ],
     );
   }
 
@@ -243,7 +249,7 @@ export function seedInitialDataIfNeeded(force: boolean = false): void {
         s.notificationsEnabled ? 1 : 0,
         s.createdAt,
         s.updatedAt,
-      ]
+      ],
     );
   }
 
@@ -305,7 +311,7 @@ export function seedInitialDataIfNeeded(force: boolean = false): void {
         log.time,
         log.status,
         new Date().toISOString(),
-      ]
+      ],
     );
   }
 
@@ -326,6 +332,6 @@ export function seedInitialDataIfNeeded(force: boolean = false): void {
       'Metformin Tablets 500mg - Take one tablet twice daily with meals. Batch DEMO-MF0426. Exp 12/2027.',
       null,
       new Date().toISOString(),
-    ]
+    ],
   );
 }

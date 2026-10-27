@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   StyleSheet,
   View,
@@ -9,27 +9,27 @@ import {
   AppState,
   AppStateStatus,
   ActivityIndicator,
-} from "react-native";
-import { AppAlert as Alert } from "../../services/appAlert";
-import { useRouter } from "expo-router";
-import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
-import { Colors } from "../../theme/colors";
-import { Radius, Spacing } from "../../theme/tokens";
-import { AppScreen } from "../../components/ui/AppScreen";
-import { AppHeader } from "../../components/ui/AppHeader";
-import { AppCard } from "../../components/ui/AppCard";
+} from 'react-native';
+import { AppAlert as Alert } from '../../services/appAlert';
+import { useRouter } from 'expo-router';
+import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Colors } from '../../theme/colors';
+import { Radius, Spacing } from '../../theme/tokens';
+import { AppScreen } from '../../components/ui/AppScreen';
+import { AppHeader } from '../../components/ui/AppHeader';
+import { AppCard } from '../../components/ui/AppCard';
 import {
   batteryOptimizationService,
   ReliabilityStatus,
   OEMGuide,
-} from "../../services/batteryOptimizationService";
+} from '../../services/batteryOptimizationService';
 
 export default function BatteryOptimizationScreen() {
   const router = useRouter();
   const [status, setStatus] = useState<ReliabilityStatus | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [selectedOemId, setSelectedOemId] = useState<string>("stock");
+  const [selectedOemId, setSelectedOemId] = useState<string>('stock');
 
   const checkStatus = useCallback(async () => {
     try {
@@ -37,7 +37,7 @@ export default function BatteryOptimizationScreen() {
       setStatus(result);
       setSelectedOemId(result.detectedOemId);
     } catch (e) {
-      console.warn("BatteryOptimizationScreen checkStatus error:", e);
+      console.warn('BatteryOptimizationScreen checkStatus error:', e);
     } finally {
       setLoading(false);
     }
@@ -47,29 +47,26 @@ export default function BatteryOptimizationScreen() {
     checkStatus();
 
     const handleAppStateChange = (nextState: AppStateStatus) => {
-      if (nextState === "active") {
+      if (nextState === 'active') {
         checkStatus();
       }
     };
 
-    const subscription = AppState.addEventListener(
-      "change",
-      handleAppStateChange,
-    );
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => {
       subscription.remove();
     };
   }, [checkStatus]);
 
   const handleRequestBatteryIgnore = async () => {
-    setActionLoading("battery");
+    setActionLoading('battery');
     try {
       await batteryOptimizationService.requestIgnoreBatteryOptimizations();
       setTimeout(checkStatus, 1500);
     } catch (e) {
       Alert.alert(
-        "Settings Unavailable",
-        "Could not open the battery exemption prompt directly. Please adjust it under App Info > Battery in device settings.",
+        'Settings Unavailable',
+        'Could not open the battery exemption prompt directly. Please adjust it under App Info > Battery in device settings.',
       );
     } finally {
       setActionLoading(null);
@@ -77,14 +74,14 @@ export default function BatteryOptimizationScreen() {
   };
 
   const handleOpenExactAlarm = async () => {
-    setActionLoading("exact");
+    setActionLoading('exact');
     try {
       await batteryOptimizationService.openExactAlarmSettings();
       setTimeout(checkStatus, 1500);
     } catch (e) {
       Alert.alert(
-        "Settings Unavailable",
-        "Could not open exact alarm settings directly. Please enable Alarms & Reminders in device settings.",
+        'Settings Unavailable',
+        'Could not open exact alarm settings directly. Please enable Alarms & Reminders in device settings.',
       );
     } finally {
       setActionLoading(null);
@@ -92,12 +89,12 @@ export default function BatteryOptimizationScreen() {
   };
 
   const handleOpenOemSettings = async () => {
-    setActionLoading("oem");
+    setActionLoading('oem');
     try {
       await batteryOptimizationService.openOemAutoStartSettings();
     } catch (e) {
       Alert.alert(
-        "Settings Unavailable",
+        'Settings Unavailable',
         "OEM autostart menu not found on this device. Please check your phone's Security or Battery app.",
       );
     } finally {
@@ -106,19 +103,18 @@ export default function BatteryOptimizationScreen() {
   };
 
   const handleOpenAppBattery = async () => {
-    setActionLoading("appBattery");
+    setActionLoading('appBattery');
     try {
       await batteryOptimizationService.openAppBatterySettings();
     } catch (e) {
-      Alert.alert("Error", "Could not open app settings.");
+      Alert.alert('Error', 'Could not open app settings.');
     } finally {
       setActionLoading(null);
     }
   };
 
   const guides = batteryOptimizationService.getGuides();
-  const activeGuide =
-    guides.find((g) => g.id === selectedOemId) || guides[guides.length - 1];
+  const activeGuide = guides.find((g) => g.id === selectedOemId) || guides[guides.length - 1];
 
   return (
     <AppScreen scrollable={false} contentContainerStyle={styles.container}>
@@ -128,10 +124,7 @@ export default function BatteryOptimizationScreen() {
         onBackPress={() => router.back()}
       />
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Status Overview Card */}
         <AppCard style={styles.statusCard}>
           {loading ? (
@@ -142,40 +135,34 @@ export default function BatteryOptimizationScreen() {
                 <View
                   style={[
                     styles.statusBadgeIcon,
-                    status?.isOptimal
-                      ? styles.statusBadgeOptimal
-                      : styles.statusBadgeWarning,
+                    status?.isOptimal ? styles.statusBadgeOptimal : styles.statusBadgeWarning,
                   ]}
                 >
                   <MaterialCommunityIcons
-                    name={status?.isOptimal ? "shield-check" : "battery-alert"}
+                    name={status?.isOptimal ? 'shield-check' : 'battery-alert'}
                     size={24}
-                    color={status?.isOptimal ? Colors.success : "#D97706"}
+                    color={status?.isOptimal ? Colors.success : '#D97706'}
                   />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.statusTitle}>
-                    {status?.isOptimal
-                      ? "Reliability Configured"
-                      : "Optimization Active"}
+                    {status?.isOptimal ? 'Reliability Configured' : 'Optimization Active'}
                   </Text>
                   <Text style={styles.statusSubtitle}>
                     {status?.isOptimal
-                      ? "HealthMate is permitted to trigger precise dose reminders."
-                      : "Background restrictions may delay or silence your medicine alarms."}
+                      ? 'HealthMate is permitted to trigger precise dose reminders.'
+                      : 'Background restrictions may delay or silence your medicine alarms.'}
                   </Text>
                 </View>
               </View>
 
               <View style={styles.deviceMetaRow}>
                 <Text style={styles.deviceMetaText}>
-                  Detected:{" "}
-                  <Text style={{ fontWeight: "700", color: "#0F172A" }}>
-                    {status?.manufacturer?.toUpperCase() || "UNKNOWN"}
-                  </Text>{" "}
-                  {status?.androidVersion
-                    ? `(Android API ${status.androidVersion})`
-                    : ""}
+                  Detected:{' '}
+                  <Text style={{ fontWeight: '700', color: '#0F172A' }}>
+                    {status?.manufacturer?.toUpperCase() || 'UNKNOWN'}
+                  </Text>{' '}
+                  {status?.androidVersion ? `(Android API ${status.androidVersion})` : ''}
                 </Text>
               </View>
 
@@ -184,44 +171,28 @@ export default function BatteryOptimizationScreen() {
                 <View style={styles.checkItem}>
                   <Ionicons
                     name={
-                      status?.isIgnoringBatteryOptimizations
-                        ? "checkmark-circle"
-                        : "close-circle"
+                      status?.isIgnoringBatteryOptimizations ? 'checkmark-circle' : 'close-circle'
                     }
                     size={18}
-                    color={
-                      status?.isIgnoringBatteryOptimizations
-                        ? Colors.success
-                        : "#EF4444"
-                    }
+                    color={status?.isIgnoringBatteryOptimizations ? Colors.success : '#EF4444'}
                   />
                   <Text style={styles.checkItemText}>
-                    Battery Optimization:{" "}
+                    Battery Optimization:{' '}
                     {status?.isIgnoringBatteryOptimizations
-                      ? "Unrestricted (Allowed)"
-                      : "Restricted (Optimized)"}
+                      ? 'Unrestricted (Allowed)'
+                      : 'Restricted (Optimized)'}
                   </Text>
                 </View>
 
                 <View style={styles.checkItem}>
                   <Ionicons
-                    name={
-                      status?.canScheduleExactAlarms
-                        ? "checkmark-circle"
-                        : "close-circle"
-                    }
+                    name={status?.canScheduleExactAlarms ? 'checkmark-circle' : 'close-circle'}
                     size={18}
-                    color={
-                      status?.canScheduleExactAlarms
-                        ? Colors.success
-                        : "#EF4444"
-                    }
+                    color={status?.canScheduleExactAlarms ? Colors.success : '#EF4444'}
                   />
                   <Text style={styles.checkItemText}>
-                    Alarms & Reminders Permission:{" "}
-                    {status?.canScheduleExactAlarms
-                      ? "Allowed"
-                      : "Denied / Missing"}
+                    Alarms & Reminders Permission:{' '}
+                    {status?.canScheduleExactAlarms ? 'Allowed' : 'Denied / Missing'}
                   </Text>
                 </View>
               </View>
@@ -232,10 +203,10 @@ export default function BatteryOptimizationScreen() {
                   <TouchableOpacity
                     style={styles.actionBtnPrimary}
                     onPress={handleRequestBatteryIgnore}
-                    disabled={actionLoading === "battery"}
+                    disabled={actionLoading === 'battery'}
                     activeOpacity={0.8}
                   >
-                    {actionLoading === "battery" ? (
+                    {actionLoading === 'battery' ? (
                       <ActivityIndicator size="small" color="#FFFFFF" />
                     ) : (
                       <>
@@ -252,24 +223,15 @@ export default function BatteryOptimizationScreen() {
                   <TouchableOpacity
                     style={styles.actionBtnSecondary}
                     onPress={handleOpenExactAlarm}
-                    disabled={actionLoading === "exact"}
+                    disabled={actionLoading === 'exact'}
                     activeOpacity={0.8}
                   >
-                    {actionLoading === "exact" ? (
-                      <ActivityIndicator
-                        size="small"
-                        color={Colors.primary}
-                      />
+                    {actionLoading === 'exact' ? (
+                      <ActivityIndicator size="small" color={Colors.primary} />
                     ) : (
                       <>
-                        <Ionicons
-                          name="alarm-outline"
-                          size={16}
-                          color={Colors.primary}
-                        />
-                        <Text style={styles.actionBtnSecondaryText}>
-                          Allow Exact Alarms
-                        </Text>
+                        <Ionicons name="alarm-outline" size={16} color={Colors.primary} />
+                        <Text style={styles.actionBtnSecondaryText}>Allow Exact Alarms</Text>
                       </>
                     )}
                   </TouchableOpacity>
@@ -279,19 +241,17 @@ export default function BatteryOptimizationScreen() {
                   <TouchableOpacity
                     style={styles.quickLinkBtn}
                     onPress={handleOpenOemSettings}
-                    disabled={actionLoading === "oem"}
+                    disabled={actionLoading === 'oem'}
                     activeOpacity={0.7}
                   >
                     <Feather name="external-link" size={14} color="#64748B" />
-                    <Text style={styles.quickLinkText}>
-                      Autostart Settings
-                    </Text>
+                    <Text style={styles.quickLinkText}>Autostart Settings</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
                     style={styles.quickLinkBtn}
                     onPress={handleOpenAppBattery}
-                    disabled={actionLoading === "appBattery"}
+                    disabled={actionLoading === 'appBattery'}
                     activeOpacity={0.7}
                   >
                     <Feather name="settings" size={14} color="#64748B" />
@@ -327,13 +287,8 @@ export default function BatteryOptimizationScreen() {
                 onPress={() => setSelectedOemId(g.id)}
                 activeOpacity={0.7}
               >
-                <Text
-                  style={[
-                    styles.oemTabText,
-                    isSelected && styles.oemTabTextActive,
-                  ]}
-                >
-                  {g.name.split("/")[0].trim()}
+                <Text style={[styles.oemTabText, isSelected && styles.oemTabTextActive]}>
+                  {g.name.split('/')[0].trim()}
                 </Text>
               </TouchableOpacity>
             );
@@ -347,26 +302,14 @@ export default function BatteryOptimizationScreen() {
               <Text style={styles.guideName}>{activeGuide.name}</Text>
               <Text style={styles.guideSubname}>{activeGuide.subname}</Text>
             </View>
-            <View
-              style={[
-                styles.oemBadge,
-                { backgroundColor: `${activeGuide.badgeColor}15` },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.oemBadgeText,
-                  { color: activeGuide.badgeColor },
-                ]}
-              >
+            <View style={[styles.oemBadge, { backgroundColor: `${activeGuide.badgeColor}15` }]}>
+              <Text style={[styles.oemBadgeText, { color: activeGuide.badgeColor }]}>
                 Recommended
               </Text>
             </View>
           </View>
 
-          <Text style={styles.guideDescription}>
-            {activeGuide.description}
-          </Text>
+          <Text style={styles.guideDescription}>{activeGuide.description}</Text>
 
           <View style={styles.divider} />
 
@@ -379,9 +322,7 @@ export default function BatteryOptimizationScreen() {
                 </View>
                 <View style={styles.stepTextCol}>
                   <Text style={styles.stepTitle}>{step.title}</Text>
-                  <Text style={styles.stepDescription}>
-                    {step.description}
-                  </Text>
+                  <Text style={styles.stepDescription}>{step.description}</Text>
                 </View>
               </View>
             ))}
@@ -390,17 +331,11 @@ export default function BatteryOptimizationScreen() {
 
         {/* Best Effort Reliability Disclaimer */}
         <View style={styles.disclaimerBox}>
-          <Feather
-            name="info"
-            size={16}
-            color="#64748B"
-            style={{ marginTop: 2, marginRight: 8 }}
-          />
+          <Feather name="info" size={16} color="#64748B" style={{ marginTop: 2, marginRight: 8 }} />
           <Text style={styles.disclaimerText}>
-            Note: Android manufacturer battery optimizations vary across device
-            models and firmware versions. These steps provide best-effort guidance
-            to maximize alarm delivery reliability, but cannot override all
-            aggressive custom OS process killers.
+            Note: Android manufacturer battery optimizations vary across device models and firmware
+            versions. These steps provide best-effort guidance to maximize alarm delivery
+            reliability, but cannot override all aggressive custom OS process killers.
           </Text>
         </View>
       </ScrollView>
@@ -411,7 +346,7 @@ export default function BatteryOptimizationScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8F9FD",
+    backgroundColor: '#F8F9FD',
   },
   scrollContent: {
     paddingHorizontal: Spacing.screenPaddingHorizontal,
@@ -422,37 +357,37 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   statusHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 12,
   },
   statusBadgeIcon: {
     width: 48,
     height: 48,
     borderRadius: Radius.pill,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 14,
   },
   statusBadgeOptimal: {
-    backgroundColor: "#DCFCE7",
+    backgroundColor: '#DCFCE7',
   },
   statusBadgeWarning: {
-    backgroundColor: "#FEF3C7",
+    backgroundColor: '#FEF3C7',
   },
   statusTitle: {
     fontSize: 16,
-    fontWeight: "700",
-    color: "#0F172A",
+    fontWeight: '700',
+    color: '#0F172A',
     marginBottom: 2,
   },
   statusSubtitle: {
     fontSize: 12,
-    color: "#64748B",
+    color: '#64748B',
     lineHeight: 17,
   },
   deviceMetaRow: {
-    backgroundColor: "#F1F5F9",
+    backgroundColor: '#F1F5F9',
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: Radius.sm,
@@ -460,21 +395,21 @@ const styles = StyleSheet.create({
   },
   deviceMetaText: {
     fontSize: 12,
-    color: "#64748B",
+    color: '#64748B',
   },
   checksList: {
     gap: 8,
     marginBottom: 16,
   },
   checkItem: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   checkItemText: {
     fontSize: 13,
-    color: "#334155",
+    color: '#334155',
     marginLeft: 8,
-    fontWeight: "500",
+    fontWeight: '500',
   },
   actionsGrid: {
     gap: 8,
@@ -483,23 +418,23 @@ const styles = StyleSheet.create({
     paddingTop: 14,
   },
   actionBtnPrimary: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: Colors.primary,
     paddingVertical: 11,
     borderRadius: Radius.pill,
     gap: 8,
   },
   actionBtnPrimaryText: {
-    color: "#FFFFFF",
+    color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: '700',
   },
   actionBtnSecondary: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: Colors.primaryLight,
     paddingVertical: 10,
     borderRadius: Radius.pill,
@@ -508,39 +443,39 @@ const styles = StyleSheet.create({
   actionBtnSecondaryText: {
     color: Colors.primary,
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: '700',
   },
   quickLinksRow: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: 8,
     marginTop: 4,
   },
   quickLinkBtn: {
     flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#F1F5F9",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F1F5F9',
     paddingVertical: 8,
     borderRadius: Radius.pill,
     gap: 6,
   },
   quickLinkText: {
     fontSize: 12,
-    fontWeight: "600",
-    color: "#475569",
+    fontWeight: '600',
+    color: '#475569',
   },
   sectionHeaderLine: {
     marginBottom: 10,
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: "700",
-    color: "#0F172A",
+    fontWeight: '700',
+    color: '#0F172A',
   },
   sectionSubtitle: {
     fontSize: 12,
-    color: "#64748B",
+    color: '#64748B',
     marginTop: 2,
   },
   tabsScroll: {
@@ -552,10 +487,10 @@ const styles = StyleSheet.create({
   oemTab: {
     paddingVertical: 6,
     paddingHorizontal: 14,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: '#FFFFFF',
     borderRadius: Radius.pill,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: '#E2E8F0',
   },
   oemTabActive: {
     backgroundColor: Colors.primary,
@@ -563,30 +498,30 @@ const styles = StyleSheet.create({
   },
   oemTabText: {
     fontSize: 13,
-    fontWeight: "600",
-    color: "#475569",
+    fontWeight: '600',
+    color: '#475569',
   },
   oemTabTextActive: {
-    color: "#FFFFFF",
+    color: '#FFFFFF',
   },
   guideCard: {
     padding: 16,
     marginBottom: 16,
   },
   guideHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     marginBottom: 6,
   },
   guideName: {
     fontSize: 16,
-    fontWeight: "700",
-    color: "#0F172A",
+    fontWeight: '700',
+    color: '#0F172A',
   },
   guideSubname: {
     fontSize: 12,
-    color: "#64748B",
+    color: '#64748B',
   },
   oemBadge: {
     paddingHorizontal: 8,
@@ -595,11 +530,11 @@ const styles = StyleSheet.create({
   },
   oemBadgeText: {
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: '700',
   },
   guideDescription: {
     fontSize: 13,
-    color: "#475569",
+    color: '#475569',
     lineHeight: 18,
     marginTop: 4,
   },
@@ -612,22 +547,22 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   stepItem: {
-    flexDirection: "row",
-    alignItems: "flex-start",
+    flexDirection: 'row',
+    alignItems: 'flex-start',
   },
   stepNumberBadge: {
     width: 22,
     height: 22,
     borderRadius: Radius.pill,
     backgroundColor: Colors.primaryLight,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 10,
     marginTop: 2,
   },
   stepNumberText: {
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: '700',
     color: Colors.primary,
   },
   stepTextCol: {
@@ -635,26 +570,26 @@ const styles = StyleSheet.create({
   },
   stepTitle: {
     fontSize: 13,
-    fontWeight: "700",
-    color: "#0F172A",
+    fontWeight: '700',
+    color: '#0F172A',
     marginBottom: 2,
   },
   stepDescription: {
     fontSize: 12,
-    color: "#64748B",
+    color: '#64748B',
     lineHeight: 17,
   },
   disclaimerBox: {
-    flexDirection: "row",
-    backgroundColor: "#F1F5F9",
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
     borderRadius: Radius.card,
     padding: 12,
-    alignItems: "flex-start",
+    alignItems: 'flex-start',
   },
   disclaimerText: {
     flex: 1,
     fontSize: 11,
-    color: "#64748B",
+    color: '#64748B',
     lineHeight: 16,
   },
 });

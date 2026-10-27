@@ -9,10 +9,7 @@ export interface NextMedicationCardProps {
   onMarkAsTaken: (dose: ScheduledDose) => void;
 }
 
-export function NextMedicationCard({
-  dose,
-  onMarkAsTaken,
-}: NextMedicationCardProps) {
+export function NextMedicationCard({ dose, onMarkAsTaken }: NextMedicationCardProps) {
   return (
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>Next up</Text>

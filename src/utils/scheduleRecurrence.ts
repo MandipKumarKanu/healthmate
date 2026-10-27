@@ -1,4 +1,4 @@
-import { ReminderSchedule } from "../types";
+import { ReminderSchedule } from '../types';
 
 /**
  * Parses a YYYY-MM-DD date string into [year, month, day] numeric tuple.
@@ -7,11 +7,7 @@ import { ReminderSchedule } from "../types";
 export function parseDateParts(value: string): [number, number, number] | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (!match) return null;
-  const parts: [number, number, number] = [
-    Number(match[1]),
-    Number(match[2]),
-    Number(match[3]),
-  ];
+  const parts: [number, number, number] = [Number(match[1]), Number(match[2]), Number(match[3])];
   const date = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
   if (
     date.getUTCFullYear() !== parts[0] ||
@@ -26,16 +22,8 @@ export function parseDateParts(value: string): [number, number, number] | null {
 /**
  * Formats numeric year, month (1-12), and day into a YYYY-MM-DD string.
  */
-export function formatDateParts(
-  year: number,
-  month: number,
-  day: number,
-): string {
-  return [
-    year,
-    String(month).padStart(2, "0"),
-    String(day).padStart(2, "0"),
-  ].join("-");
+export function formatDateParts(year: number, month: number, day: number): string {
+  return [year, String(month).padStart(2, '0'), String(day).padStart(2, '0')].join('-');
 }
 
 /**
@@ -44,9 +32,9 @@ export function formatDateParts(
 export function getTodayDateString(now: Date = new Date()): string {
   return [
     now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, "0"),
-    String(now.getDate()).padStart(2, "0"),
-  ].join("-");
+    String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0'),
+  ].join('-');
 }
 
 /**
@@ -58,9 +46,9 @@ export function getPreviousDayString(dateStr: string): string {
   const d = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2] - 1));
   return [
     d.getUTCFullYear(),
-    String(d.getUTCMonth() + 1).padStart(2, "0"),
-    String(d.getUTCDate()).padStart(2, "0"),
-  ].join("-");
+    String(d.getUTCMonth() + 1).padStart(2, '0'),
+    String(d.getUTCDate()).padStart(2, '0'),
+  ].join('-');
 }
 
 /**
@@ -75,7 +63,7 @@ export function getPreviousDayString(dateStr: string): string {
  *              for shorter months (e.g. day 31 -> Feb 28/29, Apr 30, Jun 30, etc.)
  */
 export function isScheduleDueOnDate(
-  schedule: Pick<ReminderSchedule, "recurrence" | "startDate" | "endDate">,
+  schedule: Pick<ReminderSchedule, 'recurrence' | 'startDate' | 'endDate'>,
   date: string,
 ): boolean {
   const target = parseDateParts(date);
@@ -89,22 +77,19 @@ export function isScheduleDueOnDate(
     return false;
   }
 
-  if (
-    date < schedule.startDate ||
-    (schedule.endDate && date > schedule.endDate)
-  ) {
+  if (date < schedule.startDate || (schedule.endDate && date > schedule.endDate)) {
     return false;
   }
 
-  if (schedule.recurrence === "once") return date === schedule.startDate;
-  if (schedule.recurrence === "daily") return true;
-  if (schedule.recurrence === "weekly") {
+  if (schedule.recurrence === 'once') return date === schedule.startDate;
+  if (schedule.recurrence === 'daily') return true;
+  if (schedule.recurrence === 'weekly') {
     return (
       new Date(target[0], target[1] - 1, target[2]).getDay() ===
       new Date(start[0], start[1] - 1, start[2]).getDay()
     );
   }
-  if (schedule.recurrence === "monthly") {
+  if (schedule.recurrence === 'monthly') {
     const lastDay = new Date(target[0], target[1], 0).getDate();
     return target[2] === Math.min(start[2], lastDay);
   }
@@ -116,15 +101,10 @@ export function isScheduleDueOnDate(
  * Returns whether any active, enabled schedule with doses is due on a given date.
  * Shared directly by CalendarGrid to ensure calendar dots match adherence records 1:1.
  */
-export function hasReminderForDate(
-  schedules: ReminderSchedule[],
-  date: string,
-): boolean {
+export function hasReminderForDate(schedules: ReminderSchedule[], date: string): boolean {
   return schedules.some(
     (schedule) =>
-      schedule.enabled &&
-      schedule.times.length > 0 &&
-      isScheduleDueOnDate(schedule, date),
+      schedule.enabled && schedule.times.length > 0 && isScheduleDueOnDate(schedule, date),
   );
 }
 
@@ -138,8 +118,8 @@ export function hasReminderForDate(
 export function getDateTapAction(
   schedules: ReminderSchedule[],
   date: string,
-): "select" | "openCreate" {
-  return hasReminderForDate(schedules, date) ? "select" : "openCreate";
+): 'select' | 'openCreate' {
+  return hasReminderForDate(schedules, date) ? 'select' : 'openCreate';
 }
 
 /**
@@ -147,10 +127,7 @@ export function getDateTapAction(
  * - If selectedDate is today: "Today's Schedule"
  * - If selectedDate is not today: "Schedule for <Month> <Day>" (e.g. "Schedule for Oct 29")
  */
-export function formatScheduleDateLabel(
-  dateStr: string,
-  todayStr?: string,
-): string {
+export function formatScheduleDateLabel(dateStr: string, todayStr?: string): string {
   const effectiveToday = todayStr ?? getTodayDateString();
 
   if (dateStr === effectiveToday) {
@@ -158,12 +135,12 @@ export function formatScheduleDateLabel(
   }
 
   const parts = parseDateParts(dateStr);
-  if (!parts) return "Schedule";
+  if (!parts) return 'Schedule';
 
   const d = new Date(parts[0], parts[1] - 1, parts[2]);
-  const formatted = d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
+  const formatted = d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
   });
   return `Schedule for ${formatted}`;
 }

@@ -1,16 +1,9 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import * as Notifications from 'expo-notifications';
-import {
-  medicineRepository,
-} from '../src/database/repositories/medicineRepository';
-import {
-  scheduleRepository,
-} from '../src/database/repositories/scheduleRepository';
+import { medicineRepository } from '../src/database/repositories/medicineRepository';
+import { scheduleRepository } from '../src/database/repositories/scheduleRepository';
 import { adherenceRepository } from '../src/database/repositories/adherenceRepository';
-import {
-  refillService,
-  isLowStock,
-} from '../src/services/refillService';
+import { refillService, isLowStock } from '../src/services/refillService';
 import { getDatabase, resetDatabase } from '../src/database/client';
 
 function todayString(): string {
@@ -22,7 +15,9 @@ function todayString(): string {
   ].join('-');
 }
 
-function seedTrackedMedicine(overrides: Partial<Parameters<typeof medicineRepository.create>[0]> = {}) {
+function seedTrackedMedicine(
+  overrides: Partial<Parameters<typeof medicineRepository.create>[0]> = {},
+) {
   return medicineRepository.create({
     id: 'med_refill_test',
     name: 'Metformin',
@@ -100,9 +95,27 @@ describe('Refill & Inventory Tracking (migration 003 wiring)', () => {
       seedTrackedMedicine();
       const scheduleId = seedDailySchedule('med_refill_test');
 
-      adherenceRepository.logDoseStatus(scheduleId, 'med_refill_test', todayString(), '10:00', 'taken');
-      adherenceRepository.logDoseStatus(scheduleId, 'med_refill_test', todayString(), '10:00', 'taken');
-      adherenceRepository.logDoseStatus(scheduleId, 'med_refill_test', todayString(), '10:00', 'taken');
+      adherenceRepository.logDoseStatus(
+        scheduleId,
+        'med_refill_test',
+        todayString(),
+        '10:00',
+        'taken',
+      );
+      adherenceRepository.logDoseStatus(
+        scheduleId,
+        'med_refill_test',
+        todayString(),
+        '10:00',
+        'taken',
+      );
+      adherenceRepository.logDoseStatus(
+        scheduleId,
+        'med_refill_test',
+        todayString(),
+        '10:00',
+        'taken',
+      );
 
       expect(medicineRepository.getById('med_refill_test')?.currentInventory).toBe(9);
     });
@@ -111,13 +124,31 @@ describe('Refill & Inventory Tracking (migration 003 wiring)', () => {
       seedTrackedMedicine();
       const scheduleId = seedDailySchedule('med_refill_test');
 
-      adherenceRepository.logDoseStatus(scheduleId, 'med_refill_test', todayString(), '10:00', 'taken');
+      adherenceRepository.logDoseStatus(
+        scheduleId,
+        'med_refill_test',
+        todayString(),
+        '10:00',
+        'taken',
+      );
       expect(medicineRepository.getById('med_refill_test')?.currentInventory).toBe(9);
 
-      adherenceRepository.logDoseStatus(scheduleId, 'med_refill_test', todayString(), '10:00', 'skipped');
+      adherenceRepository.logDoseStatus(
+        scheduleId,
+        'med_refill_test',
+        todayString(),
+        '10:00',
+        'skipped',
+      );
       expect(medicineRepository.getById('med_refill_test')?.currentInventory).toBe(10);
 
-      adherenceRepository.logDoseStatus(scheduleId, 'med_refill_test', todayString(), '10:00', 'taken');
+      adherenceRepository.logDoseStatus(
+        scheduleId,
+        'med_refill_test',
+        todayString(),
+        '10:00',
+        'taken',
+      );
       expect(medicineRepository.getById('med_refill_test')?.currentInventory).toBe(9);
     });
   });
@@ -131,7 +162,13 @@ describe('Refill & Inventory Tracking (migration 003 wiring)', () => {
         .spyOn(Notifications, 'scheduleNotificationAsync')
         .mockResolvedValue('notif_1');
 
-      adherenceRepository.logDoseStatus(scheduleId, 'med_refill_test', todayString(), '10:00', 'taken');
+      adherenceRepository.logDoseStatus(
+        scheduleId,
+        'med_refill_test',
+        todayString(),
+        '10:00',
+        'taken',
+      );
       expect(medicineRepository.getById('med_refill_test')?.currentInventory).toBe(3);
 
       // Allow the fire-and-forget notification + markReminded to settle
@@ -156,7 +193,13 @@ describe('Refill & Inventory Tracking (migration 003 wiring)', () => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
-      adherenceRepository.logDoseStatus('sched_refill_test_2', 'med_refill_test', todayString(), '20:00', 'taken');
+      adherenceRepository.logDoseStatus(
+        'sched_refill_test_2',
+        'med_refill_test',
+        todayString(),
+        '20:00',
+        'taken',
+      );
       expect(medicineRepository.getById('med_refill_test')?.currentInventory).toBe(2);
       expect(scheduleSpy).toHaveBeenCalledTimes(1);
       const stillSameRow = refillService.getRefillRow('med_refill_test');
@@ -200,9 +243,12 @@ describe('Refill & Inventory Tracking (migration 003 wiring)', () => {
       seedTrackedMedicine({ currentInventory: 3 });
       refillService.applyStockChange('med_refill_test', -1);
       const db = getDatabase();
-      const row = db.getFirstSync<{ medicine_id: string; threshold: number; current_stock: number; status: string }>(
-        'SELECT * FROM refill_reminders;',
-      );
+      const row = db.getFirstSync<{
+        medicine_id: string;
+        threshold: number;
+        current_stock: number;
+        status: string;
+      }>('SELECT * FROM refill_reminders;');
       expect(row).toMatchObject({
         medicine_id: 'med_refill_test',
         threshold: 3,

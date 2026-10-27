@@ -1,26 +1,26 @@
-import React, { useState, useEffect } from "react";
-import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
-import { AppAlert as Alert } from "../../services/appAlert";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
-import { Colors } from "../../theme/colors";
-import { Radius, Spacing, Typography } from "../../theme/tokens";
-import { AppScreen } from "../../components/ui/AppScreen";
-import { AppHeader } from "../../components/ui/AppHeader";
-import { AppCard } from "../../components/ui/AppCard";
-import { AppButton } from "../../components/ui/AppButton";
-import { MedicineIcon } from "../../components/ui/MedicineIcon";
-import { SectionHeader } from "../../components/ui/SectionHeader";
-import { MedicalDisclaimer } from "../../components/ui/MedicalDisclaimer";
-import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
-import { medicineRepository } from "../../database/repositories/medicineRepository";
-import { scheduleRepository } from "../../database/repositories/scheduleRepository";
-import { profileRepository } from "../../database/repositories/profileRepository";
-import { isLowStock } from "../../services/refillService";
-import { useMedicineStore } from "../../store/medicineStore";
-import { aiAssistantService, MedicineEducationalInfo } from "../../services/aiAssistantService";
-import { networkService } from "../../services/networkService";
-import { ConnectGeminiModal } from "../../components/ai/ConnectGeminiModal";
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { AppAlert as Alert } from '../../services/appAlert';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Colors } from '../../theme/colors';
+import { Radius, Spacing, Typography } from '../../theme/tokens';
+import { AppScreen } from '../../components/ui/AppScreen';
+import { AppHeader } from '../../components/ui/AppHeader';
+import { AppCard } from '../../components/ui/AppCard';
+import { AppButton } from '../../components/ui/AppButton';
+import { MedicineIcon } from '../../components/ui/MedicineIcon';
+import { SectionHeader } from '../../components/ui/SectionHeader';
+import { MedicalDisclaimer } from '../../components/ui/MedicalDisclaimer';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { medicineRepository } from '../../database/repositories/medicineRepository';
+import { scheduleRepository } from '../../database/repositories/scheduleRepository';
+import { profileRepository } from '../../database/repositories/profileRepository';
+import { isLowStock } from '../../services/refillService';
+import { useMedicineStore } from '../../store/medicineStore';
+import { aiAssistantService, MedicineEducationalInfo } from '../../services/aiAssistantService';
+import { networkService } from '../../services/networkService';
+import { ConnectGeminiModal } from '../../components/ai/ConnectGeminiModal';
 
 export default function MedicineDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -33,10 +33,8 @@ export default function MedicineDetailsScreen() {
   const [isLoadingEdu, setIsLoadingEdu] = useState(false);
   const [showConnectModal, setShowConnectModal] = useState(false);
 
-  const storeMedicine = useMedicineStore((s) =>
-    s.medicines.find((m) => m.id === id),
-  );
-  const medicine = storeMedicine || medicineRepository.getById(id || "");
+  const storeMedicine = useMedicineStore((s) => s.medicines.find((m) => m.id === id));
+  const medicine = storeMedicine || medicineRepository.getById(id || '');
   const schedule = id ? scheduleRepository.getByMedicineId(id) : null;
 
   useEffect(() => {
@@ -69,8 +67,8 @@ export default function MedicineDetailsScreen() {
     const isOnline = await networkService.checkInternet().catch(() => false);
     if (!isOnline) {
       Alert.alert(
-        "Internet Connection Required",
-        "Please connect to the internet to fetch educational information with Gemini AI."
+        'Internet Connection Required',
+        'Please connect to the internet to fetch educational information with Gemini AI.',
       );
       return;
     }
@@ -85,21 +83,21 @@ export default function MedicineDetailsScreen() {
       profileRepository.updatePreference(`edu_info_${medicine.id}`, JSON.stringify(info));
       setEduInfo(info);
     } catch (err: any) {
-      console.warn("Failed to generate educational info:", err);
-      const isBadKey = err?.code === "BAD_KEY" || err?.message?.includes("rejected");
+      console.warn('Failed to generate educational info:', err);
+      const isBadKey = err?.code === 'BAD_KEY' || err?.message?.includes('rejected');
       if (isBadKey) {
         Alert.alert(
-          "Gemini key issue",
-          "Your Gemini API key was rejected or invalid. Please reconnect a valid key.",
+          'Gemini key issue',
+          'Your Gemini API key was rejected or invalid. Please reconnect a valid key.',
           [
-            { text: "Reconnect AI", onPress: () => setShowConnectModal(true) },
-            { text: "Cancel", style: "cancel" },
-          ]
+            { text: 'Reconnect AI', onPress: () => setShowConnectModal(true) },
+            { text: 'Cancel', style: 'cancel' },
+          ],
         );
       } else {
         Alert.alert(
-          "Could not generate AI guide",
-          err?.message || "Please check your network connection and try again."
+          'Could not generate AI guide',
+          err?.message || 'Please check your network connection and try again.',
         );
       }
     } finally {
@@ -130,24 +128,23 @@ export default function MedicineDetailsScreen() {
   };
 
   const handleMenuPress = () => {
-    Alert.alert(medicine.name, "Choose an action for this medication", [
+    Alert.alert(medicine.name, 'Choose an action for this medication', [
       {
-        text: "Edit Medicine Details",
+        text: 'Edit Medicine Details',
         onPress: () => router.push(`/medicines/add?editId=${medicine.id}`),
       },
       {
-        text: "Set / Edit Reminder",
-        onPress: () =>
-          router.push(`/reminders/create?medicineId=${medicine.id}`),
+        text: 'Set / Edit Reminder',
+        onPress: () => router.push(`/reminders/create?medicineId=${medicine.id}`),
       },
       {
-        text: "Delete Medicine",
-        style: "destructive",
+        text: 'Delete Medicine',
+        style: 'destructive',
         onPress: () => setShowDeleteModal(true),
       },
       {
-        text: "Cancel",
-        style: "cancel",
+        text: 'Cancel',
+        style: 'cancel',
       },
     ]);
   };
@@ -156,39 +153,35 @@ export default function MedicineDetailsScreen() {
     try {
       const deleted = await deleteMedicine(medicine.id);
       if (!deleted) {
-        Alert.alert(
-          "Could not delete medicine",
-          "This medicine may already have been removed.",
-        );
+        Alert.alert('Could not delete medicine', 'This medicine may already have been removed.');
         return;
       }
       setShowDeleteModal(false);
       router.back();
     } catch (error) {
-      console.error("Could not delete medicine:", error);
+      console.error('Could not delete medicine:', error);
       Alert.alert(
-        "Could not delete medicine",
-        "Please try again. Your record has not been confirmed as deleted.",
+        'Could not delete medicine',
+        'Please try again. Your record has not been confirmed as deleted.',
       );
     }
   };
 
   const formatScheduleText = () => {
     if (!schedule || !schedule.enabled || schedule.times.length === 0) {
-      return "No reminder schedule set";
+      return 'No reminder schedule set';
     }
-    const times = schedule.times.map((t) => t.time).join(" & ");
+    const times = schedule.times.map((t) => t.time).join(' & ');
     const recurrenceStr =
-      schedule.recurrence === "daily"
-        ? "Every day"
-        : schedule.recurrence.charAt(0).toUpperCase() +
-          schedule.recurrence.slice(1);
+      schedule.recurrence === 'daily'
+        ? 'Every day'
+        : schedule.recurrence.charAt(0).toUpperCase() + schedule.recurrence.slice(1);
     return `${times} · ${recurrenceStr}`;
   };
 
   const scheduleDoseNote = schedule?.times[0]?.amount
     ? `${schedule.times[0].amount} per reminder · Confirm against your prescription`
-    : "No saved dose amount";
+    : 'No saved dose amount';
 
   return (
     <AppScreen scrollable contentContainerStyle={styles.scrollContent}>
@@ -204,19 +197,13 @@ export default function MedicineDetailsScreen() {
         {/* Card 1: Medicine Hero Summary */}
         <AppCard style={styles.heroCard}>
           <View style={styles.heroTopRow}>
-            <MedicineIcon
-              form={medicine.dosageForm}
-              name={medicine.name}
-              size={52}
-            />
+            <MedicineIcon form={medicine.dosageForm} name={medicine.name} size={52} />
             <View style={styles.heroInfo}>
               <View style={styles.heroNameRow}>
                 <Text style={styles.heroName}>{medicine.name}</Text>
                 <TouchableOpacity
                   style={styles.editBadgeButton}
-                  onPress={() =>
-                    router.push(`/medicines/add?editId=${medicine.id}`)
-                  }
+                  onPress={() => router.push(`/medicines/add?editId=${medicine.id}`)}
                   accessibilityRole="button"
                   accessibilityLabel="Edit medicine details"
                   activeOpacity={0.7}
@@ -226,10 +213,9 @@ export default function MedicineDetailsScreen() {
                 </TouchableOpacity>
               </View>
               <Text style={styles.heroSub}>
-                {medicine.strength} ·{" "}
-                {medicine.dosageForm.charAt(0).toUpperCase() +
-                  medicine.dosageForm.slice(1)}
-                s · {medicine.category}
+                {medicine.strength} ·{' '}
+                {medicine.dosageForm.charAt(0).toUpperCase() + medicine.dosageForm.slice(1)}s ·{' '}
+                {medicine.category}
               </Text>
             </View>
           </View>
@@ -237,20 +223,20 @@ export default function MedicineDetailsScreen() {
           <View style={styles.exampleTag}>
             <Text style={styles.exampleTagText}>
               {medicine.isSample
-                ? "Fictional demonstration data · Not real medication data"
+                ? 'Fictional demonstration data · Not real medication data'
                 : medicine.packageDetails.originalPackageChecked
-                  ? "Marked as reviewed by you · Not independently verified"
-                  : medicine.informationSource?.toLowerCase().includes("scan")
-                    ? "OCR-extracted draft · Verify every field against the package"
-                    : "User-entered details · Not independently verified"}
+                  ? 'Marked as reviewed by you · Not independently verified'
+                  : medicine.informationSource?.toLowerCase().includes('scan')
+                    ? 'OCR-extracted draft · Verify every field against the package'
+                    : 'User-entered details · Not independently verified'}
             </Text>
           </View>
 
           <Text style={styles.addedDateText}>
-            Added{" "}
+            Added{' '}
             {Number.isNaN(Date.parse(medicine.createdAt))
-              ? "date unavailable"
-              : new Date(medicine.createdAt).toLocaleDateString()}{" "}
+              ? 'date unavailable'
+              : new Date(medicine.createdAt).toLocaleDateString()}{' '}
             · HealthMate has not clinically verified this record
           </Text>
         </AppCard>
@@ -259,14 +245,12 @@ export default function MedicineDetailsScreen() {
         <View style={styles.warningBanner}>
           <View style={styles.warningHeader}>
             <Ionicons name="warning-outline" size={18} color="#D97706" />
-            <Text style={styles.warningTitle}>
-              Your prescription comes first
-            </Text>
+            <Text style={styles.warningTitle}>Your prescription comes first</Text>
           </View>
           <Text style={styles.warningBody}>
-            Only your healthcare professional or prescription label can confirm
-            why this medicine was prescribed for you and the dose you should
-            take. Do not change medication based on this app.
+            Only your healthcare professional or prescription label can confirm why this medicine
+            was prescribed for you and the dose you should take. Do not change medication based on
+            this app.
           </Text>
         </View>
 
@@ -302,8 +286,7 @@ export default function MedicineDetailsScreen() {
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Form</Text>
             <Text style={styles.infoValue}>
-              {medicine.dosageForm.charAt(0).toUpperCase() +
-                medicine.dosageForm.slice(1)}
+              {medicine.dosageForm.charAt(0).toUpperCase() + medicine.dosageForm.slice(1)}
             </Text>
           </View>
 
@@ -313,30 +296,21 @@ export default function MedicineDetailsScreen() {
             <>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>
-                  Stock remaining{medicine.unitDosage ? ` (${medicine.unitDosage})` : ""}
+                  Stock remaining{medicine.unitDosage ? ` (${medicine.unitDosage})` : ''}
                 </Text>
-                <Text
-                  style={[
-                    styles.infoValue,
-                    isLowStock(medicine) && styles.lowStockValue,
-                  ]}
-                >
+                <Text style={[styles.infoValue, isLowStock(medicine) && styles.lowStockValue]}>
                   {medicine.currentInventory}
                   {medicine.refillThreshold != null
                     ? ` · refill at ${medicine.refillThreshold}`
-                    : ""}
+                    : ''}
                 </Text>
               </View>
               {isLowStock(medicine) ? (
                 <View style={styles.stockWarningRow}>
-                  <Ionicons
-                    name="alert-circle"
-                    size={16}
-                    color={Colors.warningDark}
-                  />
+                  <Ionicons name="alert-circle" size={16} color={Colors.warningDark} />
                   <Text style={styles.stockWarningText}>
-                    Stock is at or below the refill threshold. Enter the correct
-                    count after each refill in the Edit screen.
+                    Stock is at or below the refill threshold. Enter the correct count after each
+                    refill in the Edit screen.
                   </Text>
                 </View>
               ) : null}
@@ -346,28 +320,22 @@ export default function MedicineDetailsScreen() {
 
           <TouchableOpacity
             style={styles.originalPackageRow}
-            onPress={() => router.push("/(tabs)/scan")}
+            onPress={() => router.push('/(tabs)/scan')}
             activeOpacity={0.7}
           >
             <Ionicons name="scan-outline" size={20} color={Colors.primary} />
             <View style={styles.originalPackageTextContainer}>
               <Text style={styles.originalPackageTitle}>Original package</Text>
-              <Text style={styles.originalPackageSub}>
-                Check all details against your label
-              </Text>
+              <Text style={styles.originalPackageSub}>Check all details against your label</Text>
             </View>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={Colors.textTertiary}
-            />
+            <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
           </TouchableOpacity>
         </AppCard>
 
         {/* Section: General educational information */}
         <SectionHeader
           title="General educational information"
-          actionText={eduInfo ? "Refresh" : undefined}
+          actionText={eduInfo ? 'Refresh' : undefined}
           onActionPress={eduInfo ? () => handleFetchEducationalInfo(true) : undefined}
         />
         <AppCard style={styles.educationCard}>
@@ -398,7 +366,8 @@ export default function MedicineDetailsScreen() {
               <ActivityIndicator size="large" color={Colors.primary} />
               <Text style={styles.loadingEduTitle}>Analyzing Active Composition…</Text>
               <Text style={styles.loadingEduSub}>
-                Gemini AI is examining {medicine.ingredient || medicine.name} to compile educational insights.
+                Gemini AI is examining {medicine.ingredient || medicine.name} to compile educational
+                insights.
               </Text>
             </View>
           ) : eduInfo ? (
@@ -412,9 +381,9 @@ export default function MedicineDetailsScreen() {
                   style={styles.explainButton}
                   onPress={() =>
                     router.push({
-                      pathname: "/ai-assistant",
+                      pathname: '/ai-assistant',
                       params: {
-                        query: `Explain ${medicine.name}${medicine.ingredient ? ` (${medicine.ingredient})` : ""} simply`,
+                        query: `Explain ${medicine.name}${medicine.ingredient ? ` (${medicine.ingredient})` : ''} simply`,
                       },
                     })
                   }
@@ -427,9 +396,9 @@ export default function MedicineDetailsScreen() {
                   style={styles.whyButton}
                   onPress={() =>
                     router.push({
-                      pathname: "/ai-assistant",
+                      pathname: '/ai-assistant',
                       params: {
-                        query: `Why is ${medicine.name}${medicine.ingredient ? ` (${medicine.ingredient})` : ""} prescribed?`,
+                        query: `Why is ${medicine.name}${medicine.ingredient ? ` (${medicine.ingredient})` : ''} prescribed?`,
                       },
                     })
                   }
@@ -442,36 +411,30 @@ export default function MedicineDetailsScreen() {
               {/* Expandable Educational Accordion Items */}
               <View style={styles.accordionContainer}>
                 {/* How does it work? */}
-                <TouchableOpacity
-                  style={styles.accordionRow}
-                  onPress={() => toggleExpand("how")}
-                >
+                <TouchableOpacity style={styles.accordionRow} onPress={() => toggleExpand('how')}>
                   <Text style={styles.accordionTitle}>How does it work?</Text>
                   <Ionicons
-                    name={expandedSection === "how" ? "chevron-up" : "chevron-forward"}
+                    name={expandedSection === 'how' ? 'chevron-up' : 'chevron-forward'}
                     size={16}
                     color={Colors.textTertiary}
                   />
                 </TouchableOpacity>
-                {expandedSection === "how" ? (
+                {expandedSection === 'how' ? (
                   <Text style={styles.accordionBody}>{eduInfo.mechanism}</Text>
                 ) : null}
 
                 <View style={styles.rowDivider} />
 
                 {/* Common uses */}
-                <TouchableOpacity
-                  style={styles.accordionRow}
-                  onPress={() => toggleExpand("uses")}
-                >
+                <TouchableOpacity style={styles.accordionRow} onPress={() => toggleExpand('uses')}>
                   <Text style={styles.accordionTitle}>Common uses</Text>
                   <Ionicons
-                    name={expandedSection === "uses" ? "chevron-up" : "chevron-forward"}
+                    name={expandedSection === 'uses' ? 'chevron-up' : 'chevron-forward'}
                     size={16}
                     color={Colors.textTertiary}
                   />
                 </TouchableOpacity>
-                {expandedSection === "uses" ? (
+                {expandedSection === 'uses' ? (
                   <View style={styles.bulletList}>
                     {eduInfo.commonUses.map((item, idx) => (
                       <View key={idx} style={styles.bulletItem}>
@@ -487,7 +450,7 @@ export default function MedicineDetailsScreen() {
                 {/* Important safety information */}
                 <TouchableOpacity
                   style={styles.accordionRow}
-                  onPress={() => toggleExpand("safety")}
+                  onPress={() => toggleExpand('safety')}
                 >
                   <View style={styles.safetyRow}>
                     <Ionicons
@@ -499,12 +462,12 @@ export default function MedicineDetailsScreen() {
                     <Text style={styles.accordionTitle}>Important safety information</Text>
                   </View>
                   <Ionicons
-                    name={expandedSection === "safety" ? "chevron-up" : "chevron-forward"}
+                    name={expandedSection === 'safety' ? 'chevron-up' : 'chevron-forward'}
                     size={16}
                     color={Colors.textTertiary}
                   />
                 </TouchableOpacity>
-                {expandedSection === "safety" ? (
+                {expandedSection === 'safety' ? (
                   <View style={styles.bulletList}>
                     {eduInfo.safetyAlerts.map((item, idx) => (
                       <View key={idx} style={styles.bulletItem}>
@@ -525,16 +488,16 @@ export default function MedicineDetailsScreen() {
                 {/* Common side effects */}
                 <TouchableOpacity
                   style={styles.accordionRow}
-                  onPress={() => toggleExpand("effects")}
+                  onPress={() => toggleExpand('effects')}
                 >
                   <Text style={styles.accordionTitle}>Common side effects</Text>
                   <Ionicons
-                    name={expandedSection === "effects" ? "chevron-up" : "chevron-forward"}
+                    name={expandedSection === 'effects' ? 'chevron-up' : 'chevron-forward'}
                     size={16}
                     color={Colors.textTertiary}
                   />
                 </TouchableOpacity>
-                {expandedSection === "effects" ? (
+                {expandedSection === 'effects' ? (
                   <View style={styles.bulletList}>
                     {eduInfo.sideEffects.map((item, idx) => (
                       <View key={idx} style={styles.bulletItem}>
@@ -575,7 +538,8 @@ export default function MedicineDetailsScreen() {
 
               <Text style={styles.eduQuestion}>What is it used for?</Text>
               <Text style={styles.eduBody}>
-                No reviewed patient leaflet is linked to this record. Tap "Generate with Gemini AI" above or check the official package leaflet.
+                No reviewed patient leaflet is linked to this record. Tap "Generate with Gemini AI"
+                above or check the official package leaflet.
               </Text>
 
               {/* Action pills: Explain simply / Why prescribed? */}
@@ -584,9 +548,9 @@ export default function MedicineDetailsScreen() {
                   style={styles.explainButton}
                   onPress={() =>
                     router.push({
-                      pathname: "/ai-assistant",
+                      pathname: '/ai-assistant',
                       params: {
-                        query: `Explain ${medicine.name}${medicine.ingredient ? ` (${medicine.ingredient})` : ""} simply`,
+                        query: `Explain ${medicine.name}${medicine.ingredient ? ` (${medicine.ingredient})` : ''} simply`,
                       },
                     })
                   }
@@ -599,9 +563,9 @@ export default function MedicineDetailsScreen() {
                   style={styles.whyButton}
                   onPress={() =>
                     router.push({
-                      pathname: "/ai-assistant",
+                      pathname: '/ai-assistant',
                       params: {
-                        query: `Why is ${medicine.name}${medicine.ingredient ? ` (${medicine.ingredient})` : ""} prescribed?`,
+                        query: `Why is ${medicine.name}${medicine.ingredient ? ` (${medicine.ingredient})` : ''} prescribed?`,
                       },
                     })
                   }
@@ -614,40 +578,36 @@ export default function MedicineDetailsScreen() {
               {/* Expandable Educational Accordion Items */}
               <View style={styles.accordionContainer}>
                 {/* How does it work? */}
-                <TouchableOpacity
-                  style={styles.accordionRow}
-                  onPress={() => toggleExpand("how")}
-                >
+                <TouchableOpacity style={styles.accordionRow} onPress={() => toggleExpand('how')}>
                   <Text style={styles.accordionTitle}>How does it work?</Text>
                   <Ionicons
-                    name={expandedSection === "how" ? "chevron-up" : "chevron-forward"}
+                    name={expandedSection === 'how' ? 'chevron-up' : 'chevron-forward'}
                     size={16}
                     color={Colors.textTertiary}
                   />
                 </TouchableOpacity>
-                {expandedSection === "how" ? (
+                {expandedSection === 'how' ? (
                   <Text style={styles.accordionBody}>
-                    No medicine-specific mechanism information has been verified for this record. Tap "Generate with Gemini AI" above or check the official leaflet.
+                    No medicine-specific mechanism information has been verified for this record.
+                    Tap "Generate with Gemini AI" above or check the official leaflet.
                   </Text>
                 ) : null}
 
                 <View style={styles.rowDivider} />
 
                 {/* Common uses */}
-                <TouchableOpacity
-                  style={styles.accordionRow}
-                  onPress={() => toggleExpand("uses")}
-                >
+                <TouchableOpacity style={styles.accordionRow} onPress={() => toggleExpand('uses')}>
                   <Text style={styles.accordionTitle}>Common uses</Text>
                   <Ionicons
-                    name={expandedSection === "uses" ? "chevron-up" : "chevron-forward"}
+                    name={expandedSection === 'uses' ? 'chevron-up' : 'chevron-forward'}
                     size={16}
                     color={Colors.textTertiary}
                   />
                 </TouchableOpacity>
-                {expandedSection === "uses" ? (
+                {expandedSection === 'uses' ? (
                   <Text style={styles.accordionBody}>
-                    Uses depend on the active ingredient and formulation. Tap "Generate with Gemini AI" to get active salt insights.
+                    Uses depend on the active ingredient and formulation. Tap "Generate with Gemini
+                    AI" to get active salt insights.
                   </Text>
                 ) : null}
 
@@ -656,7 +616,7 @@ export default function MedicineDetailsScreen() {
                 {/* Important safety information */}
                 <TouchableOpacity
                   style={styles.accordionRow}
-                  onPress={() => toggleExpand("safety")}
+                  onPress={() => toggleExpand('safety')}
                 >
                   <View style={styles.safetyRow}>
                     <Ionicons
@@ -668,14 +628,15 @@ export default function MedicineDetailsScreen() {
                     <Text style={styles.accordionTitle}>Important safety information</Text>
                   </View>
                   <Ionicons
-                    name={expandedSection === "safety" ? "chevron-up" : "chevron-forward"}
+                    name={expandedSection === 'safety' ? 'chevron-up' : 'chevron-forward'}
                     size={16}
                     color={Colors.textTertiary}
                   />
                 </TouchableOpacity>
-                {expandedSection === "safety" ? (
+                {expandedSection === 'safety' ? (
                   <Text style={styles.accordionBody}>
-                    Storage and precautions vary by product. Follow instructions on original packaging.
+                    Storage and precautions vary by product. Follow instructions on original
+                    packaging.
                   </Text>
                 ) : null}
 
@@ -684,18 +645,19 @@ export default function MedicineDetailsScreen() {
                 {/* Common side effects */}
                 <TouchableOpacity
                   style={styles.accordionRow}
-                  onPress={() => toggleExpand("effects")}
+                  onPress={() => toggleExpand('effects')}
                 >
                   <Text style={styles.accordionTitle}>Common side effects</Text>
                   <Ionicons
-                    name={expandedSection === "effects" ? "chevron-up" : "chevron-forward"}
+                    name={expandedSection === 'effects' ? 'chevron-up' : 'chevron-forward'}
                     size={16}
                     color={Colors.textTertiary}
                   />
                 </TouchableOpacity>
-                {expandedSection === "effects" ? (
+                {expandedSection === 'effects' ? (
                   <Text style={styles.accordionBody}>
-                    No reviewed side-effect list linked to this record. Check the package insert or consult a pharmacist.
+                    No reviewed side-effect list linked to this record. Check the package insert or
+                    consult a pharmacist.
                   </Text>
                 ) : null}
               </View>
@@ -707,9 +669,7 @@ export default function MedicineDetailsScreen() {
         <SectionHeader
           title="Your schedule"
           actionText="+ Add Dose"
-          onActionPress={() =>
-            router.push(`/reminders/create?medicineId=${medicine.id}`)
-          }
+          onActionPress={() => router.push(`/reminders/create?medicineId=${medicine.id}`)}
         />
         <AppCard style={styles.scheduleCard}>
           <Text style={styles.scheduleTitle}>{formatScheduleText()}</Text>
@@ -717,9 +677,7 @@ export default function MedicineDetailsScreen() {
 
           <TouchableOpacity
             style={styles.setReminderButton}
-            onPress={() =>
-              router.push(`/reminders/create?medicineId=${medicine.id}`)
-            }
+            onPress={() => router.push(`/reminders/create?medicineId=${medicine.id}`)}
             activeOpacity={0.7}
           >
             <Text style={styles.setReminderButtonText}>Set Reminder</Text>
@@ -732,7 +690,7 @@ export default function MedicineDetailsScreen() {
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Manufacturer</Text>
             <Text style={styles.infoValue}>
-              {medicine.packageDetails.manufacturer ?? "Fictional data"}
+              {medicine.packageDetails.manufacturer ?? 'Fictional data'}
             </Text>
           </View>
 
@@ -740,9 +698,7 @@ export default function MedicineDetailsScreen() {
 
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Expiry</Text>
-            <Text style={styles.infoValue}>
-              {medicine.packageDetails.expiryDate ?? "N/A"}
-            </Text>
+            <Text style={styles.infoValue}>{medicine.packageDetails.expiryDate ?? 'N/A'}</Text>
           </View>
 
           <View style={styles.rowDivider} />
@@ -750,7 +706,7 @@ export default function MedicineDetailsScreen() {
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Batch</Text>
             <Text style={styles.infoValue}>
-              {medicine.packageDetails.batchNumber ?? "DEMO-001"}
+              {medicine.packageDetails.batchNumber ?? 'DEMO-001'}
             </Text>
           </View>
 
@@ -759,8 +715,7 @@ export default function MedicineDetailsScreen() {
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Package details</Text>
             <Text style={styles.infoValue}>
-              {medicine.packageDetails.packageDetailsText ??
-                "Example values, not a verified scan"}
+              {medicine.packageDetails.packageDetailsText ?? 'Example values, not a verified scan'}
             </Text>
           </View>
         </AppCard>
@@ -768,12 +723,10 @@ export default function MedicineDetailsScreen() {
         {/* Section: Information Source */}
         <SectionHeader title="Information Source" />
         <AppCard style={styles.sourceCard}>
-          <Text style={styles.sourceTitle}>
-            Example package record entered for this design.
-          </Text>
+          <Text style={styles.sourceTitle}>Example package record entered for this design.</Text>
           <Text style={styles.sourceBody}>
             {medicine.informationSource ||
-              "No verified clinical reference is attached. Educational sections are not a substitute for the package leaflet or professional advice."}
+              'No verified clinical reference is attached. Educational sections are not a substitute for the package leaflet or professional advice.'}
           </Text>
         </AppCard>
 
@@ -815,7 +768,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.screenPaddingHorizontal,
   },
   notFoundContainer: {
-    alignItems: "center",
+    alignItems: 'center',
     padding: Spacing.xl,
   },
   notFoundText: {
@@ -826,8 +779,8 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   heroTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 12,
   },
   heroInfo: {
@@ -835,20 +788,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   heroNameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   heroName: {
     fontSize: 22,
-    fontWeight: "800",
+    fontWeight: '800',
     color: Colors.textPrimary,
     flex: 1,
     marginRight: 8,
   },
   editBadgeButton: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: Colors.primaryLight,
     paddingHorizontal: 10,
     paddingVertical: 5,
@@ -856,7 +809,7 @@ const styles = StyleSheet.create({
   },
   editBadgeButtonText: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: '600',
     color: Colors.primary,
     marginLeft: 4,
   },
@@ -866,64 +819,64 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   exampleTag: {
-    backgroundColor: "#FEF6E9",
+    backgroundColor: '#FEF6E9',
     paddingVertical: 4,
     paddingHorizontal: 10,
     borderRadius: Radius.pill,
-    alignSelf: "flex-start",
+    alignSelf: 'flex-start',
     marginBottom: 8,
   },
   exampleTagText: {
     fontSize: 12,
-    fontWeight: "600",
-    color: "#D97706",
+    fontWeight: '600',
+    color: '#D97706',
   },
   addedDateText: {
     fontSize: 12,
     color: Colors.textTertiary,
   },
   warningBanner: {
-    backgroundColor: "#FFF8EC",
+    backgroundColor: '#FFF8EC',
     borderRadius: Radius.card,
     padding: Spacing.cardPadding,
     borderWidth: 1,
-    borderColor: "#FDE4BC",
+    borderColor: '#FDE4BC',
     marginBottom: Spacing.lg,
   },
   warningHeader: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 6,
   },
   warningTitle: {
     fontSize: 14,
-    fontWeight: "700",
-    color: "#B45309",
+    fontWeight: '700',
+    color: '#B45309',
     marginLeft: 6,
   },
   warningBody: {
     fontSize: 12,
     lineHeight: 18,
-    color: "#92400E",
+    color: '#92400E',
   },
   packageCard: {
     marginBottom: Spacing.lg,
     paddingVertical: 6,
   },
   infoRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     paddingVertical: 12,
   },
   infoLabel: {
     fontSize: 14,
     color: Colors.textPrimary,
-    fontWeight: "500",
+    fontWeight: '500',
   },
   infoValue: {
     fontSize: 14,
     color: Colors.textSecondary,
-    fontWeight: "400",
+    fontWeight: '400',
   },
   rowDivider: {
     height: 1,
@@ -950,8 +903,8 @@ const styles = StyleSheet.create({
     maxWidth: '92%',
   },
   originalPackageRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 12,
   },
   originalPackageTextContainer: {
@@ -960,7 +913,7 @@ const styles = StyleSheet.create({
   },
   originalPackageTitle: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
     color: Colors.textPrimary,
   },
   originalPackageSub: {
@@ -973,7 +926,7 @@ const styles = StyleSheet.create({
   },
   eduQuestion: {
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: '700',
     color: Colors.textPrimary,
     marginBottom: 6,
   },
@@ -984,7 +937,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   pillActionRow: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: 8,
     marginBottom: 16,
   },
@@ -996,18 +949,18 @@ const styles = StyleSheet.create({
   },
   explainButtonText: {
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: '600',
     color: Colors.textInverse,
   },
   whyButton: {
-    backgroundColor: "#EAE9EF",
+    backgroundColor: '#EAE9EF',
     paddingVertical: 7,
     paddingHorizontal: 14,
     borderRadius: Radius.pill,
   },
   whyButtonText: {
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: '600',
     color: Colors.textPrimary,
   },
   accordionContainer: {
@@ -1016,18 +969,18 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   accordionRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: 12,
   },
   safetyRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   accordionTitle: {
     fontSize: 14,
-    fontWeight: "500",
+    fontWeight: '500',
     color: Colors.textPrimary,
   },
   accordionBody: {
@@ -1041,7 +994,7 @@ const styles = StyleSheet.create({
   },
   scheduleTitle: {
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: '700',
     color: Colors.textPrimary,
   },
   scheduleNote: {
@@ -1051,14 +1004,14 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   setReminderButton: {
-    backgroundColor: "#F0EFEF",
+    backgroundColor: '#F0EFEF',
     borderRadius: Radius.pill,
     paddingVertical: 10,
-    alignItems: "center",
+    alignItems: 'center',
   },
   setReminderButtonText: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
     color: Colors.textPrimary,
   },
   packageDetailsCard: {
@@ -1070,7 +1023,7 @@ const styles = StyleSheet.create({
   },
   sourceTitle: {
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: '700',
     color: Colors.textPrimary,
     marginBottom: 6,
   },
@@ -1081,62 +1034,62 @@ const styles = StyleSheet.create({
   },
   compositionHighlight: {
     color: Colors.primary,
-    fontWeight: "700",
+    fontWeight: '700',
   },
   aiBadgeBanner: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "#F0F4FF",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F0F4FF',
     paddingHorizontal: 12,
     paddingVertical: 9,
     borderRadius: Radius.md,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: "#D9E4FF",
+    borderColor: '#D9E4FF',
   },
   aiBadgeLeft: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
     flex: 1,
     marginRight: 8,
   },
   aiBadgeText: {
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: '700',
     color: Colors.primary,
     flexShrink: 1,
   },
   loadingEduContainer: {
-    alignItems: "center",
+    alignItems: 'center',
     paddingVertical: 24,
     gap: 8,
   },
   loadingEduTitle: {
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: '700',
     color: Colors.textPrimary,
     marginTop: 6,
   },
   loadingEduSub: {
     fontSize: 13,
     color: Colors.textSecondary,
-    textAlign: "center",
+    textAlign: 'center',
     maxWidth: 280,
     lineHeight: 18,
   },
   generateEduBox: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: '#F8FAFC',
     borderRadius: Radius.lg,
     padding: 14,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: '#E2E8F0',
   },
   generateEduHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     gap: 10,
     marginBottom: 12,
   },
@@ -1144,14 +1097,14 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "#EEF2FF",
-    alignItems: "center",
-    justifyContent: "center",
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 2,
   },
   generateEduTitle: {
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: '700',
     color: Colors.textPrimary,
     marginBottom: 3,
   },
@@ -1161,25 +1114,25 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   generateEduButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: Colors.primary,
     paddingVertical: 10,
     borderRadius: Radius.pill,
   },
   generateEduButtonText: {
     fontSize: 13,
-    fontWeight: "700",
-    color: "#FFFFFF",
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   bulletList: {
     paddingBottom: 10,
     gap: 8,
   },
   bulletItem: {
-    flexDirection: "row",
-    alignItems: "flex-start",
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     paddingRight: 8,
   },
   bulletDot: {

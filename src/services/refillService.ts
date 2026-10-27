@@ -79,25 +79,18 @@ export const refillService = {
         [rowId],
       );
       if (existing) {
-        db.runSync(
-          `UPDATE refill_reminders SET current_stock = ?, threshold = ? WHERE id = ?;`,
-          [newStock, threshold, rowId],
-        );
+        db.runSync(`UPDATE refill_reminders SET current_stock = ?, threshold = ? WHERE id = ?;`, [
+          newStock,
+          threshold,
+          rowId,
+        ]);
         return { stock: newStock, previousStock, thresholdCrossed: false };
       } else {
         db.runSync(
           `INSERT OR REPLACE INTO refill_reminders (
             id, medicine_id, threshold, current_stock, status, reminded_at, created_at
           ) VALUES (?, ?, ?, ?, ?, ?, ?);`,
-          [
-            rowId,
-            medicineId,
-            threshold,
-            newStock,
-            'pending',
-            null,
-            new Date().toISOString(),
-          ],
+          [rowId, medicineId, threshold, newStock, 'pending', null, new Date().toISOString()],
         );
         // Fresh alert: either a fresh cross (above → at/below) or the
         // medicine was created already at/below its threshold.
@@ -128,9 +121,7 @@ export const refillService = {
           body: `${medicineName} stock is low (${stock}${unitLabel} left). Order a refill in time.`,
           data: { kind: 'refill', medicineName },
           sound: 'default',
-          ...(Platform.OS === 'android'
-            ? { channelId: 'medication-reminders' }
-            : {}),
+          ...(Platform.OS === 'android' ? { channelId: 'medication-reminders' } : {}),
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -159,9 +150,6 @@ export const refillService = {
   },
 
   clearForMedicine(medicineId: string): void {
-    getDatabase().runSync(
-      'DELETE FROM refill_reminders WHERE medicine_id = ?;',
-      [medicineId],
-    );
+    getDatabase().runSync('DELETE FROM refill_reminders WHERE medicine_id = ?;', [medicineId]);
   },
 };

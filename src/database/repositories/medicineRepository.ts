@@ -68,9 +68,24 @@ function getExpiryTimestamp(value?: string): number | null {
     if (month < 1 || month > 12) return null;
     return new Date(year, month, 0, 23, 59, 59, 999).getTime();
   }
-  match = input.match(/^(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+(\d{4})$/i);
+  match = input.match(
+    /^(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+(\d{4})$/i,
+  );
   if (match) {
-    const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+    const monthNames = [
+      'jan',
+      'feb',
+      'mar',
+      'apr',
+      'may',
+      'jun',
+      'jul',
+      'aug',
+      'sep',
+      'oct',
+      'nov',
+      'dec',
+    ];
     const month = monthNames.indexOf(match[1].slice(0, 3).toLowerCase());
     return new Date(Number(match[2]), month + 1, 0, 23, 59, 59, 999).getTime();
   }
@@ -80,18 +95,13 @@ function getExpiryTimestamp(value?: string): number | null {
 export const medicineRepository = {
   getAll(): Medicine[] {
     const db = getDatabase();
-    const rows = db.getAllSync<MedicineRow>(
-      'SELECT * FROM medicines ORDER BY name ASC;'
-    );
+    const rows = db.getAllSync<MedicineRow>('SELECT * FROM medicines ORDER BY name ASC;');
     return rows.map(mapRowToMedicine);
   },
 
   getById(id: string): Medicine | null {
     const db = getDatabase();
-    const row = db.getFirstSync<MedicineRow>(
-      'SELECT * FROM medicines WHERE id = ?;',
-      [id]
-    );
+    const row = db.getFirstSync<MedicineRow>('SELECT * FROM medicines WHERE id = ?;', [id]);
     return row ? mapRowToMedicine(row) : null;
   },
 
@@ -129,7 +139,7 @@ export const medicineRepository = {
         newMedicine.currentInventory ?? null,
         newMedicine.refillThreshold ?? null,
         newMedicine.unitDosage ?? null,
-      ]
+      ],
     );
 
     return newMedicine;
@@ -173,7 +183,7 @@ export const medicineRepository = {
         updated.refillThreshold ?? null,
         updated.unitDosage ?? null,
         id,
-      ]
+      ],
     );
 
     return updated;
@@ -195,16 +205,14 @@ export const medicineRepository = {
   search(
     query: string = '',
     expiryFilter: 'all' | 'active' | 'expired' = 'all',
-    reminderFilter: 'all' | 'with' | 'without' = 'all'
+    reminderFilter: 'all' | 'with' | 'without' = 'all',
   ): Medicine[] {
     const medicines = this.getAll();
     const db = getDatabase();
     const activeScheduleMedicineIds = new Set(
       db
-        .getAllSync<{ medicine_id: string }>(
-          'SELECT medicine_id FROM schedules WHERE enabled = 1;'
-        )
-        .map((r) => r.medicine_id)
+        .getAllSync<{ medicine_id: string }>('SELECT medicine_id FROM schedules WHERE enabled = 1;')
+        .map((r) => r.medicine_id),
     );
 
     return medicines.filter((m) => {
@@ -212,8 +220,7 @@ export const medicineRepository = {
       if (query.trim()) {
         const q = query.toLowerCase();
         const matchesName = m.name.toLowerCase().includes(q);
-        const matchesIngredient =
-          m.ingredient?.toLowerCase().includes(q) ?? false;
+        const matchesIngredient = m.ingredient?.toLowerCase().includes(q) ?? false;
         if (!matchesName && !matchesIngredient) return false;
       }
 

@@ -14,11 +14,7 @@ interface MedicineCardProps {
   onPress: () => void;
 }
 
-export function MedicineCard({
-  medicine,
-  schedule,
-  onPress,
-}: MedicineCardProps) {
+export function MedicineCard({ medicine, schedule, onPress }: MedicineCardProps) {
   const isExpired =
     medicine.packageDetails.expiryDate?.toLowerCase().includes('2026') ||
     medicine.packageDetails.packageDetailsText?.toLowerCase().includes('expired');
@@ -38,31 +34,21 @@ export function MedicineCard({
   const scheduleText = formatScheduleText();
 
   return (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
       {/* Top Section: Icon, Name/Category, Chevron */}
       <View style={styles.topRow}>
-        <MedicineIcon
-          form={medicine.dosageForm}
-          name={medicine.name}
-          size={46}
-        />
+        <MedicineIcon form={medicine.dosageForm} name={medicine.name} size={46} />
 
         <View style={styles.nameContainer}>
           <Text style={styles.name}>{medicine.name}</Text>
           <Text style={styles.details}>
-            {medicine.strength} · {medicine.dosageForm.charAt(0).toUpperCase() + medicine.dosageForm.slice(1)}s · {medicine.category}
+            {medicine.strength} ·{' '}
+            {medicine.dosageForm.charAt(0).toUpperCase() + medicine.dosageForm.slice(1)}s ·{' '}
+            {medicine.category}
           </Text>
         </View>
 
-        <Ionicons
-          name="chevron-forward"
-          size={16}
-          color={Colors.textTertiary}
-        />
+        <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
       </View>
 
       {/* Middle Section: Expiry Date & Badge */}

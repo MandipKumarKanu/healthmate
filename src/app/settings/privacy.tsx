@@ -27,35 +27,34 @@ export default function PrivacyScreen() {
           </View>
           <Text style={styles.heading}>Your Data Stays on Your Device</Text>
           <Text style={styles.paragraph}>
-            HealthMate AI is designed with privacy at its core. Your medication
-            lists, dosage schedules, adherence history, and packaging camera
-            scans are stored exclusively in your device's local SQLite database.
+            HealthMate AI is designed with privacy at its core. Your medication lists, dosage
+            schedules, adherence history, and packaging camera scans are stored exclusively in your
+            device's local SQLite database.
           </Text>
         </AppCard>
 
         <AppCard style={styles.card}>
           <Text style={styles.sectionTitle}>Zero Third-Party Tracking</Text>
           <Text style={styles.paragraph}>
-            We do not sell, share, or transmit your health logs or personal
-            identifying data to advertising networks or third-party brokers.
+            We do not sell, share, or transmit your health logs or personal identifying data to
+            advertising networks or third-party brokers.
           </Text>
 
           <View style={styles.divider} />
 
           <Text style={styles.sectionTitle}>Camera & Photo Access</Text>
           <Text style={styles.paragraph}>
-            Camera access is only utilized during package label scanning to
-            extract text using on-device optical character recognition. Scanned
-            images are stored locally in application cache.
+            Camera access is only utilized during package label scanning to extract text using
+            on-device optical character recognition. Scanned images are stored locally in
+            application cache.
           </Text>
 
           <View style={styles.divider} />
 
           <Text style={styles.sectionTitle}>Data Control & Deletion</Text>
           <Text style={styles.paragraph}>
-            You have complete sovereignty over your data. You can delete
-            individual records, clear your scan history, or wipe all application
-            data at any time from Profile & Settings.
+            You have complete sovereignty over your data. You can delete individual records, clear
+            your scan history, or wipe all application data at any time from Profile & Settings.
           </Text>
         </AppCard>
       </View>

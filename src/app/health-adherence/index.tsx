@@ -101,9 +101,7 @@ export default function HealthAdherenceScreen() {
           <View style={styles.barsContainer}>
             {weeklySummaries.map((day, idx) => {
               const dateObj = new Date(day.date);
-              const dayInitial = ['S', 'M', 'T', 'W', 'T', 'F', 'S'][
-                dateObj.getDay()
-              ];
+              const dayInitial = ['S', 'M', 'T', 'W', 'T', 'F', 'S'][dateObj.getDay()];
               const barHeight = Math.max(day.percentage * 1.2, 8);
 
               return (
@@ -119,8 +117,8 @@ export default function HealthAdherenceScreen() {
                             day.percentage >= 80
                               ? Colors.success
                               : day.percentage > 0
-                              ? Colors.primary
-                              : '#E5E4EA',
+                                ? Colors.primary
+                                : '#E5E4EA',
                         },
                       ]}
                     />

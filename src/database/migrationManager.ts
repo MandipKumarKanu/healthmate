@@ -131,7 +131,7 @@ export const migrationManager = {
     this.ensureMigrationTable(db);
     try {
       const rows = db.getAllSync<MigrationRecord>(
-        'SELECT version, name, applied_at FROM schema_migrations ORDER BY version ASC;'
+        'SELECT version, name, applied_at FROM schema_migrations ORDER BY version ASC;',
       );
       return rows;
     } catch {
@@ -153,7 +153,7 @@ export const migrationManager = {
    */
   runMigrations(
     db: ISQLiteDatabase,
-    customRegistry: Migration[] = MIGRATION_REGISTRY
+    customRegistry: Migration[] = MIGRATION_REGISTRY,
   ): { appliedCount: number; currentVersion: number } {
     if (isMigrationRunning) {
       // Prevent concurrent initialization loops
@@ -189,7 +189,7 @@ export const migrationManager = {
           // Record successful migration in schema_migrations table
           db.runSync(
             'INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?);',
-            [migration.version, migration.name, now]
+            [migration.version, migration.name, now],
           );
 
           appliedSet.add(migration.version);
@@ -197,12 +197,12 @@ export const migrationManager = {
         } catch (err) {
           console.error(
             `[MigrationManager] Migration ${migration.version} (${migration.name}) FAILED:`,
-            err
+            err,
           );
           throw new Error(
             `Database migration ${migration.version} (${migration.name}) failed: ${String(
-              err instanceof Error ? err.message : err
-            )}`
+              err instanceof Error ? err.message : err,
+            )}`,
           );
         }
       }

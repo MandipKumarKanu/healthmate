@@ -8,10 +8,7 @@ export interface MedicationTimelineItemProps {
   isLast?: boolean;
 }
 
-export function MedicationTimelineItem({
-  dose,
-  isLast = false,
-}: MedicationTimelineItemProps) {
+export function MedicationTimelineItem({ dose, isLast = false }: MedicationTimelineItemProps) {
   return (
     <View style={[styles.itemContainer, !isLast && styles.divider]}>
       <View style={styles.leftInfo}>

@@ -32,9 +32,7 @@ export function TodayTimeline({ doses, onViewAllPress }: TodayTimelineProps) {
         {previewDoses.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyTitle}>No medications scheduled today</Text>
-            <Text style={styles.emptySub}>
-              Tap + on medicines to set up your daily reminders.
-            </Text>
+            <Text style={styles.emptySub}>Tap + on medicines to set up your daily reminders.</Text>
           </View>
         ) : (
           previewDoses.map((dose, index) => (

@@ -1,33 +1,29 @@
-import React, { useCallback } from "react";
-import { StyleSheet, View, Text } from "react-native";
-import { AppAlert as Alert } from "../../services/appAlert";
-import { useRouter, useFocusEffect } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-import { Colors } from "../../theme/colors";
-import { Spacing, Radius } from "../../theme/tokens";
-import { AppScreen } from "../../components/ui/AppScreen";
-import { AppHeader } from "../../components/ui/AppHeader";
-import { AppButton } from "../../components/ui/AppButton";
-import { CalendarGrid } from "../../components/ui/CalendarGrid";
-import { DayAdherenceSummaryCard } from "../../components/ui/DayAdherenceSummaryCard";
-import { SectionHeader } from "../../components/ui/SectionHeader";
-import { ReminderCard } from "../../components/ui/ReminderCard";
-import { MedicalDisclaimer } from "../../components/ui/MedicalDisclaimer";
-import { useAppStore } from "../../store/appStore";
-import { useReminderStore } from "../../store/reminderStore";
-import { ScheduledDose } from "../../types";
-import { adherenceRepository } from "../../database/repositories/adherenceRepository";
-import { scheduleRepository } from "../../database/repositories/scheduleRepository";
-import {
-  formatScheduleDateLabel,
-  getDateTapAction,
-} from "../../utils/scheduleRecurrence";
+import React, { useCallback } from 'react';
+import { StyleSheet, View, Text } from 'react-native';
+import { AppAlert as Alert } from '../../services/appAlert';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { Colors } from '../../theme/colors';
+import { Spacing, Radius } from '../../theme/tokens';
+import { AppScreen } from '../../components/ui/AppScreen';
+import { AppHeader } from '../../components/ui/AppHeader';
+import { AppButton } from '../../components/ui/AppButton';
+import { CalendarGrid } from '../../components/ui/CalendarGrid';
+import { DayAdherenceSummaryCard } from '../../components/ui/DayAdherenceSummaryCard';
+import { SectionHeader } from '../../components/ui/SectionHeader';
+import { ReminderCard } from '../../components/ui/ReminderCard';
+import { MedicalDisclaimer } from '../../components/ui/MedicalDisclaimer';
+import { useAppStore } from '../../store/appStore';
+import { useReminderStore } from '../../store/reminderStore';
+import { ScheduledDose } from '../../types';
+import { adherenceRepository } from '../../database/repositories/adherenceRepository';
+import { scheduleRepository } from '../../database/repositories/scheduleRepository';
+import { formatScheduleDateLabel, getDateTapAction } from '../../utils/scheduleRecurrence';
 
 export default function CalendarScreen() {
   const router = useRouter();
   const { selectedDate, setSelectedDate } = useAppStore();
-  const { doses, daySummary, loadDosesForDate, markDoseStatus } =
-    useReminderStore();
+  const { doses, daySummary, loadDosesForDate, markDoseStatus } = useReminderStore();
 
   useFocusEffect(
     useCallback(() => {
@@ -43,37 +39,33 @@ export default function CalendarScreen() {
     setSelectedDate(date);
     // Dates with reminders stay in place (list updates below the calendar);
     // empty dates jump straight into Add Reminder with the date prefilled.
-    if (getDateTapAction(activeSchedules, date) === "openCreate") {
+    if (getDateTapAction(activeSchedules, date) === 'openCreate') {
       router.push({
-        pathname: "/reminders/create",
+        pathname: '/reminders/create',
         params: { date },
       });
     }
   };
 
   const handleMorePress = (dose: ScheduledDose) => {
-    Alert.alert(
-      dose.medicineName,
-      `Scheduled for ${dose.time} (${dose.amount})`,
-      [
-        {
-          text: "Mark as Taken",
-          onPress: () => markDoseStatus(dose, "taken", selectedDate),
-        },
-        {
-          text: "Mark as Skipped",
-          onPress: () => markDoseStatus(dose, "skipped", selectedDate),
-        },
-        {
-          text: "View Medicine Details",
-          onPress: () => router.push(`/medicines/${dose.medicineId}`),
-        },
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-      ],
-    );
+    Alert.alert(dose.medicineName, `Scheduled for ${dose.time} (${dose.amount})`, [
+      {
+        text: 'Mark as Taken',
+        onPress: () => markDoseStatus(dose, 'taken', selectedDate),
+      },
+      {
+        text: 'Mark as Skipped',
+        onPress: () => markDoseStatus(dose, 'skipped', selectedDate),
+      },
+      {
+        text: 'View Medicine Details',
+        onPress: () => router.push(`/medicines/${dose.medicineId}`),
+      },
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+    ]);
   };
 
   return (
@@ -85,7 +77,7 @@ export default function CalendarScreen() {
         brandText="HealthMate AI"
         onAddPress={() =>
           router.push({
-            pathname: "/reminders/create",
+            pathname: '/reminders/create',
             params: { date: selectedDate },
           })
         }
@@ -108,7 +100,7 @@ export default function CalendarScreen() {
           actionText="+ Add"
           onActionPress={() =>
             router.push({
-              pathname: "/reminders/create",
+              pathname: '/reminders/create',
               params: { date: selectedDate },
             })
           }
@@ -119,8 +111,8 @@ export default function CalendarScreen() {
           <ReminderCard
             key={dose.id}
             dose={dose}
-            onMarkTaken={() => markDoseStatus(dose, "taken", selectedDate)}
-            onSkip={() => markDoseStatus(dose, "skipped", selectedDate)}
+            onMarkTaken={() => markDoseStatus(dose, 'taken', selectedDate)}
+            onSkip={() => markDoseStatus(dose, 'skipped', selectedDate)}
             onMorePress={() => handleMorePress(dose)}
             onPressCard={() => router.push(`/medicines/${dose.medicineId}`)}
           />
@@ -131,9 +123,7 @@ export default function CalendarScreen() {
             <View style={styles.emptyIconCircle}>
               <Ionicons name="calendar-outline" size={30} color={Colors.primary} />
             </View>
-            <Text style={styles.emptyTitle}>
-              No medication scheduled for this date
-            </Text>
+            <Text style={styles.emptyTitle}>No medication scheduled for this date</Text>
             <Text style={styles.emptySubtitle}>
               Tap the button below to set up a medication reminder for this date.
             </Text>
@@ -144,7 +134,7 @@ export default function CalendarScreen() {
               style={styles.emptyScheduleButton}
               onPress={() =>
                 router.push({
-                  pathname: "/reminders/create",
+                  pathname: '/reminders/create',
                   params: { date: selectedDate },
                 })
               }
@@ -177,32 +167,32 @@ const styles = StyleSheet.create({
   helperNote: {
     fontSize: 12,
     color: Colors.textSecondary,
-    textAlign: "center",
+    textAlign: 'center',
     marginTop: Spacing.xs,
     marginBottom: Spacing.xs,
   },
   emptyContainer: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: '#FFFFFF',
     borderRadius: Radius.card,
     padding: Spacing.xl,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
-    borderColor: "#ECEBF0",
+    borderColor: '#ECEBF0',
     marginTop: Spacing.sm,
     marginBottom: Spacing.md,
   },
   emptyTitle: {
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: '700',
     color: Colors.textPrimary,
     marginBottom: 6,
-    textAlign: "center",
+    textAlign: 'center',
   },
   emptySubtitle: {
     fontSize: 13,
     color: Colors.textSecondary,
-    textAlign: "center",
+    textAlign: 'center',
     lineHeight: 18,
   },
   emptyIconCircle: {
@@ -210,8 +200,8 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 26,
     backgroundColor: Colors.primaryLight,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 12,
   },
   emptyScheduleButton: {

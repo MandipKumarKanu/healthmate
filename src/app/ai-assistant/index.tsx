@@ -91,7 +91,10 @@ export default function AIAssistantScreen() {
   /** Offline fallback: fixed terminology guide, unchanged behavior. */
   const generateOfflineReply = useCallback((text: string): string => {
     const lower = text.toLowerCase();
-    const asksForPersonalMedicalAdvice = /\b(dose|dosage|take|taking|safe for me|side effects?|interaction\w*|pregnan\w*|symptom\w*|diagnos\w*|overdose|missed dose|stop taking)\b/.test(lower);
+    const asksForPersonalMedicalAdvice =
+      /\b(dose|dosage|take|taking|safe for me|side effects?|interaction\w*|pregnan\w*|symptom\w*|diagnos\w*|overdose|missed dose|stop taking)\b/.test(
+        lower,
+      );
     if (asksForPersonalMedicalAdvice) {
       return 'I can’t assess your personal treatment, symptoms, dose, or medicine interactions. Do not start, stop, or change a medicine based on this offline guide. Check the leaflet for your exact product and contact your pharmacist or prescriber. If you may have taken too much medicine or have severe symptoms, seek urgent local medical help.';
     }
@@ -123,71 +126,74 @@ export default function AIAssistantScreen() {
     }
   }, []);
 
-  const sendMessage = useCallback(async (text: string) => {
-    if (!text.trim()) return;
+  const sendMessage = useCallback(
+    async (text: string) => {
+      if (!text.trim()) return;
 
-    let activeConvId = conversationId;
-    if (!activeConvId) {
-      const title = text.trim().slice(0, 36) + (text.length > 36 ? '...' : '');
-      const created = aiRepository.createConversation(title);
-      activeConvId = created.id;
-      setConversationId(created.id);
-    }
-
-    const userMsg: AIMessage = {
-      id: `msg_${Date.now()}`,
-      role: 'user',
-      content: text.trim(),
-      timestamp: new Date().toISOString(),
-    };
-
-    // Persist user message to SQLite
-    aiRepository.addMessage(activeConvId, userMsg);
-    setMessages((prev) => [...prev, userMsg]);
-    setInputText('');
-    setIsTyping(true);
-
-    let reply: string;
-    let usedNetwork = false;
-
-    if (hasApiKey) {
-      try {
-        const answer = await aiAssistantService.askGemini(
-          text.trim(),
-          messages.map((m) => ({
-            // Map persisted message roles to the wires format: user|assistant
-            role: m.role === 'assistant' ? 'assistant' : 'user',
-            content: m.content,
-          })),
-        );
-        reply = answer.text;
-        usedNetwork = true;
-      } catch (error) {
-        console.warn('Gemini request failed, falling back to offline guide:', error);
-        if ((error as { code?: string })?.code === 'BAD_KEY') {
-          setHasApiKey(false);
-          setKeyModalVisible(true);
-        }
-        reply = `${offlinePrefixForError(error)}${generateOfflineReply(text)}`;
+      let activeConvId = conversationId;
+      if (!activeConvId) {
+        const title = text.trim().slice(0, 36) + (text.length > 36 ? '...' : '');
+        const created = aiRepository.createConversation(title);
+        activeConvId = created.id;
+        setConversationId(created.id);
       }
-    } else {
-      reply = generateOfflineReply(text);
-    }
 
-    const assistantMsg: AIMessage = {
-      id: `msg_${Date.now() + 1}`,
-      role: 'assistant',
-      content: reply,
-      timestamp: new Date().toISOString(),
-    };
+      const userMsg: AIMessage = {
+        id: `msg_${Date.now()}`,
+        role: 'user',
+        content: text.trim(),
+        timestamp: new Date().toISOString(),
+      };
 
-    // Persist assistant message to SQLite
-    if (activeConvId) {
-      aiRepository.addMessage(activeConvId, assistantMsg);
-    }
-    setMessages((prev) => [...prev, assistantMsg]);
-    setIsTyping(false);
-  }, [conversationId, messages, hasApiKey, generateOfflineReply, offlinePrefixForError]);
+      // Persist user message to SQLite
+      aiRepository.addMessage(activeConvId, userMsg);
+      setMessages((prev) => [...prev, userMsg]);
+      setInputText('');
+      setIsTyping(true);
+
+      let reply: string;
+      let usedNetwork = false;
+
+      if (hasApiKey) {
+        try {
+          const answer = await aiAssistantService.askGemini(
+            text.trim(),
+            messages.map((m) => ({
+              // Map persisted message roles to the wires format: user|assistant
+              role: m.role === 'assistant' ? 'assistant' : 'user',
+              content: m.content,
+            })),
+          );
+          reply = answer.text;
+          usedNetwork = true;
+        } catch (error) {
+          console.warn('Gemini request failed, falling back to offline guide:', error);
+          if ((error as { code?: string })?.code === 'BAD_KEY') {
+            setHasApiKey(false);
+            setKeyModalVisible(true);
+          }
+          reply = `${offlinePrefixForError(error)}${generateOfflineReply(text)}`;
+        }
+      } else {
+        reply = generateOfflineReply(text);
+      }
+
+      const assistantMsg: AIMessage = {
+        id: `msg_${Date.now() + 1}`,
+        role: 'assistant',
+        content: reply,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Persist assistant message to SQLite
+      if (activeConvId) {
+        aiRepository.addMessage(activeConvId, assistantMsg);
+      }
+      setMessages((prev) => [...prev, assistantMsg]);
+      setIsTyping(false);
+    },
+    [conversationId, messages, hasApiKey, generateOfflineReply, offlinePrefixForError],
+  );
 
   useEffect(() => {
     if (!query) {
@@ -225,7 +231,9 @@ export default function AIAssistantScreen() {
 
       <AppHeader
         title="Medication Guide"
-        subtitle={hasApiKey && isOnline ? 'Online medication guide' : 'Offline medication terminology guide'}
+        subtitle={
+          hasApiKey && isOnline ? 'Online medication guide' : 'Offline medication terminology guide'
+        }
         brandText="HealthMate AI"
         onBackPress={() => router.back()}
         rightAction={
@@ -248,22 +256,15 @@ export default function AIAssistantScreen() {
                 <View
                   style={[
                     styles.statusDot,
-                    hasApiKey
-                      ? styles.statusDotOffline
-                      : styles.statusDotDisconnected,
+                    hasApiKey ? styles.statusDotOffline : styles.statusDotDisconnected,
                   ]}
                 />
-                <Text style={styles.offlineBadgeText}>
-                  {hasApiKey ? 'Offline' : 'Connect AI'}
-                </Text>
+                <Text style={styles.offlineBadgeText}>{hasApiKey ? 'Offline' : 'Connect AI'}</Text>
               </TouchableOpacity>
             )}
 
             {messages.length > 0 ? (
-              <TouchableOpacity
-                style={styles.newChatButton}
-                onPress={handleNewChat}
-              >
+              <TouchableOpacity style={styles.newChatButton} onPress={handleNewChat}>
                 <Text style={styles.newChatText}>New Chat</Text>
               </TouchableOpacity>
             ) : null}
@@ -292,9 +293,7 @@ export default function AIAssistantScreen() {
           ref={scrollViewRef}
           style={styles.scrollArea}
           contentContainerStyle={styles.scrollContent}
-          onContentSizeChange={() =>
-            scrollViewRef.current?.scrollToEnd({ animated: true })
-          }
+          onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         >
@@ -308,8 +307,8 @@ export default function AIAssistantScreen() {
                 A little clarity,{'\n'}one question at a time.
               </Text>
               <Text style={styles.landingSubtext}>
-                Ask about medication label terms, active ingredients, dosage forms,
-                or packaging symbols.
+                Ask about medication label terms, active ingredients, dosage forms, or packaging
+                symbols.
               </Text>
 
               {/* Suggestions */}
@@ -340,9 +339,7 @@ export default function AIAssistantScreen() {
                     ]}
                   >
                     {isUser ? (
-                      <Text style={[styles.messageText, styles.userText]}>
-                        {m.content}
-                      </Text>
+                      <Text style={[styles.messageText, styles.userText]}>{m.content}</Text>
                     ) : (
                       <FormattedAIMessage content={m.content} />
                     )}
@@ -372,10 +369,7 @@ export default function AIAssistantScreen() {
             onSubmitEditing={() => sendMessage(inputText)}
           />
           <TouchableOpacity
-            style={[
-              styles.sendButton,
-              !inputText.trim() && styles.sendButtonDisabled,
-            ]}
+            style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
             onPress={() => sendMessage(inputText)}
             disabled={!inputText.trim()}
           >

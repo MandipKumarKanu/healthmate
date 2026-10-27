@@ -1,10 +1,10 @@
-import React, { useEffect } from "react";
-import { AppState } from "react-native";
-import { Stack } from "expo-router";
-import { SafeAreaProvider } from "react-native-safe-area-context";
-import { useAppStore } from "../store/appStore";
-import { notificationService } from "../services/notificationService";
-import { AppAlertProvider } from "../services/appAlert";
+import React, { useEffect } from 'react';
+import { AppState } from 'react-native';
+import { Stack } from 'expo-router';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useAppStore } from '../store/appStore';
+import { notificationService } from '../services/notificationService';
+import { AppAlertProvider } from '../services/appAlert';
 
 export default function RootLayout() {
   const initApp = useAppStore((state) => state.initApp);
@@ -23,8 +23,8 @@ export default function RootLayout() {
     });
 
     // Recover alarms on launch, reboot, or when permissions return from system settings.
-    const subscription = AppState.addEventListener("change", (nextAppState) => {
-      if (nextAppState === "active") {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
         notificationService.reconcileScheduledReminders();
       }
     });
@@ -40,8 +40,8 @@ export default function RootLayout() {
         <Stack
           screenOptions={{
             headerShown: false,
-            contentStyle: { backgroundColor: "#F2F1F7" },
-            animation: "slide_from_right",
+            contentStyle: { backgroundColor: '#F2F1F7' },
+            animation: 'slide_from_right',
           }}
         >
           <Stack.Screen name="index" />
@@ -61,8 +61,8 @@ export default function RootLayout() {
           <Stack.Screen
             name="alarm"
             options={{
-              presentation: "fullScreenModal",
-              animation: "fade",
+              presentation: 'fullScreenModal',
+              animation: 'fade',
               gestureEnabled: false,
             }}
           />

@@ -33,27 +33,25 @@ describe('Remote OCR Service', () => {
       delete process.env.EXPO_PUBLIC_OCR_API_URL;
       process.env.EXPO_PUBLIC_OCR_API_KEY = 'test-key';
 
-      await expect(
-        recognizePackagingImage('file:///test/med.jpg')
-      ).rejects.toThrow(/OCR API URL is missing/);
+      await expect(recognizePackagingImage('file:///test/med.jpg')).rejects.toThrow(
+        /OCR API URL is missing/,
+      );
     });
 
     it('throws error when API key is missing', async () => {
       process.env.EXPO_PUBLIC_OCR_API_URL = 'http://test-server:8080';
       delete process.env.EXPO_PUBLIC_OCR_API_KEY;
 
-      await expect(
-        recognizePackagingImage('file:///test/med.jpg')
-      ).rejects.toThrow(/OCR API key is missing/);
+      await expect(recognizePackagingImage('file:///test/med.jpg')).rejects.toThrow(
+        /OCR API key is missing/,
+      );
     });
 
     it('throws error when no image is provided', async () => {
       process.env.EXPO_PUBLIC_OCR_API_URL = 'http://test-server:8080';
       process.env.EXPO_PUBLIC_OCR_API_KEY = 'test-key';
 
-      await expect(recognizePackagingImage('')).rejects.toThrow(
-        /No image provided/
-      );
+      await expect(recognizePackagingImage('')).rejects.toThrow(/No image provided/);
     });
   });
 
@@ -62,9 +60,7 @@ describe('Remote OCR Service', () => {
       const err = new OcrConnectionError();
       expect(err.isConnectionError).toBe(true);
       expect(err.name).toBe('OcrConnectionError');
-      expect(err.message).toBe(
-        'Please connect to internet to use this feature or add manually.'
-      );
+      expect(err.message).toBe('Please connect to internet to use this feature or add manually.');
     });
   });
 
@@ -75,7 +71,7 @@ describe('Remote OCR Service', () => {
         Promise.resolve({
           ok: true,
           json: () => Promise.resolve({ ok: true }),
-        })
+        }),
       );
       (globalThis as any).fetch = mockFetch;
 
@@ -83,14 +79,14 @@ describe('Remote OCR Service', () => {
       expect(healthy).toBe(true);
       expect(mockFetch).toHaveBeenCalledWith(
         'http://mock-server:8010/health',
-        expect.objectContaining({ method: 'GET' })
+        expect.objectContaining({ method: 'GET' }),
       );
     });
 
     it('returns false when server health check fails or times out', async () => {
       process.env.EXPO_PUBLIC_OCR_API_URL = 'http://mock-server:8010';
       (globalThis as any).fetch = jest.fn((..._args: any[]) =>
-        Promise.reject(new Error('Network request failed'))
+        Promise.reject(new Error('Network request failed')),
       );
 
       const healthy = await checkOcrServerHealth();
@@ -118,7 +114,7 @@ describe('Remote OCR Service', () => {
         Promise.resolve({
           ok: true,
           json: () => Promise.resolve(mockResponse),
-        })
+        }),
       );
       (globalThis as any).fetch = mockFetch;
 
@@ -134,7 +130,7 @@ describe('Remote OCR Service', () => {
           headers: expect.objectContaining({
             'X-API-Key': 'valid-test-key-999',
           }),
-        })
+        }),
       );
     });
 
@@ -143,12 +139,12 @@ describe('Remote OCR Service', () => {
       process.env.EXPO_PUBLIC_OCR_API_KEY = 'valid-test-key-999';
 
       (globalThis as any).fetch = jest.fn((..._args: any[]) =>
-        Promise.reject(new Error('Network request failed'))
+        Promise.reject(new Error('Network request failed')),
       );
 
-      await expect(
-        recognizePackagingImage('file:///mock/image.jpg')
-      ).rejects.toThrow(OcrConnectionError);
+      await expect(recognizePackagingImage('file:///mock/image.jpg')).rejects.toThrow(
+        OcrConnectionError,
+      );
     });
   });
 });

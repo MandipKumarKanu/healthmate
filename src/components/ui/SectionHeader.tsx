@@ -10,12 +10,7 @@ interface SectionHeaderProps {
   count?: number;
 }
 
-export function SectionHeader({
-  title,
-  actionText,
-  onActionPress,
-  count,
-}: SectionHeaderProps) {
+export function SectionHeader({ title, actionText, onActionPress, count }: SectionHeaderProps) {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>

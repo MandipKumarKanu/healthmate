@@ -1,11 +1,5 @@
 import React from 'react';
-import {
-  StyleSheet,
-  View,
-  TouchableOpacity,
-  ViewStyle,
-  StyleProp,
-} from 'react-native';
+import { StyleSheet, View, TouchableOpacity, ViewStyle, StyleProp } from 'react-native';
 import { Colors } from '../../theme/colors';
 import { Radius, Shadows, Spacing } from '../../theme/tokens';
 
@@ -16,12 +10,7 @@ interface AppCardProps {
   variant?: 'elevated' | 'flat' | 'outline' | 'tinted';
 }
 
-export function AppCard({
-  children,
-  style,
-  onPress,
-  variant = 'flat',
-}: AppCardProps) {
+export function AppCard({ children, style, onPress, variant = 'flat' }: AppCardProps) {
   const containerStyle = [
     styles.base,
     variant === 'elevated' && styles.elevated,
@@ -32,11 +21,7 @@ export function AppCard({
 
   if (onPress) {
     return (
-      <TouchableOpacity
-        style={containerStyle}
-        onPress={onPress}
-        activeOpacity={0.7}
-      >
+      <TouchableOpacity style={containerStyle} onPress={onPress} activeOpacity={0.7}>
         {children}
       </TouchableOpacity>
     );

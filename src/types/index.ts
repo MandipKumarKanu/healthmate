@@ -1,25 +1,9 @@
 export type DosageForm =
-  | 'tablet'
-  | 'capsule'
-  | 'softgel'
-  | 'eye_drop'
-  | 'syrup'
-  | 'injection'
-  | 'cream'
-  | 'other';
+  'tablet' | 'capsule' | 'softgel' | 'eye_drop' | 'syrup' | 'injection' | 'cream' | 'other';
 
-export type RecurrenceType =
-  | 'daily'
-  | 'weekly'
-  | 'monthly'
-  | 'custom'
-  | 'once';
+export type RecurrenceType = 'daily' | 'weekly' | 'monthly' | 'custom' | 'once';
 
-export type DoseStatus =
-  | 'taken'
-  | 'missed'
-  | 'skipped'
-  | 'upcoming';
+export type DoseStatus = 'taken' | 'missed' | 'skipped' | 'upcoming';
 
 export type GenderOption = 'Male' | 'Female' | 'Other' | 'Prefer not to say';
 export type UnitSystem = 'metric' | 'imperial';

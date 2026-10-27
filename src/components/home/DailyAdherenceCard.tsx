@@ -55,7 +55,9 @@ export function DailyAdherenceCard({
 
       {/* Progress Track */}
       <View style={styles.progressTrack}>
-        <View style={[styles.progressBar, { width: `${Math.min(Math.max(percentage, 0), 100)}%` }]} />
+        <View
+          style={[styles.progressBar, { width: `${Math.min(Math.max(percentage, 0), 100)}%` }]}
+        />
       </View>
 
       {/* Breakdown Footnote */}

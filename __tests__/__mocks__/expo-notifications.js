@@ -38,7 +38,9 @@ module.exports = {
   getPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted', granted: true }),
   requestPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted', granted: true }),
   getExactAlarmPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted', granted: true }),
-  requestExactAlarmPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted', granted: true }),
+  requestExactAlarmPermissionsAsync: jest
+    .fn()
+    .mockResolvedValue({ status: 'granted', granted: true }),
 
   scheduleNotificationAsync: jest.fn().mockImplementation(async (request) => {
     const identifier = `notif_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;

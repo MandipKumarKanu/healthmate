@@ -1,14 +1,11 @@
-import * as Notifications from "expo-notifications";
-import { AndroidImportance } from "expo-notifications";
-import { Platform } from "react-native";
-import { ReminderSchedule, RecurrenceType } from "../types";
-import {
-  parseDateParts,
-  isScheduleDueOnDate,
-} from "../utils/scheduleRecurrence";
-import { scheduleRepository } from "../database/repositories/scheduleRepository";
-import { medicineRepository } from "../database/repositories/medicineRepository";
-import { nativeAlarmService } from "./nativeAlarmService";
+import * as Notifications from 'expo-notifications';
+import { AndroidImportance } from 'expo-notifications';
+import { Platform } from 'react-native';
+import { ReminderSchedule, RecurrenceType } from '../types';
+import { parseDateParts, isScheduleDueOnDate } from '../utils/scheduleRecurrence';
+import { scheduleRepository } from '../database/repositories/scheduleRepository';
+import { medicineRepository } from '../database/repositories/medicineRepository';
+import { nativeAlarmService } from './nativeAlarmService';
 
 // Foreground notifications must remain visible and audible. Android 8+ uses the
 // channel's sound/vibration settings for delivery behavior.
@@ -27,9 +24,7 @@ try {
 }
 
 export function getNotificationTriggersForDose(
-  schedule:
-    | Pick<ReminderSchedule, "recurrence" | "startDate" | "endDate">
-    | undefined,
+  schedule: Pick<ReminderSchedule, 'recurrence' | 'startDate' | 'endDate'> | undefined,
   time: string,
   now: Date = new Date(),
   allowAlarmClock: boolean = true,
@@ -41,12 +36,12 @@ export function getNotificationTriggersForDose(
 
   const todayStr = [
     now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, "0"),
-    String(now.getDate()).padStart(2, "0"),
-  ].join("-");
+    String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0'),
+  ].join('-');
 
   const effectiveSchedule = schedule ?? {
-    recurrence: "daily" as const,
+    recurrence: 'daily' as const,
     startDate: todayStr,
   };
 
@@ -61,25 +56,17 @@ export function getNotificationTriggersForDose(
   }
 
   const androidOptions =
-    Platform.OS === "android"
+    Platform.OS === 'android'
       ? allowAlarmClock
-        ? { channelId: "medication-reminders", delivery: "alarmClock" as const }
-        : { channelId: "medication-reminders" }
+        ? { channelId: 'medication-reminders', delivery: 'alarmClock' as const }
+        : { channelId: 'medication-reminders' }
       : {};
 
   const { recurrence, startDate, endDate } = effectiveSchedule;
 
   // 1. One-time schedule: must never become a repeating daily trigger
-  if (recurrence === "once") {
-    const targetDate = new Date(
-      start[0],
-      start[1] - 1,
-      start[2],
-      hour,
-      minute,
-      0,
-      0,
-    );
+  if (recurrence === 'once') {
+    const targetDate = new Date(start[0], start[1] - 1, start[2], hour, minute, 0, 0);
     if (targetDate.getTime() <= now.getTime()) {
       return [];
     }
@@ -93,7 +80,7 @@ export function getNotificationTriggersForDose(
   }
 
   // 2. Daily schedule
-  if (recurrence === "daily") {
+  if (recurrence === 'daily') {
     // If unbounded and start date is not in the future, use native repeating DAILY trigger
     if (!endDate && startDate <= todayStr) {
       return [
@@ -108,9 +95,7 @@ export function getNotificationTriggersForDose(
 
     // Bounded by endDate or future startDate: schedule discrete DATE triggers
     const triggers: Notifications.SchedulableNotificationTriggerInput[] = [];
-    const [curY, curM, curD] = parseDateParts(
-      startDate > todayStr ? startDate : todayStr,
-    )!;
+    const [curY, curM, curD] = parseDateParts(startDate > todayStr ? startDate : todayStr)!;
     const cursor = new Date(curY, curM - 1, curD);
     const maxOccurrences = 60;
 
@@ -118,11 +103,7 @@ export function getNotificationTriggersForDose(
       const y = cursor.getFullYear();
       const m = cursor.getMonth() + 1;
       const d = cursor.getDate();
-      const dateStr = [
-        y,
-        String(m).padStart(2, "0"),
-        String(d).padStart(2, "0"),
-      ].join("-");
+      const dateStr = [y, String(m).padStart(2, '0'), String(d).padStart(2, '0')].join('-');
 
       if (endDate && dateStr > endDate) break;
 
@@ -144,7 +125,7 @@ export function getNotificationTriggersForDose(
   }
 
   // 3. Weekly schedule
-  if (recurrence === "weekly") {
+  if (recurrence === 'weekly') {
     const startJsWeekday = new Date(start[0], start[1] - 1, start[2]).getDay();
     const expoWeekday = startJsWeekday + 1; // 1 = Sunday ... 7 = Saturday
 
@@ -162,9 +143,7 @@ export function getNotificationTriggersForDose(
 
     // Bounded or future start date: schedule discrete DATE triggers
     const triggers: Notifications.SchedulableNotificationTriggerInput[] = [];
-    const [startY, startM, startD] = parseDateParts(
-      startDate > todayStr ? startDate : todayStr,
-    )!;
+    const [startY, startM, startD] = parseDateParts(startDate > todayStr ? startDate : todayStr)!;
     const cursor = new Date(startY, startM - 1, startD);
 
     // Advance cursor to the first matching weekday
@@ -177,11 +156,7 @@ export function getNotificationTriggersForDose(
       const y = cursor.getFullYear();
       const m = cursor.getMonth() + 1;
       const d = cursor.getDate();
-      const dateStr = [
-        y,
-        String(m).padStart(2, "0"),
-        String(d).padStart(2, "0"),
-      ].join("-");
+      const dateStr = [y, String(m).padStart(2, '0'), String(d).padStart(2, '0')].join('-');
 
       if (endDate && dateStr > endDate) break;
 
@@ -203,7 +178,7 @@ export function getNotificationTriggersForDose(
   }
 
   // 4. Monthly schedule
-  if (recurrence === "monthly") {
+  if (recurrence === 'monthly') {
     const startDay = start[2];
 
     // Native monthly repeating triggers can only be used if:
@@ -239,9 +214,9 @@ export function getNotificationTriggersForDose(
       const targetDate = new Date(year, month, clampedDay, hour, minute, 0, 0);
       const dateStr = [
         year,
-        String(month + 1).padStart(2, "0"),
-        String(clampedDay).padStart(2, "0"),
-      ].join("-");
+        String(month + 1).padStart(2, '0'),
+        String(clampedDay).padStart(2, '0'),
+      ].join('-');
 
       if (dateStr >= startDate) {
         if (endDate && dateStr > endDate) break;
@@ -278,9 +253,7 @@ export function getNotificationTriggersForDose(
  * by dose after each firing.
  */
 export function getNativeAlarmTriggerWindow(
-  schedule:
-    | Pick<ReminderSchedule, "recurrence" | "startDate" | "endDate">
-    | undefined,
+  schedule: Pick<ReminderSchedule, 'recurrence' | 'startDate' | 'endDate'> | undefined,
   time: string,
   now: Date = new Date(),
 ): number[] {
@@ -291,12 +264,12 @@ export function getNativeAlarmTriggerWindow(
 
   const todayStr = [
     now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, "0"),
-    String(now.getDate()).padStart(2, "0"),
-  ].join("-");
+    String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0'),
+  ].join('-');
 
   const effectiveSchedule = schedule ?? {
-    recurrence: "daily" as const,
+    recurrence: 'daily' as const,
     startDate: todayStr,
   };
 
@@ -313,7 +286,7 @@ export function getNativeAlarmTriggerWindow(
   const { recurrence, startDate, endDate } = effectiveSchedule;
   const triggers: number[] = [];
 
-  if (recurrence === "once") {
+  if (recurrence === 'once') {
     const targetDate = new Date(start[0], start[1] - 1, start[2], hour, minute, 0, 0);
     if (targetDate.getTime() > now.getTime()) triggers.push(targetDate.getTime());
     return triggers;
@@ -321,18 +294,16 @@ export function getNativeAlarmTriggerWindow(
 
   const scanStart = startDate > todayStr ? startDate : todayStr;
 
-  if (recurrence === "daily") {
+  if (recurrence === 'daily') {
     const [y, m, d] = parseDateParts(scanStart)!;
     const cursor = new Date(y, m - 1, d);
     while (triggers.length < 60) {
       const y = cursor.getFullYear();
       const month = cursor.getMonth();
       const day = cursor.getDate();
-      const dateStr = [
-        y,
-        String(month + 1).padStart(2, "0"),
-        String(day).padStart(2, "0"),
-      ].join("-");
+      const dateStr = [y, String(month + 1).padStart(2, '0'), String(day).padStart(2, '0')].join(
+        '-',
+      );
       if (endDate && dateStr > endDate) break;
       if (isScheduleDueOnDate(effectiveSchedule, dateStr)) {
         const targetDate = new Date(y, month, day, hour, minute, 0, 0);
@@ -343,7 +314,7 @@ export function getNativeAlarmTriggerWindow(
     return triggers;
   }
 
-  if (recurrence === "weekly") {
+  if (recurrence === 'weekly') {
     const startJsWeekday = new Date(start[0], start[1] - 1, start[2]).getDay();
     const [startY, startM, startD] = parseDateParts(scanStart)!;
     const cursor = new Date(startY, startM - 1, startD);
@@ -354,11 +325,9 @@ export function getNativeAlarmTriggerWindow(
       const y = cursor.getFullYear();
       const month = cursor.getMonth();
       const day = cursor.getDate();
-      const dateStr = [
-        y,
-        String(month + 1).padStart(2, "0"),
-        String(day).padStart(2, "0"),
-      ].join("-");
+      const dateStr = [y, String(month + 1).padStart(2, '0'), String(day).padStart(2, '0')].join(
+        '-',
+      );
       if (endDate && dateStr > endDate) break;
       if (isScheduleDueOnDate(effectiveSchedule, dateStr)) {
         const targetDate = new Date(y, month, day, hour, minute, 0, 0);
@@ -369,11 +338,12 @@ export function getNativeAlarmTriggerWindow(
     return triggers;
   }
 
-  if (recurrence === "monthly") {
+  if (recurrence === 'monthly') {
     const startDay = start[2];
-    const currentRef = startDate > todayStr
-      ? new Date(start[0], start[1] - 1, 1)
-      : new Date(now.getFullYear(), now.getMonth(), 1);
+    const currentRef =
+      startDate > todayStr
+        ? new Date(start[0], start[1] - 1, 1)
+        : new Date(now.getFullYear(), now.getMonth(), 1);
     for (let i = 0; i < 24; i++) {
       const year = currentRef.getFullYear();
       const month = currentRef.getMonth();
@@ -381,9 +351,9 @@ export function getNativeAlarmTriggerWindow(
       const clampedDay = Math.min(startDay, lastDay);
       const dateStr = [
         year,
-        String(month + 1).padStart(2, "0"),
-        String(clampedDay).padStart(2, "0"),
-      ].join("-");
+        String(month + 1).padStart(2, '0'),
+        String(clampedDay).padStart(2, '0'),
+      ].join('-');
       if (endDate && dateStr > endDate) break;
       if (dateStr >= startDate && isScheduleDueOnDate(effectiveSchedule, dateStr)) {
         const targetDate = new Date(year, month, clampedDay, hour, minute, 0, 0);
@@ -410,7 +380,7 @@ export function getNativeAlarmTriggerWindow(
 // native alarm module such as iOS.)
 // ---------------------------------------------------------------------------
 
-type DatedRecurrence = Extract<RecurrenceType, "daily" | "weekly" | "monthly">;
+type DatedRecurrence = Extract<RecurrenceType, 'daily' | 'weekly' | 'monthly'>;
 
 /**
  * Elapsed-day equivalent of the occurrence caps inside
@@ -432,9 +402,9 @@ const EXTENSION_MARGIN_DAYS = 30;
 function toDateStringOf(date: Date): string {
   return [
     date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("-");
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-');
 }
 
 /**
@@ -449,18 +419,14 @@ export function getRequiredCoverageThroughDate(
   endDate: string | undefined,
   now: Date = new Date(),
 ): string | null {
-  if (recurrence === "once") return null;
+  if (recurrence === 'once') return null;
 
   const today = toDateStringOf(now);
   const capDays =
-    recurrence === "daily" || recurrence === "weekly" || recurrence === "monthly"
+    recurrence === 'daily' || recurrence === 'weekly' || recurrence === 'monthly'
       ? TRIGGER_WINDOW_CAP_DAYS[recurrence]
       : 60;
-  const horizon = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate() + capDays,
-  );
+  const horizon = new Date(now.getFullYear(), now.getMonth(), now.getDate() + capDays);
 
   let requiredThrough = toDateStringOf(horizon);
   if (endDate) {
@@ -483,28 +449,26 @@ export function getRequiredCoverageThroughDate(
  * literal shape) and the normalized shapes expo-notifications returns
  * ({ type: 'date', timestamp: epoch-seconds } on Android/iOS).
  */
-export function getTriggerCoveredThroughDate(
-  trigger: unknown,
-): "forever" | string | null {
+export function getTriggerCoveredThroughDate(trigger: unknown): 'forever' | string | null {
   const t = (trigger ?? null) as Record<string, unknown> | null;
   if (!t) return null;
 
-  const type = String(t.type ?? "").toLowerCase();
-  if (t.repeats === true) return "forever";
-  if (["daily", "weekly", "monthly", "yearly"].includes(type)) {
-    return "forever";
+  const type = String(t.type ?? '').toLowerCase();
+  if (t.repeats === true) return 'forever';
+  if (['daily', 'weekly', 'monthly', 'yearly'].includes(type)) {
+    return 'forever';
   }
 
   const rawDate = t.date ?? t.timestamp ?? null;
   if (rawDate instanceof Date) {
     return toDateStringOf(rawDate);
   }
-  if (typeof rawDate === "number") {
+  if (typeof rawDate === 'number') {
     // Epoch seconds vs milliseconds — accept both.
     const ms = rawDate < 1e12 ? rawDate * 1000 : rawDate;
     return toDateStringOf(new Date(ms));
   }
-  if (typeof rawDate === "string") {
+  if (typeof rawDate === 'string') {
     const parsed = new Date(rawDate);
     return Number.isNaN(parsed.getTime()) ? null : toDateStringOf(parsed);
   }
@@ -513,27 +477,23 @@ export function getTriggerCoveredThroughDate(
 
 export const notificationService = {
   async init(): Promise<void> {
-    if (Platform.OS !== "android") return;
+    if (Platform.OS !== 'android') return;
 
     try {
-      await Notifications.setNotificationChannelAsync("medication-reminders", {
-        name: "Medication Reminders",
-        description: "Time-sensitive medication dose alarms",
+      await Notifications.setNotificationChannelAsync('medication-reminders', {
+        name: 'Medication Reminders',
+        description: 'Time-sensitive medication dose alarms',
         importance: AndroidImportance.MAX,
         vibrationPattern: [0, 300, 200, 300, 200, 500],
-        sound: "default",
+        sound: 'default',
         enableVibrate: true,
         enableLights: true,
-        lightColor: "#0788F5",
+        lightColor: '#0788F5',
         bypassDnd: false,
-        lockscreenVisibility:
-          Notifications.AndroidNotificationVisibility.PUBLIC,
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       });
     } catch (error) {
-      console.warn(
-        "Unable to configure medication notification channel:",
-        error,
-      );
+      console.warn('Unable to configure medication notification channel:', error);
     }
   },
 
@@ -546,32 +506,26 @@ export const notificationService = {
       await this.init();
 
       const current = await Notifications.getPermissionsAsync();
-      let notificationGranted = current.granted || current.status === "granted";
+      let notificationGranted = current.granted || current.status === 'granted';
       if (!notificationGranted) {
         const requested = await Notifications.requestPermissionsAsync();
-        notificationGranted =
-          requested.granted || requested.status === "granted";
+        notificationGranted = requested.granted || requested.status === 'granted';
       }
       if (!notificationGranted) return false;
 
-      if (Platform.OS === "android") {
+      if (Platform.OS === 'android') {
         const notificationsAny = Notifications as any;
-        if (
-          typeof notificationsAny.getExactAlarmPermissionsAsync === "function"
-        ) {
-          let exactAlarm =
-            await notificationsAny.getExactAlarmPermissionsAsync();
+        if (typeof notificationsAny.getExactAlarmPermissionsAsync === 'function') {
+          let exactAlarm = await notificationsAny.getExactAlarmPermissionsAsync();
           if (
             exactAlarm &&
             !exactAlarm.granted &&
-            typeof notificationsAny.requestExactAlarmPermissionsAsync ===
-              "function"
+            typeof notificationsAny.requestExactAlarmPermissionsAsync === 'function'
           ) {
             try {
-              exactAlarm =
-                await notificationsAny.requestExactAlarmPermissionsAsync();
+              exactAlarm = await notificationsAny.requestExactAlarmPermissionsAsync();
             } catch (error) {
-              console.warn("Exact-alarm access was not granted:", error);
+              console.warn('Exact-alarm access was not granted:', error);
               return false;
             }
           }
@@ -581,25 +535,19 @@ export const notificationService = {
 
       return true;
     } catch (error) {
-      console.warn("Unable to confirm reminder permissions:", error);
+      console.warn('Unable to confirm reminder permissions:', error);
       return false;
     }
-  },  async hasReliableAlarmAccess(): Promise<boolean> {
+  },
+  async hasReliableAlarmAccess(): Promise<boolean> {
     try {
       const notificationPermission = await Notifications.getPermissionsAsync();
-      if (
-        !(
-          notificationPermission.granted ||
-          notificationPermission.status === "granted"
-        )
-      ) {
+      if (!(notificationPermission.granted || notificationPermission.status === 'granted')) {
         return false;
       }
-      if (Platform.OS !== "android") return true;
+      if (Platform.OS !== 'android') return true;
       const notificationsAny = Notifications as any;
-      if (
-        typeof notificationsAny.getExactAlarmPermissionsAsync === "function"
-      ) {
+      if (typeof notificationsAny.getExactAlarmPermissionsAsync === 'function') {
         const exactAlarm = await notificationsAny.getExactAlarmPermissionsAsync();
         return Boolean(exactAlarm?.granted);
       }
@@ -620,15 +568,11 @@ export const notificationService = {
   }> {
     try {
       const status = await Notifications.getPermissionsAsync();
-      const notificationPermission = Boolean(
-        status.granted || status.status === "granted",
-      );
+      const notificationPermission = Boolean(status.granted || status.status === 'granted');
       let exactAlarm = true; // No exact-alarm concept outside Android.
-      if (Platform.OS === "android") {
+      if (Platform.OS === 'android') {
         const notificationsAny = Notifications as any;
-        if (
-          typeof notificationsAny.getExactAlarmPermissionsAsync === "function"
-        ) {
+        if (typeof notificationsAny.getExactAlarmPermissionsAsync === 'function') {
           try {
             const ea = await notificationsAny.getExactAlarmPermissionsAsync();
             exactAlarm = Boolean(ea?.granted);
@@ -649,13 +593,10 @@ export const notificationService = {
     amount: string,
     time: string, // 'HH:mm'
     doseLabel?: string,
-    scheduleConfig?: Pick<
-      ReminderSchedule,
-      "recurrence" | "startDate" | "endDate"
-    >,
+    scheduleConfig?: Pick<ReminderSchedule, 'recurrence' | 'startDate' | 'endDate'>,
   ): Promise<string | null> {
     try {
-      const [hourStr, minStr] = time.split(":");
+      const [hourStr, minStr] = time.split(':');
       const hour = Number(hourStr);
       const minute = Number(minStr);
       if (
@@ -672,15 +613,13 @@ export const notificationService = {
       // Do not silently fall back to an inexact Android alarm. The caller must
       // first obtain exact-alarm access; otherwise report scheduling failure.
       if (!(await this.hasReliableAlarmAccess())) {
-        console.warn(
-          "Reminder not scheduled: notification or exact-alarm permission is missing.",
-        );
+        console.warn('Reminder not scheduled: notification or exact-alarm permission is missing.');
         return null;
       }
 
       // Check exact-alarm permission capability
       let allowAlarmClock = true;
-      if (Platform.OS === "android") {
+      if (Platform.OS === 'android') {
         const canExact = await nativeAlarmService.canScheduleExactAlarms();
         if (!canExact) {
           allowAlarmClock = false;
@@ -694,14 +633,11 @@ export const notificationService = {
         allowAlarmClock,
       );
       if (triggers.length === 0) {
-        console.warn(
-          "Reminder not scheduled: no valid future triggers for schedule.",
-          {
-            scheduleId,
-            time,
-            scheduleConfig,
-          },
-        );
+        console.warn('Reminder not scheduled: no valid future triggers for schedule.', {
+          scheduleId,
+          time,
+          scheduleConfig,
+        });
         return null;
       }
 
@@ -717,7 +653,7 @@ export const notificationService = {
             Notifications.scheduleNotificationAsync({
               content: {
                 title: `Time to take ${medicineName}`,
-                body: `${doseLabel ? `${doseLabel} · ` : ""}Scheduled dose: ${amount}`,
+                body: `${doseLabel ? `${doseLabel} · ` : ''}Scheduled dose: ${amount}`,
                 data: {
                   scheduleId,
                   time,
@@ -725,12 +661,10 @@ export const notificationService = {
                   // Identity fields reconcile diffs against, so a
                   // rename or edited dose replaces stale OS text.
                   amount,
-                  doseLabel: doseLabel ?? "",
+                  doseLabel: doseLabel ?? '',
                 },
-                sound: "default",
-                ...(Platform.OS === "android"
-                  ? { channelId: "medication-reminders" }
-                  : {}),
+                sound: 'default',
+                ...(Platform.OS === 'android' ? { channelId: 'medication-reminders' } : {}),
               },
               trigger,
             }),
@@ -742,13 +676,9 @@ export const notificationService = {
       // Schedule the reboot-proof native alarm chain on Android: each dose's
       // full upcoming trigger window is persisted natively (and re-armed at
       // boot by AlarmArming), with the earliest trigger armed now.
-      if (Platform.OS === "android" && nativeAlarmService.isAvailable()) {
+      if (Platform.OS === 'android' && nativeAlarmService.isAvailable()) {
         try {
-          const windowMillis = getNativeAlarmTriggerWindow(
-            scheduleConfig,
-            time,
-            new Date(),
-          );
+          const windowMillis = getNativeAlarmTriggerWindow(scheduleConfig, time, new Date());
           if (windowMillis.length > 0) {
             await nativeAlarmService.syncAlarmChain({
               scheduleId,
@@ -756,18 +686,18 @@ export const notificationService = {
               amount,
               time,
               label: doseLabel,
-              recurrence: scheduleConfig?.recurrence ?? "daily",
+              recurrence: scheduleConfig?.recurrence ?? 'daily',
               triggerMillis: windowMillis,
             });
           }
         } catch (alarmErr) {
-          console.warn("Could not schedule native alarm chain:", alarmErr);
+          console.warn('Could not schedule native alarm chain:', alarmErr);
         }
       }
 
       return identifiers[0] ?? null;
     } catch (error) {
-      console.warn("Failed to schedule medication alarm:", error);
+      console.warn('Failed to schedule medication alarm:', error);
       return null;
     }
   },
@@ -776,7 +706,7 @@ export const notificationService = {
     try {
       await Notifications.cancelScheduledNotificationAsync(notificationId);
     } catch (error) {
-      console.warn("Failed to cancel notification:", error);
+      console.warn('Failed to cancel notification:', error);
     }
   },
 
@@ -789,13 +719,11 @@ export const notificationService = {
       );
       await Promise.all(
         matching.map((notification) =>
-          Notifications.cancelScheduledNotificationAsync(
-            notification.identifier,
-          ),
+          Notifications.cancelScheduledNotificationAsync(notification.identifier),
         ),
       );
     } catch (error) {
-      console.warn("Failed to cancel schedule notifications:", error);
+      console.warn('Failed to cancel schedule notifications:', error);
     }
   },
 
@@ -804,7 +732,7 @@ export const notificationService = {
       await nativeAlarmService.cancelAllAlarms();
       await Notifications.cancelAllScheduledNotificationsAsync();
     } catch (error) {
-      console.warn("Failed to cancel all notifications:", error);
+      console.warn('Failed to cancel all notifications:', error);
     }
   },
 
@@ -853,242 +781,229 @@ let reconcileInFlight: Promise<ReconcileResult> | null = null;
  * - medicine lookups are memoized instead of hitting the DB per loop visit.
  */
 async function performReconcile(): Promise<ReconcileResult> {
-    let cancelledStale = 0;
-    let rescheduled = 0;
+  let cancelledStale = 0;
+  let rescheduled = 0;
 
-    try {
-      const hasAccess = await notificationService.hasReliableAlarmAccess();
-      const allSchedules = scheduleRepository.getAll();
-      const activeSchedules = allSchedules.filter((s) => s.enabled);
+  try {
+    const hasAccess = await notificationService.hasReliableAlarmAccess();
+    const allSchedules = scheduleRepository.getAll();
+    const activeSchedules = allSchedules.filter((s) => s.enabled);
 
-      // If reliable alarm access is available, re-enable notifications for enabled schedules
-      // that were temporarily marked notificationsEnabled=false during permission loss.
-      if (hasAccess) {
-        for (const s of activeSchedules) {
-          if (!s.notificationsEnabled) {
-            scheduleRepository.save({ ...s, notificationsEnabled: true });
-            s.notificationsEnabled = true;
-          }
+    // If reliable alarm access is available, re-enable notifications for enabled schedules
+    // that were temporarily marked notificationsEnabled=false during permission loss.
+    if (hasAccess) {
+      for (const s of activeSchedules) {
+        if (!s.notificationsEnabled) {
+          scheduleRepository.save({ ...s, notificationsEnabled: true });
+          s.notificationsEnabled = true;
         }
       }
+    }
 
-      // Memoize medicine lookups — the same medicine was previously
-      // fetched once per filter visit and again per scheduling loop visit.
-      const medicineCache = new Map<
-        string,
-        ReturnType<typeof medicineRepository.getById>
-      >();
-      const getMedicine = (id: string) => {
-        let med = medicineCache.get(id);
-        if (med === undefined) {
-          med = medicineRepository.getById(id);
-          medicineCache.set(id, med);
-        }
-        return med;
-      };
-
-      // Valid active schedules: must be enabled, notification-enabled, and medicine must exist
-      const validActiveSchedules = activeSchedules.filter((s) => {
-        if (!s.notificationsEnabled) return false;
-        return Boolean(getMedicine(s.medicineId));
-      });
-
-      const validScheduleIdSet = new Set(validActiveSchedules.map((s) => s.id));
-
-      // Desired identity per dose: what each OS notification's
-      // stored data must say (medicine name, amount, label). A mismatch means a
-      // rename/edit reached the OS untouched, so the window is replaced.
-      const doseIdentity = (medicineName: string, amount: string, label?: string) =>
-        `${medicineName}|${amount}|${label ?? ""}`;
-      const desiredIdentityByKey = new Map<string, string>();
-      for (const s of validActiveSchedules) {
-        const medName = getMedicine(s.medicineId)?.name ?? "Medicine";
-        for (const dose of s.times) {
-          desiredIdentityByKey.set(
-            `${s.id}:${dose.time}`,
-            doseIdentity(medName, dose.amount, dose.label),
-          );
-        }
+    // Memoize medicine lookups — the same medicine was previously
+    // fetched once per filter visit and again per scheduling loop visit.
+    const medicineCache = new Map<string, ReturnType<typeof medicineRepository.getById>>();
+    const getMedicine = (id: string) => {
+      let med = medicineCache.get(id);
+      if (med === undefined) {
+        med = medicineRepository.getById(id);
+        medicineCache.set(id, med);
       }
+      return med;
+    };
 
-      // 1. Fetch currently scheduled notifications from OS
-      const scheduledNotifications =
-        await Notifications.getAllScheduledNotificationsAsync();
+    // Valid active schedules: must be enabled, notification-enabled, and medicine must exist
+    const validActiveSchedules = activeSchedules.filter((s) => {
+      if (!s.notificationsEnabled) return false;
+      return Boolean(getMedicine(s.medicineId));
+    });
 
-      // Track per-dose OS coverage and the notification entries behind it.
-      // Coverage is 'forever' for repeating triggers, or the latest
-      // 'YYYY-MM-DD' covered by any one-shot DATE trigger for the dose.
-      const existingCoverage = new Map<string, "forever" | string | null>();
-      const notificationsByKey = new Map<
-        string,
-        typeof scheduledNotifications
-      >();
+    const validScheduleIdSet = new Set(validActiveSchedules.map((s) => s.id));
 
-      // Collect orphans first, cancel in one batch afterwards:
-      // identifiers in parallel, one native alarm cancel per schedule instead
-      // of one per notification.
-      const orphanNotificationIds: string[] = [];
-      const orphanScheduleIds = new Set<string>();
-      const mismatchedKeys = new Set<string>();
-
-      for (const notif of scheduledNotifications) {
-        const notifScheduleId = notif.content.data?.scheduleId as
-          | string
-          | undefined;
-        const notifTime = notif.content.data?.time as string | undefined;
-
-        if (notifScheduleId) {
-          if (!validScheduleIdSet.has(notifScheduleId)) {
-            // Orphaned / stale notification (schedule deleted or disabled).
-            orphanNotificationIds.push(notif.identifier);
-            orphanScheduleIds.add(notifScheduleId);
-          } else if (notifTime) {
-            const key = `${notifScheduleId}:${notifTime}`;
-            const coveredThrough = getTriggerCoveredThroughDate(notif.trigger);
-
-            let merged: "forever" | string | null = existingCoverage.get(key) ?? null;
-            if (coveredThrough === "forever" || merged === "forever") {
-              merged = "forever";
-            } else if (typeof coveredThrough === "string") {
-              merged =
-                typeof merged === "string" && merged > coveredThrough
-                  ? merged
-                  : coveredThrough;
-            }
-            existingCoverage.set(key, merged);
-
-            // Identity diff — only trust notifications that actually carry the
-            // identity fields; legacy ones without them are left alone.
-            const data = notif.content.data ?? {};
-            if (typeof data.amount === "string") {
-              const stored = doseIdentity(
-                String(data.medicineName ?? ""),
-                data.amount,
-                typeof data.doseLabel === "string" ? data.doseLabel : undefined,
-              );
-              const desired = desiredIdentityByKey.get(key);
-              if (desired !== undefined && stored !== desired) {
-                mismatchedKeys.add(key);
-              }
-            }
-
-            const entries = notificationsByKey.get(key) ?? [];
-            entries.push(notif);
-            notificationsByKey.set(key, entries);
-          }
-        }
-      }
-
-      if (orphanNotificationIds.length > 0) {
-        await Promise.all(
-          orphanNotificationIds.map((identifier) =>
-            Notifications.cancelScheduledNotificationAsync(identifier),
-          ),
+    // Desired identity per dose: what each OS notification's
+    // stored data must say (medicine name, amount, label). A mismatch means a
+    // rename/edit reached the OS untouched, so the window is replaced.
+    const doseIdentity = (medicineName: string, amount: string, label?: string) =>
+      `${medicineName}|${amount}|${label ?? ''}`;
+    const desiredIdentityByKey = new Map<string, string>();
+    for (const s of validActiveSchedules) {
+      const medName = getMedicine(s.medicineId)?.name ?? 'Medicine';
+      for (const dose of s.times) {
+        desiredIdentityByKey.set(
+          `${s.id}:${dose.time}`,
+          doseIdentity(medName, dose.amount, dose.label),
         );
-        for (const orphanScheduleId of orphanScheduleIds) {
-          await nativeAlarmService.cancelAlarm(orphanScheduleId);
+      }
+    }
+
+    // 1. Fetch currently scheduled notifications from OS
+    const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
+
+    // Track per-dose OS coverage and the notification entries behind it.
+    // Coverage is 'forever' for repeating triggers, or the latest
+    // 'YYYY-MM-DD' covered by any one-shot DATE trigger for the dose.
+    const existingCoverage = new Map<string, 'forever' | string | null>();
+    const notificationsByKey = new Map<string, typeof scheduledNotifications>();
+
+    // Collect orphans first, cancel in one batch afterwards:
+    // identifiers in parallel, one native alarm cancel per schedule instead
+    // of one per notification.
+    const orphanNotificationIds: string[] = [];
+    const orphanScheduleIds = new Set<string>();
+    const mismatchedKeys = new Set<string>();
+
+    for (const notif of scheduledNotifications) {
+      const notifScheduleId = notif.content.data?.scheduleId as string | undefined;
+      const notifTime = notif.content.data?.time as string | undefined;
+
+      if (notifScheduleId) {
+        if (!validScheduleIdSet.has(notifScheduleId)) {
+          // Orphaned / stale notification (schedule deleted or disabled).
+          orphanNotificationIds.push(notif.identifier);
+          orphanScheduleIds.add(notifScheduleId);
+        } else if (notifTime) {
+          const key = `${notifScheduleId}:${notifTime}`;
+          const coveredThrough = getTriggerCoveredThroughDate(notif.trigger);
+
+          let merged: 'forever' | string | null = existingCoverage.get(key) ?? null;
+          if (coveredThrough === 'forever' || merged === 'forever') {
+            merged = 'forever';
+          } else if (typeof coveredThrough === 'string') {
+            merged =
+              typeof merged === 'string' && merged > coveredThrough ? merged : coveredThrough;
+          }
+          existingCoverage.set(key, merged);
+
+          // Identity diff — only trust notifications that actually carry the
+          // identity fields; legacy ones without them are left alone.
+          const data = notif.content.data ?? {};
+          if (typeof data.amount === 'string') {
+            const stored = doseIdentity(
+              String(data.medicineName ?? ''),
+              data.amount,
+              typeof data.doseLabel === 'string' ? data.doseLabel : undefined,
+            );
+            const desired = desiredIdentityByKey.get(key);
+            if (desired !== undefined && stored !== desired) {
+              mismatchedKeys.add(key);
+            }
+          }
+
+          const entries = notificationsByKey.get(key) ?? [];
+          entries.push(notif);
+          notificationsByKey.set(key, entries);
         }
-        cancelledStale = orphanNotificationIds.length;
       }
+    }
 
-      // 2. If we don't have reliable alarm access, we cannot schedule new exact alarms right now.
-      if (!hasAccess) {
-        return {
-          cancelledStale,
-          rescheduled: 0,
-          activeSchedules: validActiveSchedules.length,
-        };
-      }
-
-      // 3. For all valid active schedules, ensure each dose time is scheduled
-      // — and extend one-shot trigger windows that are about to run out.
-      const nowForExtension = new Date();
-      const extensionDeadline = toDateStringOf(
-        new Date(
-          nowForExtension.getFullYear(),
-          nowForExtension.getMonth(),
-          nowForExtension.getDate() + EXTENSION_MARGIN_DAYS,
+    if (orphanNotificationIds.length > 0) {
+      await Promise.all(
+        orphanNotificationIds.map((identifier) =>
+          Notifications.cancelScheduledNotificationAsync(identifier),
         ),
       );
+      for (const orphanScheduleId of orphanScheduleIds) {
+        await nativeAlarmService.cancelAlarm(orphanScheduleId);
+      }
+      cancelledStale = orphanNotificationIds.length;
+    }
 
-      for (const schedule of validActiveSchedules) {
-        const medicine = getMedicine(schedule.medicineId);
-        const medicineName = medicine?.name ?? "Medicine";
+    // 2. If we don't have reliable alarm access, we cannot schedule new exact alarms right now.
+    if (!hasAccess) {
+      return {
+        cancelledStale,
+        rescheduled: 0,
+        activeSchedules: validActiveSchedules.length,
+      };
+    }
 
-        for (const dose of schedule.times) {
-          const key = `${schedule.id}:${dose.time}`;
-          const coverage = existingCoverage.get(key);
-          const requiredThrough = getRequiredCoverageThroughDate(
-            schedule.recurrence,
-            schedule.endDate,
-            new Date(),
-          );
+    // 3. For all valid active schedules, ensure each dose time is scheduled
+    // — and extend one-shot trigger windows that are about to run out.
+    const nowForExtension = new Date();
+    const extensionDeadline = toDateStringOf(
+      new Date(
+        nowForExtension.getFullYear(),
+        nowForExtension.getMonth(),
+        nowForExtension.getDate() + EXTENSION_MARGIN_DAYS,
+      ),
+    );
 
-          // Extend when required dates remain beyond the current window AND
-          // the remaining covered margin has dropped under the threshold.
-          const needsExtension =
-            typeof coverage === "string" &&
-            requiredThrough !== null &&
-            coverage < requiredThrough &&
-            coverage < extensionDeadline;
+    for (const schedule of validActiveSchedules) {
+      const medicine = getMedicine(schedule.medicineId);
+      const medicineName = medicine?.name ?? 'Medicine';
 
-          // Diff decision: arm when coverage is missing, extend when
-          // the window runs out, replace when the stored identity no longer
-          // matches (medicine renamed / dose edited outside saveSchedule).
-          const identityMismatch = mismatchedKeys.has(key);
+      for (const dose of schedule.times) {
+        const key = `${schedule.id}:${dose.time}`;
+        const coverage = existingCoverage.get(key);
+        const requiredThrough = getRequiredCoverageThroughDate(
+          schedule.recurrence,
+          schedule.endDate,
+          new Date(),
+        );
 
-          if (coverage === undefined || needsExtension || identityMismatch) {
-            if (needsExtension || identityMismatch) {
-              // Replace the expiring/mismatched window in full: cancel its
-              // entries first, then arm a fresh window from today.
-              // scheduleDoseReminder also re-syncs the native reboot-proof
-              // alarm chain, so weekly/monthly chains that exhausted their
-              // stored triggers recover too.
-              const expiring = notificationsByKey.get(key) ?? [];
-              await Promise.all(
-                expiring.map((notif) =>
-                  Notifications.cancelScheduledNotificationAsync(
-                    notif.identifier,
-                  ),
-                ),
-              );
-            }
+        // Extend when required dates remain beyond the current window AND
+        // the remaining covered margin has dropped under the threshold.
+        const needsExtension =
+          typeof coverage === 'string' &&
+          requiredThrough !== null &&
+          coverage < requiredThrough &&
+          coverage < extensionDeadline;
 
-            const id = await notificationService.scheduleDoseReminder(
-              schedule.id,
-              medicineName,
-              dose.amount,
-              dose.time,
-              dose.label,
-              {
-                recurrence: schedule.recurrence,
-                startDate: schedule.startDate,
-                endDate: schedule.endDate,
-              },
+        // Diff decision: arm when coverage is missing, extend when
+        // the window runs out, replace when the stored identity no longer
+        // matches (medicine renamed / dose edited outside saveSchedule).
+        const identityMismatch = mismatchedKeys.has(key);
+
+        if (coverage === undefined || needsExtension || identityMismatch) {
+          if (needsExtension || identityMismatch) {
+            // Replace the expiring/mismatched window in full: cancel its
+            // entries first, then arm a fresh window from today.
+            // scheduleDoseReminder also re-syncs the native reboot-proof
+            // alarm chain, so weekly/monthly chains that exhausted their
+            // stored triggers recover too.
+            const expiring = notificationsByKey.get(key) ?? [];
+            await Promise.all(
+              expiring.map((notif) =>
+                Notifications.cancelScheduledNotificationAsync(notif.identifier),
+              ),
             );
-            if (id) {
-              rescheduled++;
-              if (needsExtension && requiredThrough) {
-                // The fresh window reaches the required horizon; record it so
-                // the extension is idempotent across reconcile passes.
-                existingCoverage.set(key, requiredThrough);
-              }
+          }
+
+          const id = await notificationService.scheduleDoseReminder(
+            schedule.id,
+            medicineName,
+            dose.amount,
+            dose.time,
+            dose.label,
+            {
+              recurrence: schedule.recurrence,
+              startDate: schedule.startDate,
+              endDate: schedule.endDate,
+            },
+          );
+          if (id) {
+            rescheduled++;
+            if (needsExtension && requiredThrough) {
+              // The fresh window reaches the required horizon; record it so
+              // the extension is idempotent across reconcile passes.
+              existingCoverage.set(key, requiredThrough);
             }
           }
         }
       }
-
-      return {
-        cancelledStale,
-        rescheduled,
-        activeSchedules: validActiveSchedules.length,
-      };
-    } catch (error) {
-      console.warn("Reconcile scheduled reminders failed:", error);
-      return {
-        cancelledStale,
-        rescheduled,
-        activeSchedules: 0,
-      };
     }
+
+    return {
+      cancelledStale,
+      rescheduled,
+      activeSchedules: validActiveSchedules.length,
+    };
+  } catch (error) {
+    console.warn('Reconcile scheduled reminders failed:', error);
+    return {
+      cancelledStale,
+      rescheduled,
+      activeSchedules: 0,
+    };
+  }
 }

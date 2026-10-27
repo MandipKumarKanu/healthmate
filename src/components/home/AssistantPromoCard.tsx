@@ -11,12 +11,7 @@ export function AssistantPromoCard({ onAskPress }: AssistantPromoCardProps) {
   return (
     <View style={styles.card}>
       <View style={styles.topRow}>
-        <Ionicons
-          name="sparkles"
-          size={22}
-          color="#0788F5"
-          style={styles.icon}
-        />
+        <Ionicons name="sparkles" size={22} color="#0788F5" style={styles.icon} />
         <View style={styles.textContainer}>
           <Text style={styles.title}>HealthMate AI Mode</Text>
           <Text style={styles.subtitle}>
@@ -25,11 +20,7 @@ export function AssistantPromoCard({ onAskPress }: AssistantPromoCardProps) {
         </View>
       </View>
 
-      <TouchableOpacity
-        style={styles.askButton}
-        onPress={onAskPress}
-        activeOpacity={0.7}
-      >
+      <TouchableOpacity style={styles.askButton} onPress={onAskPress} activeOpacity={0.7}>
         <Text style={styles.askButtonText}>Ask about a label</Text>
       </TouchableOpacity>
     </View>

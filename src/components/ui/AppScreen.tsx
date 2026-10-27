@@ -34,13 +34,7 @@ export function AppScreen({
   });
 
   return (
-    <View
-      style={[
-        styles.screen,
-        { paddingTop: insets.top, paddingBottom: insets.bottom },
-        style,
-      ]}
-    >
+    <View style={[styles.screen, { paddingTop: insets.top, paddingBottom: insets.bottom }, style]}>
       <StatusBar style="dark" />
       {scrollable ? (
         <KeyboardAvoidingView
@@ -65,9 +59,7 @@ export function AppScreen({
           </ScrollView>
         </KeyboardAvoidingView>
       ) : (
-        <View style={[styles.contentContainer, contentContainerStyle]}>
-          {children}
-        </View>
+        <View style={[styles.contentContainer, contentContainerStyle]}>{children}</View>
       )}
     </View>
   );

@@ -1,12 +1,5 @@
 import React, { useEffect } from 'react';
-import {
-  StyleSheet,
-  View,
-  Text,
-  TouchableOpacity,
-  Image,
-  Dimensions,
-} from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Image, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
@@ -36,11 +29,7 @@ export default function OnboardingWelcomeScreen() {
         {/* Top Header: Logo Icon & App Name */}
         <View style={styles.topHeader}>
           <View style={styles.appIcon}>
-            <MaterialCommunityIcons
-              name="heart-pulse"
-              size={36}
-              color="#FFFFFF"
-            />
+            <MaterialCommunityIcons name="heart-pulse" size={36} color="#FFFFFF" />
           </View>
           <Text style={styles.brandTitle}>HealthMate AI</Text>
         </View>
@@ -58,12 +47,10 @@ export default function OnboardingWelcomeScreen() {
         {/* Headline & Supporting Text */}
         <View style={styles.textContainer}>
           <Text style={styles.stepIndicator}>STEP 1 OF 3</Text>
-          <Text style={styles.headline}>
-            Your medication,{'\n'}organized beautifully.
-          </Text>
+          <Text style={styles.headline}>Your medication,{'\n'}organized beautifully.</Text>
           <Text style={styles.subhead}>
-            A little clarity for your everyday routine. Keep medicines, reminders
-            and label questions together.
+            A little clarity for your everyday routine. Keep medicines, reminders and label
+            questions together.
           </Text>
         </View>
 
@@ -77,19 +64,12 @@ export default function OnboardingWelcomeScreen() {
             accessibilityLabel="Next, proceed to profile setup"
           >
             <Text style={styles.nextButtonText}>Next</Text>
-            <Feather
-              name="arrow-right"
-              size={18}
-              color="#FFFFFF"
-              style={styles.nextArrow}
-            />
+            <Feather name="arrow-right" size={18} color="#FFFFFF" style={styles.nextArrow} />
           </TouchableOpacity>
 
           <View style={styles.privacyNote}>
             <Feather name="lock" size={13} color={Colors.textSecondary} />
-            <Text style={styles.privacyText}>
-              Private & stored locally on your device
-            </Text>
+            <Text style={styles.privacyText}>Private & stored locally on your device</Text>
           </View>
         </View>
       </View>

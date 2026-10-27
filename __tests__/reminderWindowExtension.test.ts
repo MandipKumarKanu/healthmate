@@ -1,93 +1,73 @@
-import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
-import * as Notifications from "expo-notifications";
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
+import * as Notifications from 'expo-notifications';
 import {
   getRequiredCoverageThroughDate,
   getTriggerCoveredThroughDate,
   notificationService,
-} from "../src/services/notificationService";
-import { medicineRepository } from "../src/database/repositories/medicineRepository";
-import { scheduleRepository } from "../src/database/repositories/scheduleRepository";
-import { Medicine, ReminderSchedule, ReminderTime } from "../src/types";
+} from '../src/services/notificationService';
+import { medicineRepository } from '../src/database/repositories/medicineRepository';
+import { scheduleRepository } from '../src/database/repositories/scheduleRepository';
+import { Medicine, ReminderSchedule, ReminderTime } from '../src/types';
 
 const FIXED_NOW = new Date(2026, 9, 27, 10, 0, 0); // Oct 27 2026, 10:00
 
 function dateStr(offsetDays: number, base: Date = FIXED_NOW): string {
-  const d = new Date(
-    base.getFullYear(),
-    base.getMonth(),
-    base.getDate() + offsetDays,
-  );
+  const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + offsetDays);
   return [
     d.getFullYear(),
-    String(d.getMonth() + 1).padStart(2, "0"),
-    String(d.getDate()).padStart(2, "0"),
-  ].join("-");
+    String(d.getMonth() + 1).padStart(2, '0'),
+    String(d.getDate()).padStart(2, '0'),
+  ].join('-');
 }
 
-describe("Notification trigger-window extension (cap fix)", () => {
-  describe("getRequiredCoverageThroughDate", () => {
-    it("uses the recurrence window cap for unbounded schedules", () => {
-      expect(
-        getRequiredCoverageThroughDate("daily", undefined, FIXED_NOW),
-      ).toBe(dateStr(60));
-      expect(
-        getRequiredCoverageThroughDate("weekly", undefined, FIXED_NOW),
-      ).toBe(dateStr(364));
-      expect(
-        getRequiredCoverageThroughDate("monthly", undefined, FIXED_NOW),
-      ).toBe(dateStr(729));
+describe('Notification trigger-window extension (cap fix)', () => {
+  describe('getRequiredCoverageThroughDate', () => {
+    it('uses the recurrence window cap for unbounded schedules', () => {
+      expect(getRequiredCoverageThroughDate('daily', undefined, FIXED_NOW)).toBe(dateStr(60));
+      expect(getRequiredCoverageThroughDate('weekly', undefined, FIXED_NOW)).toBe(dateStr(364));
+      expect(getRequiredCoverageThroughDate('monthly', undefined, FIXED_NOW)).toBe(dateStr(729));
     });
 
-    it("clamps to endDate when it lies inside the window cap", () => {
-      expect(
-        getRequiredCoverageThroughDate("daily", dateStr(45), FIXED_NOW),
-      ).toBe(dateStr(45));
+    it('clamps to endDate when it lies inside the window cap', () => {
+      expect(getRequiredCoverageThroughDate('daily', dateStr(45), FIXED_NOW)).toBe(dateStr(45));
     });
 
-    it("uses the window cap when endDate lies beyond it (long bounded schedule)", () => {
-      expect(
-        getRequiredCoverageThroughDate("daily", dateStr(90), FIXED_NOW),
-      ).toBe(dateStr(60));
+    it('uses the window cap when endDate lies beyond it (long bounded schedule)', () => {
+      expect(getRequiredCoverageThroughDate('daily', dateStr(90), FIXED_NOW)).toBe(dateStr(60));
     });
 
-    it("returns null for once doses and for schedules that are already over", () => {
-      expect(getRequiredCoverageThroughDate("once", dateStr(90), FIXED_NOW)).toBe(
-        null,
-      );
-      expect(
-        getRequiredCoverageThroughDate("daily", dateStr(-1), FIXED_NOW),
-      ).toBe(null);
+    it('returns null for once doses and for schedules that are already over', () => {
+      expect(getRequiredCoverageThroughDate('once', dateStr(90), FIXED_NOW)).toBe(null);
+      expect(getRequiredCoverageThroughDate('daily', dateStr(-1), FIXED_NOW)).toBe(null);
     });
   });
 
-  describe("getTriggerCoveredThroughDate", () => {
-    it("maps a one-shot DATE trigger (Date object) to its date string", () => {
+  describe('getTriggerCoveredThroughDate', () => {
+    it('maps a one-shot DATE trigger (Date object) to its date string', () => {
       const covered = getTriggerCoveredThroughDate({
         type: Notifications.SchedulableTriggerInputTypes.DATE,
         date: new Date(2026, 10, 15, 8, 0),
       });
-      expect(covered).toBe("2026-11-15");
+      expect(covered).toBe('2026-11-15');
     });
 
-    it("maps expo-normalized DATE triggers (epoch seconds) to a date string", () => {
-      const seconds = Math.floor(
-        new Date(2026, 10, 15, 8, 0).getTime() / 1000,
-      );
+    it('maps expo-normalized DATE triggers (epoch seconds) to a date string', () => {
+      const seconds = Math.floor(new Date(2026, 10, 15, 8, 0).getTime() / 1000);
       const covered = getTriggerCoveredThroughDate({
-        type: "date",
+        type: 'date',
         timestamp: seconds,
       });
-      expect(covered).toBe("2026-11-15");
+      expect(covered).toBe('2026-11-15');
     });
 
-    it("tells repeating triggers apart: they are covered forever", () => {
+    it('tells repeating triggers apart: they are covered forever', () => {
       expect(
         getTriggerCoveredThroughDate({
           type: Notifications.SchedulableTriggerInputTypes.DAILY,
           hour: 8,
           minute: 0,
         }),
-      ).toBe("forever");
+      ).toBe('forever');
       expect(
         getTriggerCoveredThroughDate({
           type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
@@ -95,19 +75,19 @@ describe("Notification trigger-window extension (cap fix)", () => {
           hour: 8,
           minute: 0,
         }),
-      ).toBe("forever");
-      expect(getTriggerCoveredThroughDate({ repeats: true })).toBe("forever");
+      ).toBe('forever');
+      expect(getTriggerCoveredThroughDate({ repeats: true })).toBe('forever');
     });
 
-    it("returns null for unusable trigger shapes so the dose gets re-armed", () => {
+    it('returns null for unusable trigger shapes so the dose gets re-armed', () => {
       expect(getTriggerCoveredThroughDate(null)).toBe(null);
       expect(getTriggerCoveredThroughDate({})).toBe(null);
     });
   });
 
-  describe("reconcileScheduledReminders extension behavior", () => {
-    const MEDICINE_ID = "med_cap_extension";
-    const SCHEDULE_ID = "sched_cap_extension";
+  describe('reconcileScheduledReminders extension behavior', () => {
+    const MEDICINE_ID = 'med_cap_extension';
+    const SCHEDULE_ID = 'sched_cap_extension';
 
     // Integration tests exercise scheduleDoseReminder + reconcile, which both
     // use the real current time — derive all dates from it.
@@ -116,10 +96,10 @@ describe("Notification trigger-window extension (cap fix)", () => {
     function makeMedicine(): Medicine {
       return {
         id: MEDICINE_ID,
-        name: "Cap Extension Test Medicine",
-        strength: "500 mg",
-        dosageForm: "tablet",
-        category: "Generic",
+        name: 'Cap Extension Test Medicine',
+        strength: '500 mg',
+        dosageForm: 'tablet',
+        category: 'Generic',
         packageDetails: {},
         isSample: false,
         createdAt: new Date().toISOString(),
@@ -131,14 +111,14 @@ describe("Notification trigger-window extension (cap fix)", () => {
       // A daily schedule bounded 90 days out: the initial window is capped at
       // 60 occurrences (min(endDate, today + 60)).
       const time: ReminderTime = {
-        id: "t_cap",
-        time: "23:30",
-        amount: "1 tablet",
+        id: 't_cap',
+        time: '23:30',
+        amount: '1 tablet',
       };
       return {
         id: SCHEDULE_ID,
         medicineId: MEDICINE_ID,
-        recurrence: "daily",
+        recurrence: 'daily',
         startDate: dateStr(0, now),
         endDate: dateStr(90, now),
         times: [time],
@@ -151,9 +131,7 @@ describe("Notification trigger-window extension (cap fix)", () => {
 
     async function scheduleCountForSchedule(): Promise<number> {
       const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-      return scheduled.filter(
-        (n) => n.content.data?.scheduleId === SCHEDULE_ID,
-      ).length;
+      return scheduled.filter((n) => n.content.data?.scheduleId === SCHEDULE_ID).length;
     }
 
     async function coveredDatesForSchedule(): Promise<string[]> {
@@ -162,19 +140,19 @@ describe("Notification trigger-window extension (cap fix)", () => {
       for (const n of scheduled) {
         if (n.content.data?.scheduleId !== SCHEDULE_ID) continue;
         const covered = getTriggerCoveredThroughDate((n as any).trigger);
-        if (typeof covered === "string") dates.push(covered);
+        if (typeof covered === 'string') dates.push(covered);
       }
       return dates.sort();
     }
 
     function addDays(dateStr_: string, days: number): string {
-      const [y, m, d] = dateStr_.split("-").map(Number);
+      const [y, m, d] = dateStr_.split('-').map(Number);
       const out = new Date(y!, m! - 1, d! + days);
       return [
         out.getFullYear(),
-        String(out.getMonth() + 1).padStart(2, "0"),
-        String(out.getDate()).padStart(2, "0"),
-      ].join("-");
+        String(out.getMonth() + 1).padStart(2, '0'),
+        String(out.getDate()).padStart(2, '0'),
+      ].join('-');
     }
 
     beforeEach(async () => {
@@ -190,14 +168,14 @@ describe("Notification trigger-window extension (cap fix)", () => {
       (Notifications as any).__clearScheduledNotifications();
     });
 
-    it("extends a running-out bounded window during reconcile", async () => {
+    it('extends a running-out bounded window during reconcile', async () => {
       const id = await notificationService.scheduleDoseReminder(
         SCHEDULE_ID,
-        "Cap Extension Test Medicine",
-        "1 tablet",
-        "23:30",
+        'Cap Extension Test Medicine',
+        '1 tablet',
+        '23:30',
         undefined,
-        { recurrence: "daily", startDate: dateStr(0, now), endDate: dateStr(90, now) },
+        { recurrence: 'daily', startDate: dateStr(0, now), endDate: dateStr(90, now) },
       );
       expect(id).toBeTruthy();
       expect(await scheduleCountForSchedule()).toBe(60); // capped at 60 occurrences
@@ -208,19 +186,13 @@ describe("Notification trigger-window extension (cap fix)", () => {
       for (let i = 1; i <= 4; i++) {
         await Notifications.scheduleNotificationAsync({
           content: {
-            title: "Time to take Cap Extension Test Medicine",
-            body: "Scheduled dose: 1 tablet",
-            data: { scheduleId: SCHEDULE_ID, time: "23:30" },
+            title: 'Time to take Cap Extension Test Medicine',
+            body: 'Scheduled dose: 1 tablet',
+            data: { scheduleId: SCHEDULE_ID, time: '23:30' },
           },
           trigger: {
             type: Notifications.SchedulableTriggerInputTypes.DATE,
-            date: new Date(
-              now.getFullYear(),
-              now.getMonth(),
-              now.getDate() + i,
-              23,
-              30,
-            ),
+            date: new Date(now.getFullYear(), now.getMonth(), now.getDate() + i, 23, 30),
           },
         });
       }
@@ -241,14 +213,14 @@ describe("Notification trigger-window extension (cap fix)", () => {
       expect(dates[dates.length - 1]).toBe(addDays(dates[0], 59));
     });
 
-    it("does not re-extend an already-full window (idempotent reconcile)", async () => {
+    it('does not re-extend an already-full window (idempotent reconcile)', async () => {
       const id = await notificationService.scheduleDoseReminder(
         SCHEDULE_ID,
-        "Cap Extension Test Medicine",
-        "1 tablet",
-        "23:30",
+        'Cap Extension Test Medicine',
+        '1 tablet',
+        '23:30',
         undefined,
-        { recurrence: "daily", startDate: dateStr(0, now), endDate: dateStr(90, now) },
+        { recurrence: 'daily', startDate: dateStr(0, now), endDate: dateStr(90, now) },
       );
       expect(id).toBeTruthy();
 
@@ -260,15 +232,15 @@ describe("Notification trigger-window extension (cap fix)", () => {
       expect(await scheduleCountForSchedule()).toBe(60);
     });
 
-    it("leaves repeating (native DAILY) triggers untouched", async () => {
+    it('leaves repeating (native DAILY) triggers untouched', async () => {
       // Unbounded started daily schedule -> native repeating DAILY trigger.
       const id = await notificationService.scheduleDoseReminder(
         SCHEDULE_ID,
-        "Cap Extension Test Medicine",
-        "1 tablet",
-        "23:30",
+        'Cap Extension Test Medicine',
+        '1 tablet',
+        '23:30',
         undefined,
-        { recurrence: "daily", startDate: dateStr(0, now) },
+        { recurrence: 'daily', startDate: dateStr(0, now) },
       );
       expect(id).toBeTruthy();
 
@@ -283,9 +255,7 @@ describe("Notification trigger-window extension (cap fix)", () => {
 
       const after = await Notifications.getAllScheduledNotificationsAsync();
       expect(after).toHaveLength(1); // no duplicate churn
-      expect((after[0] as any).trigger.type).toBe(
-        Notifications.SchedulableTriggerInputTypes.DAILY,
-      );
+      expect((after[0] as any).trigger.type).toBe(Notifications.SchedulableTriggerInputTypes.DAILY);
     });
   });
 });

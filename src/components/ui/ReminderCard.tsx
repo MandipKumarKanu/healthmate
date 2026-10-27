@@ -40,11 +40,7 @@ export function ReminderCard({
         activeOpacity={onPressCard ? 0.7 : 1}
       >
         <View style={styles.medRow}>
-          <MedicineIcon
-            form={dose.dosageForm}
-            name={dose.medicineName}
-            size={44}
-          />
+          <MedicineIcon form={dose.dosageForm} name={dose.medicineName} size={44} />
 
           <View style={styles.infoContainer}>
             <Text style={styles.medicineName}>{dose.medicineName}</Text>
@@ -53,16 +49,8 @@ export function ReminderCard({
             </Text>
           </View>
 
-          <TouchableOpacity
-            style={styles.moreButton}
-            onPress={onMorePress}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name="ellipsis-horizontal"
-              size={18}
-              color={Colors.textPrimary}
-            />
+          <TouchableOpacity style={styles.moreButton} onPress={onMorePress} activeOpacity={0.7}>
+            <Ionicons name="ellipsis-horizontal" size={18} color={Colors.textPrimary} />
           </TouchableOpacity>
         </View>
 
@@ -70,20 +58,11 @@ export function ReminderCard({
         {isUpcoming && onMarkTaken ? (
           <View style={styles.actionRow}>
             <View style={styles.markTakenContainer}>
-              <AppButton
-                title="Mark Taken"
-                onPress={onMarkTaken}
-                variant="primary"
-                size="md"
-              />
+              <AppButton title="Mark Taken" onPress={onMarkTaken} variant="primary" size="md" />
             </View>
 
             {onSkip ? (
-              <TouchableOpacity
-                style={styles.skipButton}
-                onPress={onSkip}
-                activeOpacity={0.7}
-              >
+              <TouchableOpacity style={styles.skipButton} onPress={onSkip} activeOpacity={0.7}>
                 <Text style={styles.skipText}>Skip</Text>
               </TouchableOpacity>
             ) : null}

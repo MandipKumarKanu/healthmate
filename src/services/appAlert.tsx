@@ -1,10 +1,4 @@
-import React, {
-  type PropsWithChildren,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
+import React, { type PropsWithChildren, useCallback, useEffect, useRef, useState } from 'react';
 import { AppDialog, type AppDialogButton } from '../components/ui/AppDialog';
 
 export interface AppAlertOptions {
@@ -27,12 +21,7 @@ let nextId = 1;
 const pendingRequests: AlertRequest[] = [];
 
 export const AppAlert = {
-  alert(
-    title: string,
-    message?: string,
-    buttons?: AppDialogButton[],
-    options?: AppAlertOptions,
-  ) {
+  alert(title: string, message?: string, buttons?: AppDialogButton[], options?: AppAlertOptions) {
     const request: AlertRequest = {
       id: nextId++,
       title,

@@ -81,7 +81,12 @@ export const PHARMACEUTICAL_DICTIONARY: PharmaceuticalEntry[] = [
   // Common Brands mapped to Generics
   { name: 'Glucophage', genericName: 'Metformin', isBrand: true },
   { name: 'Amoxil', genericName: 'Amoxicillin', isBrand: true },
-  { name: 'Augmentin', genericName: 'Amoxicillin', isBrand: true, aliases: ['Amoxicillin-Clavulanate'] },
+  {
+    name: 'Augmentin',
+    genericName: 'Amoxicillin',
+    isBrand: true,
+    aliases: ['Amoxicillin-Clavulanate'],
+  },
   { name: 'Tylenol', genericName: 'Acetaminophen', isBrand: true },
   { name: 'Advil', genericName: 'Ibuprofen', isBrand: true },
   { name: 'Motrin', genericName: 'Ibuprofen', isBrand: true },
@@ -155,9 +160,9 @@ export function ocrAwareEditDistance(s1: string, s2: string): number {
       }
 
       dp[i][j] = Math.min(
-        dp[i - 1][j] + 1.0,     // deletion
-        dp[i][j - 1] + 1.0,     // insertion
-        dp[i - 1][j - 1] + cost // substitution
+        dp[i - 1][j] + 1.0, // deletion
+        dp[i][j - 1] + 1.0, // insertion
+        dp[i - 1][j - 1] + cost, // substitution
       );
     }
   }

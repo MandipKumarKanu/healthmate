@@ -79,7 +79,7 @@ export const MEDICATION_GUARDRAIL_SYSTEM_PROMPT = [
   '- NEVER give personalized medical advice: no recommended or adjusted doses for the user,',
   '  no assessment of symptoms, no drug-interaction judgments, no advice to start, stop, or change any medicine.',
   '- If a question seeks any of that, answer ONLY with a short, kind refusal that points to the',
-  "  patient leaflet, a pharmacist, or the prescriber. If overdose or severe symptoms are mentioned,",
+  '  patient leaflet, a pharmacist, or the prescriber. If overdose or severe symptoms are mentioned,',
   '  direct the user to urgent local medical help.',
   '- Do not invent drug facts. General educational content only; no product-name claims that you cannot verify.',
   '- Keep answers short (under 180 words), plain-language, and validating of "confirm with your pharmacist".',
@@ -94,10 +94,7 @@ export const MEDICATION_GUARDRAIL_SYSTEM_PROMPT = [
  * instead of merging local dictionary/regex guesses (lot numbers, strengths
  * inferred from noise) back into the result.
  */
-function geminiOptionalField(
-  parsed: Record<string, unknown>,
-  key: string,
-): string | undefined {
+function geminiOptionalField(parsed: Record<string, unknown>, key: string): string | undefined {
   const value = parsed[key];
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
@@ -174,7 +171,9 @@ export const aiAssistantService = {
       // Do not cache a storage failure as "no key". A later read may succeed.
       this._cachedKey = undefined;
       throw Object.assign(
-        new Error('HealthMate could not read the saved Gemini key securely. Reopen AI setup and try again.'),
+        new Error(
+          'HealthMate could not read the saved Gemini key securely. Reopen AI setup and try again.',
+        ),
         { code: 'SECURE_STORE_READ' },
       );
     }
@@ -209,9 +208,7 @@ export const aiAssistantService = {
       await SecureStore.deleteItemAsync(KEY_STORE_NAME);
     } catch {
       this._cachedKey = undefined;
-      throw new Error(
-        'HealthMate could not remove the saved Gemini key. Please try again.',
-      );
+      throw new Error('HealthMate could not remove the saved Gemini key. Please try again.');
     }
   },
 
@@ -229,15 +226,9 @@ export const aiAssistantService = {
    * Maps persisted chat history (most recent first in caller order) into
    * Gemini contents, bounded to MAX_HISTORY_TURNS recent non-empty turns.
    */
-  buildContents(
-    history: Pick<AIMessage, 'role' | 'content'>[],
-    prompt: string,
-  ): GeminiTurn[] {
+  buildContents(history: Pick<AIMessage, 'role' | 'content'>[], prompt: string): GeminiTurn[] {
     const usable = history
-      .filter(
-        (m) =>
-          (m.role === 'user' || m.role === 'assistant') && m.content.trim(),
-      )
+      .filter((m) => (m.role === 'user' || m.role === 'assistant') && m.content.trim())
       .slice(-MAX_HISTORY_TURNS);
     usable.push({ role: 'user', content: prompt });
     return usable.map((m) => ({
@@ -288,8 +279,7 @@ export const aiAssistantService = {
 
     // Start from the last model that answered successfully so the
     // common case is one request instead of replaying the whole try-chain.
-    const preferredModel =
-      options.model ?? (await this.getWorkingModel()) ?? DEFAULT_MODEL;
+    const preferredModel = options.model ?? (await this.getWorkingModel()) ?? DEFAULT_MODEL;
     const modelsToTry = [
       preferredModel,
       ...GEMINI_MODELS_TO_TRY.filter((model) => model !== preferredModel),
@@ -394,21 +384,18 @@ export const aiAssistantService = {
 
     try {
       for (const model of GEMINI_MODELS_TO_TRY) {
-        const response = await fetch(
-          `${API_BASE}/models/${model}:generateContent`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-goog-api-key': trimmed,
-            },
-            body: JSON.stringify({
-              contents: [{ role: 'user', parts: [{ text: 'ping' }] }],
-              generationConfig: { maxOutputTokens: 2 },
-            }),
-            signal: controller.signal,
+        const response = await fetch(`${API_BASE}/models/${model}:generateContent`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': trimmed,
           },
-        );
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: 'ping' }] }],
+            generationConfig: { maxOutputTokens: 2 },
+          }),
+          signal: controller.signal,
+        });
 
         if (response.ok) {
           // The key was verified through this model — prefer it next.
@@ -420,7 +407,11 @@ export const aiAssistantService = {
         if (response.status === 404) continue;
 
         const mapped = classifyGeminiError(response.status, detail);
-        if (mapped.code === 'BAD_KEY' || mapped.code === 'ACCESS_DENIED' || mapped.code === 'RATE_LIMIT') {
+        if (
+          mapped.code === 'BAD_KEY' ||
+          mapped.code === 'ACCESS_DENIED' ||
+          mapped.code === 'RATE_LIMIT'
+        ) {
           return { valid: false, error: mapped.message };
         }
         return {
@@ -433,7 +424,8 @@ export const aiAssistantService = {
 
       return {
         valid: false,
-        error: 'Google did not expose a supported Gemini model to this key. Check the project and API access in Google AI Studio.',
+        error:
+          'Google did not expose a supported Gemini model to this key. Check the project and API access in Google AI Studio.',
       };
     } catch (error: any) {
       if (error?.name === 'AbortError') {
@@ -455,9 +447,7 @@ export const aiAssistantService = {
    * Interprets raw OCR text from medicine packaging using the user's personal
    * Gemini AI to accurately identify medicine name, strength, form, batch, and expiry.
    */
-  async parseMedicinePackagingWithAI(
-    rawOcrText: string
-  ): Promise<ExtractedMedicineData> {
+  async parseMedicinePackagingWithAI(rawOcrText: string): Promise<ExtractedMedicineData> {
     const baseExtraction = ocrService.extractMedicineData(rawOcrText);
     const apiKey = await this.getApiKey();
     if (!apiKey || !rawOcrText.trim()) {
@@ -491,10 +481,7 @@ export const aiAssistantService = {
     // not replay the full try-chain either.
     const preferredParseModel = await this.getWorkingModel();
     const modelsToTry = preferredParseModel
-      ? [
-          preferredParseModel,
-          ...GEMINI_MODELS_TO_TRY.filter((m) => m !== preferredParseModel),
-        ]
+      ? [preferredParseModel, ...GEMINI_MODELS_TO_TRY.filter((m) => m !== preferredParseModel)]
       : GEMINI_MODELS_TO_TRY;
     let lastPackagingParseError: unknown = null;
     let lastModelError = '';
@@ -506,51 +493,50 @@ export const aiAssistantService = {
 
         let response: Response;
         try {
-          response = await fetch(
-            `${API_BASE}/models/${model}:generateContent`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-goog-api-key': apiKey,
+          response = await fetch(`${API_BASE}/models/${model}:generateContent`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': apiKey,
+            },
+            body: JSON.stringify({
+              systemInstruction: {
+                parts: [{ text: systemPrompt }],
               },
-              body: JSON.stringify({
-                systemInstruction: {
-                  parts: [{ text: systemPrompt }],
+              contents: [
+                {
+                  role: 'user',
+                  parts: [
+                    {
+                      text: [
+                        `Raw OCR text from medication packaging:\n\n${rawOcrText}`,
+                        baseExtraction.genericName
+                          ? `\nInitial salt/composition hint from local dictionary: ${baseExtraction.genericName}`
+                          : '',
+                        baseExtraction.medicineName &&
+                        baseExtraction.medicineName !== 'Unknown medicine'
+                          ? `Initial brand hint from local dictionary: ${baseExtraction.medicineName}`
+                          : '',
+                      ]
+                        .filter(Boolean)
+                        .join('\n'),
+                    },
+                  ],
                 },
-                contents: [
-                  {
-                    role: 'user',
-                    parts: [
-                      {
-                        text: [
-                          `Raw OCR text from medication packaging:\n\n${rawOcrText}`,
-                          baseExtraction.genericName
-                            ? `\nInitial salt/composition hint from local dictionary: ${baseExtraction.genericName}`
-                            : '',
-                          baseExtraction.medicineName && baseExtraction.medicineName !== 'Unknown medicine'
-                            ? `Initial brand hint from local dictionary: ${baseExtraction.medicineName}`
-                            : '',
-                        ].filter(Boolean).join('\n'),
-                      },
-                    ],
-                  },
-                ],
-                generationConfig: {
-                  temperature: 0.1,
-                  responseMimeType: 'application/json',
-                  maxOutputTokens: 512,
-                },
-              }),
-              signal: controller.signal,
-            }
-          );
+              ],
+              generationConfig: {
+                temperature: 0.1,
+                responseMimeType: 'application/json',
+                maxOutputTokens: 512,
+              },
+            }),
+            signal: controller.signal,
+          });
         } catch (error) {
           if ((error as { name?: string })?.name === 'AbortError') {
-            throw Object.assign(
-              new Error('Gemini packaging interpretation timed out.'),
-              { code: 'TIMEOUT' },
-            );
+            throw Object.assign(new Error('Gemini packaging interpretation timed out.'), {
+              code: 'TIMEOUT',
+            });
           }
           throw Object.assign(
             new Error('Could not reach Gemini to interpret this medicine label.'),
@@ -579,10 +565,9 @@ export const aiAssistantService = {
         const data = await response.json();
         const answerText = this.extractAnswerText(data);
         if (!answerText) {
-          throw Object.assign(
-            new Error('Gemini returned an empty packaging interpretation.'),
-            { code: 'EMPTY_ANSWER' },
-          );
+          throw Object.assign(new Error('Gemini returned an empty packaging interpretation.'), {
+            code: 'EMPTY_ANSWER',
+          });
         }
 
         const cleanJson = answerText
@@ -600,10 +585,8 @@ export const aiAssistantService = {
         // value stays absent rather than inheriting dictionary noise.
         const geminiName = geminiOptionalField(parsed, 'medicineName');
         const geminiGeneric = geminiOptionalField(parsed, 'genericName');
-        const resolvedMedName =
-          geminiName || geminiGeneric || baseExtraction.medicineName;
-        const resolvedGenName =
-          geminiGeneric || baseExtraction.genericName;
+        const resolvedMedName = geminiName || geminiGeneric || baseExtraction.medicineName;
+        const resolvedGenName = geminiGeneric || baseExtraction.genericName;
 
         return {
           medicineName: resolvedMedName,
@@ -633,7 +616,9 @@ export const aiAssistantService = {
 
     if (lastPackagingParseError) {
       throw Object.assign(
-        new Error('Gemini could not return a reliable structured interpretation. Review the OCR fields manually.'),
+        new Error(
+          'Gemini could not return a reliable structured interpretation. Review the OCR fields manually.',
+        ),
         { code: 'AI_PARSE' },
       );
     }
@@ -654,7 +639,7 @@ export const aiAssistantService = {
   async fetchMedicineEducationalInfo(
     medicineName: string,
     activeIngredient?: string,
-    dosageForm?: string
+    dosageForm?: string,
   ): Promise<MedicineEducationalInfo> {
     const apiKey = await this.getApiKey();
     if (!apiKey) {
@@ -688,9 +673,10 @@ export const aiAssistantService = {
       ...GEMINI_MODELS_TO_TRY.filter((m) => m !== preferredModel),
     ];
 
-    const saltText = activeIngredient && activeIngredient.trim()
-      ? activeIngredient.trim()
-      : 'Infer from medicine name';
+    const saltText =
+      activeIngredient && activeIngredient.trim()
+        ? activeIngredient.trim()
+        : 'Infer from medicine name';
     const userPrompt = `Medicine Name: ${medicineName}\nActive Salt / Composition: ${saltText}\nDosage Form: ${dosageForm || 'tablet'}`;
 
     let lastError: unknown = null;
@@ -702,33 +688,30 @@ export const aiAssistantService = {
 
         let response: Response;
         try {
-          response = await fetch(
-            `${API_BASE}/models/${model}:generateContent`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-goog-api-key': apiKey,
+          response = await fetch(`${API_BASE}/models/${model}:generateContent`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': apiKey,
+            },
+            body: JSON.stringify({
+              systemInstruction: {
+                parts: [{ text: systemPrompt }],
               },
-              body: JSON.stringify({
-                systemInstruction: {
-                  parts: [{ text: systemPrompt }],
+              contents: [
+                {
+                  role: 'user',
+                  parts: [{ text: userPrompt }],
                 },
-                contents: [
-                  {
-                    role: 'user',
-                    parts: [{ text: userPrompt }],
-                  },
-                ],
-                generationConfig: {
-                  temperature: 0.2,
-                  responseMimeType: 'application/json',
-                  maxOutputTokens: 768,
-                },
-              }),
-              signal: controller.signal,
-            }
-          );
+              ],
+              generationConfig: {
+                temperature: 0.2,
+                responseMimeType: 'application/json',
+                maxOutputTokens: 768,
+              },
+            }),
+            signal: controller.signal,
+          });
         } catch (error) {
           if ((error as { name?: string })?.name === 'AbortError') {
             throw Object.assign(new Error('AI request timed out.'), { code: 'TIMEOUT' });
@@ -766,17 +749,26 @@ export const aiAssistantService = {
         await this.setWorkingModel(model);
 
         return {
-          summary: typeof parsed.summary === 'string' ? parsed.summary.trim() : `Educational summary for ${medicineName}.`,
-          mechanism: typeof parsed.mechanism === 'string' ? parsed.mechanism.trim() : 'Mechanism details not available.',
-          commonUses: Array.isArray(parsed.commonUses) && parsed.commonUses.length > 0
-            ? parsed.commonUses.map(String)
-            : ['General health management as prescribed by your doctor.'],
-          safetyAlerts: Array.isArray(parsed.safetyAlerts) && parsed.safetyAlerts.length > 0
-            ? parsed.safetyAlerts.map(String)
-            : ['Check the patient leaflet on the original package and consult a pharmacist.'],
-          sideEffects: Array.isArray(parsed.sideEffects) && parsed.sideEffects.length > 0
-            ? parsed.sideEffects.map(String)
-            : ['Refer to the official package insert for potential side effects.'],
+          summary:
+            typeof parsed.summary === 'string'
+              ? parsed.summary.trim()
+              : `Educational summary for ${medicineName}.`,
+          mechanism:
+            typeof parsed.mechanism === 'string'
+              ? parsed.mechanism.trim()
+              : 'Mechanism details not available.',
+          commonUses:
+            Array.isArray(parsed.commonUses) && parsed.commonUses.length > 0
+              ? parsed.commonUses.map(String)
+              : ['General health management as prescribed by your doctor.'],
+          safetyAlerts:
+            Array.isArray(parsed.safetyAlerts) && parsed.safetyAlerts.length > 0
+              ? parsed.safetyAlerts.map(String)
+              : ['Check the patient leaflet on the original package and consult a pharmacist.'],
+          sideEffects:
+            Array.isArray(parsed.sideEffects) && parsed.sideEffects.length > 0
+              ? parsed.sideEffects.map(String)
+              : ['Refer to the official package insert for potential side effects.'],
           activeSaltUsed: activeIngredient || medicineName,
           generatedAt: new Date().toISOString(),
         };
@@ -795,11 +787,7 @@ export const aiAssistantService = {
 function normalizeDosageForm(form?: string): DosageForm {
   if (!form) return 'tablet';
   const lower = form.toLowerCase().trim();
-  if (
-    lower.includes('tablet') ||
-    lower.includes('tab') ||
-    lower.includes('pill')
-  ) {
+  if (lower.includes('tablet') || lower.includes('tab') || lower.includes('pill')) {
     return 'tablet';
   }
   if (lower.includes('capsule') || lower.includes('cap')) {
@@ -808,11 +796,7 @@ function normalizeDosageForm(form?: string): DosageForm {
   if (lower.includes('softgel') || lower.includes('gel cap')) {
     return 'softgel';
   }
-  if (
-    lower.includes('eye drop') ||
-    lower.includes('ophthalmic') ||
-    lower.includes('eye_drop')
-  ) {
+  if (lower.includes('eye drop') || lower.includes('ophthalmic') || lower.includes('eye_drop')) {
     return 'eye_drop';
   }
   if (

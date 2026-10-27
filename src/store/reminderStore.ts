@@ -1,15 +1,10 @@
-import { create } from "zustand";
-import {
-  ScheduledDose,
-  DoseStatus,
-  DayAdherenceSummary,
-  ReminderSchedule,
-} from "../types";
-import { adherenceRepository } from "../database/repositories/adherenceRepository";
-import { scheduleRepository } from "../database/repositories/scheduleRepository";
-import { medicineRepository } from "../database/repositories/medicineRepository";
-import { notificationService } from "../services/notificationService";
-import { getTodayDateString } from "../database/seed";
+import { create } from 'zustand';
+import { ScheduledDose, DoseStatus, DayAdherenceSummary, ReminderSchedule } from '../types';
+import { adherenceRepository } from '../database/repositories/adherenceRepository';
+import { scheduleRepository } from '../database/repositories/scheduleRepository';
+import { medicineRepository } from '../database/repositories/medicineRepository';
+import { notificationService } from '../services/notificationService';
+import { getTodayDateString } from '../database/seed';
 
 /**
  * Named, user-facing reasons a schedule could not arm its alarms.
@@ -18,10 +13,7 @@ import { getTodayDateString } from "../database/seed";
  * `internal`: permission state looks fine, but scheduling still failed
  *   (runtime, storage or network failure inside the scheduling path).
  */
-export type ScheduleAlarmFailure =
-  | "notification_permission"
-  | "exact_alarm"
-  | "internal";
+export type ScheduleAlarmFailure = 'notification_permission' | 'exact_alarm' | 'internal';
 
 export interface ScheduleSaveResult {
   /** The schedule row (and the visible date refresh) persisted successfully. */
@@ -34,15 +26,8 @@ interface ReminderState {
   doses: ScheduledDose[];
   daySummary: DayAdherenceSummary | null;
   loadDosesForDate: (date: string) => void;
-  markDoseStatus: (
-    dose: ScheduledDose,
-    status: DoseStatus,
-    targetDate: string,
-  ) => void;
-  saveSchedule: (
-    schedule: ReminderSchedule,
-    refreshDate?: string,
-  ) => Promise<ScheduleSaveResult>;
+  markDoseStatus: (dose: ScheduledDose, status: DoseStatus, targetDate: string) => void;
+  saveSchedule: (schedule: ReminderSchedule, refreshDate?: string) => Promise<ScheduleSaveResult>;
   deleteSchedule: (scheduleId: string, refreshDate?: string) => Promise<void>;
   toggleScheduleEnabled: (
     scheduleId: string,
@@ -86,7 +71,7 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
     }
 
     const medicine = medicineRepository.getById(schedule.medicineId);
-    const medicineName = medicine?.name ?? "Medicine";
+    const medicineName = medicine?.name ?? 'Medicine';
 
     // A schedule can contain multiple dose times. Schedule those dose chains
     // concurrently; each native chain is keyed by scheduleId + time, and each
@@ -118,12 +103,11 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
       // Classify WHY scheduling failed so screens can show a named
       // reason (permission loss vs exact-alarm denial vs internal error).
       const diagnosis = await notificationService.diagnoseAlarmAccess();
-      const alarmFailure: ScheduleAlarmFailure =
-        !diagnosis.notificationPermission
-          ? "notification_permission"
-          : !diagnosis.exactAlarm
-            ? "exact_alarm"
-            : "internal";
+      const alarmFailure: ScheduleAlarmFailure = !diagnosis.notificationPermission
+        ? 'notification_permission'
+        : !diagnosis.exactAlarm
+          ? 'exact_alarm'
+          : 'internal';
       return { saved: true, alarmFailure };
     }
 
@@ -137,11 +121,7 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
     get().loadDosesForDate(refreshDate);
   },
 
-  toggleScheduleEnabled: async (
-    scheduleId,
-    enabled,
-    refreshDate = getTodayDateString(),
-  ) => {
+  toggleScheduleEnabled: async (scheduleId, enabled, refreshDate = getTodayDateString()) => {
     scheduleRepository.toggleEnabled(scheduleId, enabled);
     if (!enabled) {
       await notificationService.cancelForSchedule(scheduleId);
@@ -149,7 +129,7 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
       const schedule = scheduleRepository.getById(scheduleId);
       if (schedule && schedule.notificationsEnabled) {
         const medicine = medicineRepository.getById(schedule.medicineId);
-        const medicineName = medicine?.name ?? "Medicine";
+        const medicineName = medicine?.name ?? 'Medicine';
         for (const dose of schedule.times) {
           await notificationService.scheduleDoseReminder(
             schedule.id,

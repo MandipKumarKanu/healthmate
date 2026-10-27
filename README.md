@@ -41,7 +41,7 @@ The application faithfully reproduces the iOS-style reference design, offering a
    - Automated OCR parsing extracting Medicine Name, Strength, Dosage Form, Manufacturer, Batch, and Expiry Date
    - Human-in-the-loop review allowing corrections before adding to cabinet or saving to history
 
-6. **AI Assistant (`/ai-assistant`)**:    - Live answers via Gemini `gemini-flash-lite-latest`, with `latest`-alias fallback.
+6. **AI Assistant (`/ai-assistant`)**: - Live answers via Gemini `gemini-flash-lite-latest`, with `latest`-alias fallback.
    - The in-app "Connect AI" flow verifies the key and confirms SecureStore persistence before showing a connected state. Rejected keys are disconnected and the user is prompted to reconnect.
    - The key stays in Expo SecureStore on-device and is sent to Google when a Gemini feature is used. Google rejects unrestricted standard keys; use a new auth key or a standard key with explicit API restrictions.
    - Suggested prompts for mg vs. mL, active ingredients, batch/lot numbers, and medicine storage
@@ -155,16 +155,19 @@ healthmate/
 ## 🚀 Getting Started
 
 ### 1. Install Dependencies
+
 ```bash
 npm install
 ```
 
 ### 2. Start the Metro Development Server
+
 ```bash
 npm run start
 ```
 
 ### 3. Run on Target Platform
+
 - **iOS Simulator**: `npm run ios` (macOS with Xcode required)
 - **Android Emulator / Device**: `npm run android`
 - **Web Browser**: `npm run web`
@@ -196,6 +199,7 @@ npx expo-doctor
 HealthMate includes an automated GitHub Actions workflow (`.github/workflows/release-apk.yml`) that builds, packages, and releases installable Android APKs.
 
 ### 1. Trigger via Git Tag (Automatic Release)
+
 Pushing any version tag starting with `v` automatically kicks off a build and publishes a GitHub Release with the APK attached:
 
 ```bash
@@ -204,13 +208,15 @@ git push origin v1.3.1
 ```
 
 ### 2. Trigger Manually (GitHub Actions UI)
+
 1. Navigate to the **Actions** tab in your GitHub repository.
 2. Select **Build & Release Android APK** from the left sidebar.
 3. Click **Run workflow**.
-4. *(Optional)* Provide a custom tag name (e.g. `v1.3.1`) and release title.
+4. _(Optional)_ Provide a custom tag name (e.g. `v1.3.1`) and release title.
 5. Click **Run workflow**.
 
 ### 3. Output & Distribution
+
 - **GitHub Releases**: Standalone installable APKs (`healthmate-v1.3.1-arm64-v8a.apk` and `healthmate-v1.3.1-armeabi-v7a.apk`) are automatically attached to the published GitHub Release with generated release notes.
 - **Workflow Artifacts**: The APKs are also preserved as downloadable workflow artifacts (`healthmate-apk-arm64-v8a` and `healthmate-apk-armeabi-v7a`) in the Actions run summary page for 30 days.
 
@@ -219,4 +225,3 @@ git push origin v1.3.1
 ## 🔒 Medical & Privacy Safety Notice
 
 HealthMate AI is strictly an **educational and organizational tool**. It is not a diagnostic device, clinical decision system, or prescription dispensing service. All medication records remain stored on the local device.
-

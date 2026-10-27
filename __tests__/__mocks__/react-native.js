@@ -1,8 +1,7 @@
 const Platform = {
-  OS: "android",
+  OS: 'android',
   Version: 34,
-  select: (obj) =>
-    obj && obj.android !== undefined ? obj.android : obj?.default,
+  select: (obj) => (obj && obj.android !== undefined ? obj.android : obj?.default),
 };
 
 const NativeModules = {
@@ -19,7 +18,7 @@ const NativeModules = {
     requestIgnoreBatteryOptimizations: jest.fn().mockResolvedValue(true),
     openExactAlarmSettings: jest.fn().mockResolvedValue(true),
     openAppBatterySettings: jest.fn().mockResolvedValue(true),
-    getDeviceManufacturer: jest.fn().mockResolvedValue("samsung"),
+    getDeviceManufacturer: jest.fn().mockResolvedValue('samsung'),
     openOemAutoStartSettings: jest.fn().mockResolvedValue(true),
     canUseFullScreenIntent: jest.fn().mockResolvedValue(true),
     openFullScreenIntentSettings: jest.fn().mockResolvedValue(true),

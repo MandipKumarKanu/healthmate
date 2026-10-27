@@ -1,23 +1,17 @@
-import React, { useEffect, useState } from "react";
-import {
-  StyleSheet,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-} from "react-native";
-import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-import { Colors } from "../../theme/colors";
-import { Radius, Spacing, Typography } from "../../theme/tokens";
-import { AppScreen } from "../../components/ui/AppScreen";
-import { AppHeader } from "../../components/ui/AppHeader";
-import { MedicineCard } from "../../components/ui/MedicineCard";
-import { SectionHeader } from "../../components/ui/SectionHeader";
-import { MedicalDisclaimer } from "../../components/ui/MedicalDisclaimer";
-import { useMedicineStore } from "../../store/medicineStore";
-import { scheduleRepository } from "../../database/repositories/scheduleRepository";
-import { ReminderSchedule } from "../../types";
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, View, Text, TextInput, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { Colors } from '../../theme/colors';
+import { Radius, Spacing, Typography } from '../../theme/tokens';
+import { AppScreen } from '../../components/ui/AppScreen';
+import { AppHeader } from '../../components/ui/AppHeader';
+import { MedicineCard } from '../../components/ui/MedicineCard';
+import { SectionHeader } from '../../components/ui/SectionHeader';
+import { MedicalDisclaimer } from '../../components/ui/MedicalDisclaimer';
+import { useMedicineStore } from '../../store/medicineStore';
+import { scheduleRepository } from '../../database/repositories/scheduleRepository';
+import { ReminderSchedule } from '../../types';
 
 export default function MedicinesScreen() {
   const router = useRouter();
@@ -32,9 +26,7 @@ export default function MedicinesScreen() {
     setReminderFilter,
   } = useMedicineStore();
 
-  const [schedulesMap, setSchedulesMap] = useState<
-    Map<string, ReminderSchedule>
-  >(new Map());
+  const [schedulesMap, setSchedulesMap] = useState<Map<string, ReminderSchedule>>(new Map());
 
   useEffect(() => {
     loadMedicines();
@@ -53,18 +45,13 @@ export default function MedicinesScreen() {
         title="My Medicines"
         subtitle="A little order for your medicine cabinet"
         brandText="HealthMate AI"
-        onAddPress={() => router.push("/medicines/add")}
+        onAddPress={() => router.push('/medicines/add')}
       />
 
       <View style={styles.body}>
         {/* Search Bar */}
         <View style={styles.searchContainer}>
-          <Ionicons
-            name="search"
-            size={18}
-            color={Colors.textTertiary}
-            style={styles.searchIcon}
-          />
+          <Ionicons name="search" size={18} color={Colors.textTertiary} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="Name or ingredient"
@@ -76,41 +63,29 @@ export default function MedicinesScreen() {
           {searchQuery.length > 0 && (
             <TouchableOpacity
               style={styles.clearSearchButton}
-              onPress={() => setSearchQuery("")}
+              onPress={() => setSearchQuery('')}
               accessibilityRole="button"
               accessibilityLabel="Clear search text"
               activeOpacity={0.7}
             >
-              <Ionicons
-                name="close-circle"
-                size={18}
-                color={Colors.textTertiary}
-              />
+              <Ionicons name="close-circle" size={18} color={Colors.textTertiary} />
             </TouchableOpacity>
           )}
         </View>
 
         {/* Filter Segment 1: All / Active / Expired */}
         <View style={styles.segmentControl}>
-          {(["all", "active", "expired"] as const).map((filter) => {
+          {(['all', 'active', 'expired'] as const).map((filter) => {
             const isActive = expiryFilter === filter;
             const label = filter.charAt(0).toUpperCase() + filter.slice(1);
             return (
               <TouchableOpacity
                 key={filter}
-                style={[
-                  styles.segmentButton,
-                  isActive && styles.segmentButtonActive,
-                ]}
+                style={[styles.segmentButton, isActive && styles.segmentButtonActive]}
                 onPress={() => setExpiryFilter(filter)}
                 activeOpacity={0.7}
               >
-                <Text
-                  style={[
-                    styles.segmentText,
-                    isActive && styles.segmentTextActive,
-                  ]}
-                >
+                <Text style={[styles.segmentText, isActive && styles.segmentTextActive]}>
                   {label}
                 </Text>
               </TouchableOpacity>
@@ -121,19 +96,14 @@ export default function MedicinesScreen() {
         {/* Filter Row 2: With Reminders / Without Reminders */}
         <View style={styles.reminderFilterRow}>
           <TouchableOpacity
-            style={[
-              styles.pillFilter,
-              reminderFilter === "with" && styles.pillFilterActive,
-            ]}
-            onPress={() =>
-              setReminderFilter(reminderFilter === "with" ? "all" : "with")
-            }
+            style={[styles.pillFilter, reminderFilter === 'with' && styles.pillFilterActive]}
+            onPress={() => setReminderFilter(reminderFilter === 'with' ? 'all' : 'with')}
             activeOpacity={0.7}
           >
             <Text
               style={[
                 styles.pillFilterText,
-                reminderFilter === "with" && styles.pillFilterTextActive,
+                reminderFilter === 'with' && styles.pillFilterTextActive,
               ]}
             >
               With Reminders
@@ -141,21 +111,14 @@ export default function MedicinesScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[
-              styles.pillFilter,
-              reminderFilter === "without" && styles.pillFilterActive,
-            ]}
-            onPress={() =>
-              setReminderFilter(
-                reminderFilter === "without" ? "all" : "without",
-              )
-            }
+            style={[styles.pillFilter, reminderFilter === 'without' && styles.pillFilterActive]}
+            onPress={() => setReminderFilter(reminderFilter === 'without' ? 'all' : 'without')}
             activeOpacity={0.7}
           >
             <Text
               style={[
                 styles.pillFilterText,
-                reminderFilter === "without" && styles.pillFilterTextActive,
+                reminderFilter === 'without' && styles.pillFilterTextActive,
               ]}
             >
               Without Reminders
@@ -180,8 +143,7 @@ export default function MedicinesScreen() {
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyTitle}>No medicines found</Text>
             <Text style={styles.emptySubtitle}>
-              Try adjusting your search or filters, or tap + Add to add a new
-              medicine.
+              Try adjusting your search or filters, or tap + Add to add a new medicine.
             </Text>
           </View>
         ) : null}
@@ -204,9 +166,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.screenPaddingHorizontal,
   },
   searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#E5E4EA",
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E5E4EA',
     borderRadius: Radius.pill,
     paddingHorizontal: 12,
     height: 42,
@@ -224,8 +186,8 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   segmentControl: {
-    flexDirection: "row",
-    backgroundColor: "#E4E3E8",
+    flexDirection: 'row',
+    backgroundColor: '#E4E3E8',
     borderRadius: Radius.pill,
     padding: 3,
     marginBottom: Spacing.sm,
@@ -233,12 +195,12 @@ const styles = StyleSheet.create({
   segmentButton: {
     flex: 1,
     paddingVertical: 6,
-    alignItems: "center",
+    alignItems: 'center',
     borderRadius: Radius.pill,
   },
   segmentButtonActive: {
-    backgroundColor: "#FFFFFF",
-    shadowColor: "#000",
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
@@ -246,15 +208,15 @@ const styles = StyleSheet.create({
   },
   segmentText: {
     fontSize: 13,
-    fontWeight: "500",
+    fontWeight: '500',
     color: Colors.textSecondary,
   },
   segmentTextActive: {
     color: Colors.textPrimary,
-    fontWeight: "700",
+    fontWeight: '700',
   },
   reminderFilterRow: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: 8,
     marginBottom: Spacing.lg,
   },
@@ -269,14 +231,14 @@ const styles = StyleSheet.create({
   },
   pillFilterText: {
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: '600',
     color: Colors.primary,
   },
   pillFilterTextActive: {
     color: Colors.textInverse,
   },
   emptyContainer: {
-    alignItems: "center",
+    alignItems: 'center',
     paddingVertical: 40,
   },
   emptyTitle: {
@@ -287,7 +249,7 @@ const styles = StyleSheet.create({
   emptySubtitle: {
     ...Typography.bodyMedium,
     color: Colors.textSecondary,
-    textAlign: "center",
+    textAlign: 'center',
     paddingHorizontal: 20,
   },
 });

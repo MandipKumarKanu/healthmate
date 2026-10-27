@@ -77,10 +77,7 @@ const TABS: TabItemConfig[] = [
   },
 ];
 
-export function CustomBottomTabBar({
-  activeTab,
-  onTabPress,
-}: CustomBottomTabBarProps) {
+export function CustomBottomTabBar({ activeTab, onTabPress }: CustomBottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const bottomPadding = Math.max(insets.bottom, 12);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
@@ -88,11 +85,11 @@ export function CustomBottomTabBar({
   useEffect(() => {
     const showSub = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      () => setIsKeyboardVisible(true)
+      () => setIsKeyboardVisible(true),
     );
     const hideSub = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => setIsKeyboardVisible(false)
+      () => setIsKeyboardVisible(false),
     );
 
     return () => {
@@ -118,9 +115,7 @@ export function CustomBottomTabBar({
               activeOpacity={0.7}
             >
               {tab.renderIcon(isActive)}
-              <Text style={[styles.tabLabel, isActive && styles.activeLabel]}>
-                {tab.label}
-              </Text>
+              <Text style={[styles.tabLabel, isActive && styles.activeLabel]}>{tab.label}</Text>
             </TouchableOpacity>
           );
         })}

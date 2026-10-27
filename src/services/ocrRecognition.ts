@@ -34,10 +34,7 @@ import {
   PreparedImage,
 } from './imagePreProcessing';
 import { ocrService, ExtractedMedicineData } from './ocrService';
-import {
-  recognizePackagingImage,
-  OcrConnectionError,
-} from './remoteOcrService';
+import { recognizePackagingImage, OcrConnectionError } from './remoteOcrService';
 import {
   FramedLine,
   LineFrame,
@@ -63,10 +60,7 @@ interface TextRecognitionResultLike {
 }
 
 interface TextRecognitionModuleLike {
-  recognize: (
-    uri: string,
-    script?: string
-  ) => Promise<TextRecognitionResultLike>;
+  recognize: (uri: string, script?: string) => Promise<TextRecognitionResultLike>;
 }
 
 let TextRecognitionModule: TextRecognitionModuleLike | null = null;
@@ -131,9 +125,7 @@ export interface LabelScanPassDebug {
   rawText: string;
 }
 
-function collectFramedLines(
-  recognition: TextRecognitionResultLike
-): FramedLine[] {
+function collectFramedLines(recognition: TextRecognitionResultLike): FramedLine[] {
   const lines: FramedLine[] = [];
   for (const block of recognition.blocks ?? []) {
     for (const line of block.lines ?? []) {
@@ -158,10 +150,7 @@ interface RecognitionPass {
  * `text` blob is only a last resort.
  */
 async function recognizePass(uri: string): Promise<RecognitionPass | null> {
-  if (
-    !TextRecognitionModule ||
-    typeof TextRecognitionModule.recognize !== 'function'
-  ) {
+  if (!TextRecognitionModule || typeof TextRecognitionModule.recognize !== 'function') {
     return null;
   }
   try {
@@ -171,15 +160,17 @@ async function recognizePass(uri: string): Promise<RecognitionPass | null> {
     let orderedLines = reconstructReadingOrder(framedLines);
     if (orderedLines.length === 0) {
       const flat = recognition.text?.trim();
-      if (flat) orderedLines = flat.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+      if (flat)
+        orderedLines = flat
+          .split(/\r?\n/)
+          .map((l) => l.trim())
+          .filter(Boolean);
     }
     if (orderedLines.length === 0) return null;
 
     return {
       rawText: orderedLines.join('\n'),
-      frames: framedLines
-        .map((line) => line.frame)
-        .filter((frame): frame is LineFrame => !!frame),
+      frames: framedLines.map((line) => line.frame).filter((frame): frame is LineFrame => !!frame),
     };
   } catch (error) {
     console.warn('Medicine label text recognition failed:', error);
@@ -207,8 +198,7 @@ function scorePass(pass: RecognitionPass): {
   ].filter(Boolean).length;
   const chars = pass.rawText.replace(/\s+/g, '').length;
   const lineCount = pass.rawText.split('\n').length;
-  const score =
-    signals * 100 + Math.min(chars, 1600) + Math.min(lineCount, 40) * 2;
+  const score = signals * 100 + Math.min(chars, 1600) + Math.min(lineCount, 40) * 2;
   return { score, signals, chars };
 }
 
@@ -223,9 +213,7 @@ const devMode = typeof __DEV__ !== 'undefined' && __DEV__;
  * Runs the Cloud OCR pipeline for a medicine-label photo using the remote
  * RapidOCR service. Requires an active internet connection.
  */
-export async function processLabelImage(
-  imageUri: string
-): Promise<LabelScanResult> {
+export async function processLabelImage(imageUri: string): Promise<LabelScanResult> {
   // Pre-process and optimize resolution for upload
   const prepared = await prepareImageForOcr(imageUri, {
     maxDimension: OCR_VARIANT_COMPACT,
@@ -237,7 +225,7 @@ export async function processLabelImage(
   // Perform remote recognition via RapidOCR API
   const remoteResult = await recognizePackagingImage(uploadUri);
 
-  const rawText = remoteResult.text || "";
+  const rawText = remoteResult.text || '';
   let extracted = ocrService.extractMedicineData(rawText);
   let aiWarning: string | undefined;
   try {
@@ -246,10 +234,10 @@ export async function processLabelImage(
       extracted = aiParsed;
     }
   } catch (aiErr) {
-    console.warn("AI medication packaging interpretation fallback:", aiErr);
+    console.warn('AI medication packaging interpretation fallback:', aiErr);
     aiWarning =
       (aiErr as { message?: string })?.message ||
-      "Personal AI interpretation failed. Review all extracted medicine fields manually.";
+      'Personal AI interpretation failed. Review all extracted medicine fields manually.';
   }
 
   return {
@@ -261,7 +249,7 @@ export async function processLabelImage(
     debugPasses: devMode
       ? [
           {
-            label: "cloud-rapidocr",
+            label: 'cloud-rapidocr',
             score: (remoteResult.count || 0) * 10,
             signals: [
               (extracted.candidates?.length ?? 0) > 0,
@@ -270,7 +258,7 @@ export async function processLabelImage(
               !!extracted.batchNumber,
               !!extracted.manufacturer,
             ].filter(Boolean).length,
-            chars: rawText.replace(/\s+/g, "").length,
+            chars: rawText.replace(/\s+/g, '').length,
             imageUri: uploadUri,
             rawText,
           },

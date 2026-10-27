@@ -7,12 +7,7 @@ import {
   reconstructReadingOrder,
 } from '../src/services/ocrTextGeometry';
 
-function frame(
-  left: number,
-  top: number,
-  width: number,
-  height: number
-): LineFrame {
+function frame(left: number, top: number, width: number, height: number): LineFrame {
   return { left, top, width, height };
 }
 
@@ -44,10 +39,7 @@ describe('OCR text geometry - reading order reconstruction', () => {
       line('Batch: DEMO-0001', frame(0, 40, 180, 16)),
     ];
 
-    expect(reconstructReadingOrder(recognition)).toEqual([
-      'Metformin 500mg',
-      'Batch: DEMO-0001',
-    ]);
+    expect(reconstructReadingOrder(recognition)).toEqual(['Metformin 500mg', 'Batch: DEMO-0001']);
   });
 
   it('splits wide column gaps on the same row into separate lines', () => {
@@ -77,10 +69,7 @@ describe('OCR text geometry - reading order reconstruction', () => {
   });
 
   it('preserves recognition order when no frames are available', () => {
-    const recognition = [
-      line('Metformin 500mg Tablets BP'),
-      line('Batch: DEMO-MF0426'),
-    ];
+    const recognition = [line('Metformin 500mg Tablets BP'), line('Batch: DEMO-MF0426')];
 
     expect(reconstructReadingOrder(recognition)).toEqual([
       'Metformin 500mg Tablets BP',
@@ -127,11 +116,7 @@ describe('OCR text geometry - helpers', () => {
   });
 
   it('computeTextRegion boxes the text with margin and skips full-frame crops', () => {
-    const region = computeTextRegion(
-      [frame(100, 50, 60, 14), frame(200, 90, 80, 14)],
-      1000,
-      2000
-    );
+    const region = computeTextRegion([frame(100, 50, 60, 14), frame(200, 90, 80, 14)], 1000, 2000);
     // Text box 100..280 × 50..104 with a 10% margin per edge.
     expect(region).toEqual({ originX: 82, originY: 44, width: 216, height: 66 });
 
@@ -139,7 +124,7 @@ describe('OCR text geometry - helpers', () => {
     const useless = computeTextRegion(
       [frame(0, 0, 990, 1990), frame(10, 10, 970, 1960)],
       1000,
-      2000
+      2000,
     );
     expect(useless).toBeNull();
 

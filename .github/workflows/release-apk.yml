@@ -39,10 +39,10 @@ jobs:
       matrix:
         include:
           - arch: arm64-v8a
-            name: "ARM64 (Modern 64-bit Phones)"
+            name: 'ARM64 (Modern 64-bit Phones)'
             gradle_arch: arm64-v8a
           - arch: armeabi-v7a
-            name: "ARMv7 (32-bit Phones)"
+            name: 'ARMv7 (32-bit Phones)'
             gradle_arch: armeabi-v7a
 
     env:

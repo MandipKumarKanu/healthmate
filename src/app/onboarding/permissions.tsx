@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   StyleSheet,
   View,
@@ -10,25 +10,20 @@ import {
   Linking,
   AppState,
   AppStateStatus,
-} from "react-native";
-import { AppAlert as Alert } from "../../services/appAlert";
-import { useRouter, useFocusEffect, useNavigation } from "expo-router";
-import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
-import * as Notifications from "expo-notifications";
-import { Camera } from "expo-camera";
-import * as ImagePicker from "expo-image-picker";
-import { useAppStore } from "../../store/appStore";
-import { AppScreen } from "../../components/ui/AppScreen";
-import { Colors } from "../../theme/colors";
-import { Radius, Spacing } from "../../theme/tokens";
-import { nativeAlarmService } from "../../services/nativeAlarmService";
+} from 'react-native';
+import { AppAlert as Alert } from '../../services/appAlert';
+import { useRouter, useFocusEffect, useNavigation } from 'expo-router';
+import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Notifications from 'expo-notifications';
+import { Camera } from 'expo-camera';
+import * as ImagePicker from 'expo-image-picker';
+import { useAppStore } from '../../store/appStore';
+import { AppScreen } from '../../components/ui/AppScreen';
+import { Colors } from '../../theme/colors';
+import { Radius, Spacing } from '../../theme/tokens';
+import { nativeAlarmService } from '../../services/nativeAlarmService';
 
-type PermissionStatus =
-  | "granted"
-  | "denied"
-  | "needs_settings"
-  | "not_determined"
-  | "unavailable";
+type PermissionStatus = 'granted' | 'denied' | 'needs_settings' | 'not_determined' | 'unavailable';
 
 export default function OnboardingPermissionsScreen() {
   const router = useRouter();
@@ -40,22 +35,18 @@ export default function OnboardingPermissionsScreen() {
       try {
         navigation.reset({
           index: 0,
-          routes: [{ name: "(tabs)" }],
+          routes: [{ name: '(tabs)' }],
         });
       } catch {
-        router.replace("/(tabs)/home");
+        router.replace('/(tabs)/home');
       }
     }
   }, [profile?.onboardingCompleted, navigation, router]);
 
-  const [notificationStatus, setNotificationStatus] =
-    useState<PermissionStatus>("not_determined");
-  const [exactAlarmStatus, setExactAlarmStatus] =
-    useState<PermissionStatus>("not_determined");
-  const [cameraStatus, setCameraStatus] =
-    useState<PermissionStatus>("not_determined");
-  const [photoStatus, setPhotoStatus] =
-    useState<PermissionStatus>("not_determined");
+  const [notificationStatus, setNotificationStatus] = useState<PermissionStatus>('not_determined');
+  const [exactAlarmStatus, setExactAlarmStatus] = useState<PermissionStatus>('not_determined');
+  const [cameraStatus, setCameraStatus] = useState<PermissionStatus>('not_determined');
+  const [photoStatus, setPhotoStatus] = useState<PermissionStatus>('not_determined');
 
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
 
@@ -63,61 +54,61 @@ export default function OnboardingPermissionsScreen() {
     // 1. Medicine notifications (Required)
     try {
       const notif = await Notifications.getPermissionsAsync();
-      if (notif.granted || notif.status === "granted") {
-        setNotificationStatus("granted");
+      if (notif.granted || notif.status === 'granted') {
+        setNotificationStatus('granted');
       } else if (!notif.canAskAgain) {
-        setNotificationStatus("needs_settings");
-      } else if (notif.status === "denied") {
-        setNotificationStatus("denied");
+        setNotificationStatus('needs_settings');
+      } else if (notif.status === 'denied') {
+        setNotificationStatus('denied');
       } else {
-        setNotificationStatus("not_determined");
+        setNotificationStatus('not_determined');
       }
     } catch {
-      setNotificationStatus("denied");
+      setNotificationStatus('denied');
     }
 
     // 2. Precise reminders / Exact alarms (Android)
-    if (Platform.OS === "android") {
+    if (Platform.OS === 'android') {
       try {
         const canExact = await nativeAlarmService.canScheduleExactAlarms();
-        setExactAlarmStatus(canExact ? "granted" : "needs_settings");
+        setExactAlarmStatus(canExact ? 'granted' : 'needs_settings');
       } catch {
-        setExactAlarmStatus("needs_settings");
+        setExactAlarmStatus('needs_settings');
       }
     } else {
-      setExactAlarmStatus("granted"); // Implicitly supported on iOS
+      setExactAlarmStatus('granted'); // Implicitly supported on iOS
     }
 
     // 3. Camera access (Optional)
     try {
       const cam = await Camera.getCameraPermissionsAsync();
-      if (cam.granted || cam.status === "granted") {
-        setCameraStatus("granted");
+      if (cam.granted || cam.status === 'granted') {
+        setCameraStatus('granted');
       } else if (!cam.canAskAgain) {
-        setCameraStatus("needs_settings");
-      } else if (cam.status === "denied") {
-        setCameraStatus("denied");
+        setCameraStatus('needs_settings');
+      } else if (cam.status === 'denied') {
+        setCameraStatus('denied');
       } else {
-        setCameraStatus("not_determined");
+        setCameraStatus('not_determined');
       }
     } catch {
-      setCameraStatus("unavailable");
+      setCameraStatus('unavailable');
     }
 
     // 4. Photos and media (Optional)
     try {
       const photos = await ImagePicker.getMediaLibraryPermissionsAsync();
-      if (photos.granted || photos.status === "granted") {
-        setPhotoStatus("granted");
+      if (photos.granted || photos.status === 'granted') {
+        setPhotoStatus('granted');
       } else if (!photos.canAskAgain) {
-        setPhotoStatus("needs_settings");
-      } else if (photos.status === "denied") {
-        setPhotoStatus("denied");
+        setPhotoStatus('needs_settings');
+      } else if (photos.status === 'denied') {
+        setPhotoStatus('denied');
       } else {
-        setPhotoStatus("not_determined");
+        setPhotoStatus('not_determined');
       }
     } catch {
-      setPhotoStatus("unavailable");
+      setPhotoStatus('unavailable');
     }
   }, []);
 
@@ -126,15 +117,12 @@ export default function OnboardingPermissionsScreen() {
     checkAllPermissions();
 
     const handleAppStateChange = (nextState: AppStateStatus) => {
-      if (nextState === "active") {
+      if (nextState === 'active') {
         checkAllPermissions();
       }
     };
 
-    const subscription = AppState.addEventListener(
-      "change",
-      handleAppStateChange,
-    );
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => {
       subscription.remove();
     };
@@ -148,34 +136,34 @@ export default function OnboardingPermissionsScreen() {
   );
 
   const handleToggleNotifications = async () => {
-    if (notificationStatus === "granted") {
+    if (notificationStatus === 'granted') {
       Alert.alert(
-        "Already Allowed",
-        "Medicine notifications are enabled. You will receive dose reminders as scheduled.",
+        'Already Allowed',
+        'Medicine notifications are enabled. You will receive dose reminders as scheduled.',
       );
       return;
     }
 
-    setLoadingKey("notifications");
+    setLoadingKey('notifications');
     try {
       const result = await Notifications.requestPermissionsAsync();
-      if (result.granted || result.status === "granted") {
-        setNotificationStatus("granted");
+      if (result.granted || result.status === 'granted') {
+        setNotificationStatus('granted');
       } else if (!result.canAskAgain) {
-        setNotificationStatus("needs_settings");
+        setNotificationStatus('needs_settings');
         Alert.alert(
-          "Notifications Required",
+          'Notifications Required',
           "Notification access is needed to alert you when it's time for your medication. Please allow notifications in device settings.",
           [
-            { text: "Cancel", style: "cancel" },
+            { text: 'Cancel', style: 'cancel' },
             {
-              text: "Open Settings",
+              text: 'Open Settings',
               onPress: () => Linking.openSettings(),
             },
           ],
         );
       } else {
-        setNotificationStatus("denied");
+        setNotificationStatus('denied');
       }
     } catch {
       Linking.openSettings();
@@ -185,23 +173,23 @@ export default function OnboardingPermissionsScreen() {
   };
 
   const handleToggleExactAlarm = async () => {
-    if (Platform.OS !== "android") {
+    if (Platform.OS !== 'android') {
       Alert.alert(
-        "Precise Timing",
-        "Exact hardware reminder triggers are natively managed by your device.",
+        'Precise Timing',
+        'Exact hardware reminder triggers are natively managed by your device.',
       );
       return;
     }
 
-    if (exactAlarmStatus === "granted") {
+    if (exactAlarmStatus === 'granted') {
       Alert.alert(
-        "Already Allowed",
-        "Exact alarm permissions are active for zero-latency medicine alarms.",
+        'Already Allowed',
+        'Exact alarm permissions are active for zero-latency medicine alarms.',
       );
       return;
     }
 
-    setLoadingKey("exact");
+    setLoadingKey('exact');
     try {
       await nativeAlarmService.openExactAlarmSettings();
     } catch {
@@ -212,34 +200,34 @@ export default function OnboardingPermissionsScreen() {
   };
 
   const handleToggleCamera = async () => {
-    if (cameraStatus === "granted") {
+    if (cameraStatus === 'granted') {
       Alert.alert(
-        "Already Allowed",
-        "Camera access is active for scanning medication labels and barcodes.",
+        'Already Allowed',
+        'Camera access is active for scanning medication labels and barcodes.',
       );
       return;
     }
 
-    setLoadingKey("camera");
+    setLoadingKey('camera');
     try {
       const result = await Camera.requestCameraPermissionsAsync();
-      if (result.granted || result.status === "granted") {
-        setCameraStatus("granted");
+      if (result.granted || result.status === 'granted') {
+        setCameraStatus('granted');
       } else if (!result.canAskAgain) {
-        setCameraStatus("needs_settings");
+        setCameraStatus('needs_settings');
         Alert.alert(
-          "Camera Access",
-          "Camera access is needed to scan medication boxes and prescription labels. You can enable it in device settings.",
+          'Camera Access',
+          'Camera access is needed to scan medication boxes and prescription labels. You can enable it in device settings.',
           [
-            { text: "Cancel", style: "cancel" },
+            { text: 'Cancel', style: 'cancel' },
             {
-              text: "Open Settings",
+              text: 'Open Settings',
               onPress: () => Linking.openSettings(),
             },
           ],
         );
       } else {
-        setCameraStatus("denied");
+        setCameraStatus('denied');
       }
     } catch {
       Linking.openSettings();
@@ -249,34 +237,34 @@ export default function OnboardingPermissionsScreen() {
   };
 
   const handleTogglePhotos = async () => {
-    if (photoStatus === "granted") {
+    if (photoStatus === 'granted') {
       Alert.alert(
-        "Already Allowed",
-        "Photo gallery access is active for importing prescription images.",
+        'Already Allowed',
+        'Photo gallery access is active for importing prescription images.',
       );
       return;
     }
 
-    setLoadingKey("photos");
+    setLoadingKey('photos');
     try {
       const result = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (result.granted || result.status === "granted") {
-        setPhotoStatus("granted");
+      if (result.granted || result.status === 'granted') {
+        setPhotoStatus('granted');
       } else if (!result.canAskAgain) {
-        setPhotoStatus("needs_settings");
+        setPhotoStatus('needs_settings');
         Alert.alert(
-          "Photo Access",
-          "Photo library access is needed to select medication images from your gallery. You can enable it in device settings.",
+          'Photo Access',
+          'Photo library access is needed to select medication images from your gallery. You can enable it in device settings.',
           [
-            { text: "Cancel", style: "cancel" },
+            { text: 'Cancel', style: 'cancel' },
             {
-              text: "Open Settings",
+              text: 'Open Settings',
               onPress: () => Linking.openSettings(),
             },
           ],
         );
       } else {
-        setPhotoStatus("denied");
+        setPhotoStatus('denied');
       }
     } catch {
       Linking.openSettings();
@@ -285,7 +273,7 @@ export default function OnboardingPermissionsScreen() {
     }
   };
 
-  const isNotificationsGranted = notificationStatus === "granted";
+  const isNotificationsGranted = notificationStatus === 'granted';
 
   const handleFinish = () => {
     if (!isNotificationsGranted) return;
@@ -293,22 +281,19 @@ export default function OnboardingPermissionsScreen() {
     try {
       navigation.reset({
         index: 0,
-        routes: [{ name: "(tabs)" }],
+        routes: [{ name: '(tabs)' }],
       });
     } catch {
       if (router.canDismiss()) {
         router.dismissAll();
       }
-      router.replace("/(tabs)/home");
+      router.replace('/(tabs)/home');
     }
   };
 
   return (
     <AppScreen scrollable={false} contentContainerStyle={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Top Navigation Row: Back Button */}
         <View style={styles.topNavRow}>
           <TouchableOpacity
@@ -328,17 +313,12 @@ export default function OnboardingPermissionsScreen() {
             <Text style={styles.stepIndicator}>STEP 3 OF 3</Text>
             <Text style={styles.screenTitle}>Set up permissions</Text>
             <Text style={styles.screenSubtitle}>
-              Enable notifications so HealthMate can alert you when it's time
-              for your medication.
+              Enable notifications so HealthMate can alert you when it's time for your medication.
             </Text>
           </View>
 
           <View style={styles.headerIconContainer}>
-            <MaterialCommunityIcons
-              name="shield-check"
-              size={30}
-              color={Colors.primary}
-            />
+            <MaterialCommunityIcons name="shield-check" size={30} color={Colors.primary} />
           </View>
         </View>
 
@@ -346,10 +326,7 @@ export default function OnboardingPermissionsScreen() {
         <View style={styles.cardsList}>
           {/* 1. Medicine Notifications (Mandatory / Required) */}
           <TouchableOpacity
-            style={[
-              styles.card,
-              isNotificationsGranted && styles.cardGranted,
-            ]}
+            style={[styles.card, isNotificationsGranted && styles.cardGranted]}
             onPress={handleToggleNotifications}
             activeOpacity={0.75}
             accessibilityRole="button"
@@ -358,17 +335,13 @@ export default function OnboardingPermissionsScreen() {
             <View
               style={[
                 styles.iconBox,
-                isNotificationsGranted
-                  ? styles.iconBoxGranted
-                  : styles.iconBoxPrimary,
+                isNotificationsGranted ? styles.iconBoxGranted : styles.iconBoxPrimary,
               ]}
             >
               <Feather
                 name="bell"
                 size={22}
-                color={
-                  isNotificationsGranted ? Colors.successDark : Colors.primary
-                }
+                color={isNotificationsGranted ? Colors.successDark : Colors.primary}
               />
             </View>
 
@@ -376,12 +349,7 @@ export default function OnboardingPermissionsScreen() {
               <View style={styles.cardHeaderLine}>
                 <Text style={styles.cardTitle}>Medicine notifications</Text>
                 <View style={[styles.priorityBadge, styles.priorityRequired]}>
-                  <Text
-                    style={[
-                      styles.priorityBadgeText,
-                      styles.priorityRequiredText,
-                    ]}
-                  >
+                  <Text style={[styles.priorityBadgeText, styles.priorityRequiredText]}>
                     Required
                   </Text>
                 </View>
@@ -392,33 +360,21 @@ export default function OnboardingPermissionsScreen() {
               </Text>
 
               <View style={styles.statusRow}>
-                {loadingKey === "notifications" ? (
+                {loadingKey === 'notifications' ? (
                   <ActivityIndicator size="small" color={Colors.primary} />
                 ) : isNotificationsGranted ? (
                   <View style={styles.statusPillAllowed}>
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={15}
-                      color={Colors.successDark}
-                    />
+                    <Ionicons name="checkmark-circle" size={15} color={Colors.successDark} />
                     <Text style={styles.statusPillAllowedText}>Allowed</Text>
                   </View>
-                ) : notificationStatus === "needs_settings" ? (
+                ) : notificationStatus === 'needs_settings' ? (
                   <View style={styles.statusPillSettings}>
-                    <Ionicons
-                      name="open-outline"
-                      size={13}
-                      color={Colors.primary}
-                    />
+                    <Ionicons name="open-outline" size={13} color={Colors.primary} />
                     <Text style={styles.statusPillActionText}>Open Settings</Text>
                   </View>
                 ) : (
                   <View style={styles.statusPillAction}>
-                    <Feather
-                      name="arrow-right"
-                      size={13}
-                      color={Colors.primary}
-                    />
+                    <Feather name="arrow-right" size={13} color={Colors.primary} />
                     <Text style={styles.statusPillActionText}>Tap to enable</Text>
                   </View>
                 )}
@@ -428,10 +384,7 @@ export default function OnboardingPermissionsScreen() {
 
           {/* 2. Precise Reminders / Exact Alarms (Recommended) */}
           <TouchableOpacity
-            style={[
-              styles.card,
-              exactAlarmStatus === "granted" && styles.cardGranted,
-            ]}
+            style={[styles.card, exactAlarmStatus === 'granted' && styles.cardGranted]}
             onPress={handleToggleExactAlarm}
             activeOpacity={0.75}
             accessibilityRole="button"
@@ -440,34 +393,21 @@ export default function OnboardingPermissionsScreen() {
             <View
               style={[
                 styles.iconBox,
-                exactAlarmStatus === "granted"
-                  ? styles.iconBoxGranted
-                  : styles.iconBoxPrimary,
+                exactAlarmStatus === 'granted' ? styles.iconBoxGranted : styles.iconBoxPrimary,
               ]}
             >
               <Feather
                 name="clock"
                 size={22}
-                color={
-                  exactAlarmStatus === "granted"
-                    ? Colors.successDark
-                    : Colors.primary
-                }
+                color={exactAlarmStatus === 'granted' ? Colors.successDark : Colors.primary}
               />
             </View>
 
             <View style={styles.cardContent}>
               <View style={styles.cardHeaderLine}>
                 <Text style={styles.cardTitle}>Precise reminders</Text>
-                <View
-                  style={[styles.priorityBadge, styles.priorityRecommended]}
-                >
-                  <Text
-                    style={[
-                      styles.priorityBadgeText,
-                      styles.priorityRecommendedText,
-                    ]}
-                  >
+                <View style={[styles.priorityBadge, styles.priorityRecommended]}>
+                  <Text style={[styles.priorityBadgeText, styles.priorityRecommendedText]}>
                     Recommended
                   </Text>
                 </View>
@@ -478,24 +418,16 @@ export default function OnboardingPermissionsScreen() {
               </Text>
 
               <View style={styles.statusRow}>
-                {loadingKey === "exact" ? (
+                {loadingKey === 'exact' ? (
                   <ActivityIndicator size="small" color={Colors.primary} />
-                ) : exactAlarmStatus === "granted" ? (
+                ) : exactAlarmStatus === 'granted' ? (
                   <View style={styles.statusPillAllowed}>
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={15}
-                      color={Colors.successDark}
-                    />
+                    <Ionicons name="checkmark-circle" size={15} color={Colors.successDark} />
                     <Text style={styles.statusPillAllowedText}>Allowed</Text>
                   </View>
                 ) : (
                   <View style={styles.statusPillSettings}>
-                    <Ionicons
-                      name="open-outline"
-                      size={13}
-                      color={Colors.primary}
-                    />
+                    <Ionicons name="open-outline" size={13} color={Colors.primary} />
                     <Text style={styles.statusPillActionText}>Open Settings</Text>
                   </View>
                 )}
@@ -506,7 +438,7 @@ export default function OnboardingPermissionsScreen() {
           {/* Battery Optimization Guide Link */}
           <TouchableOpacity
             style={styles.batteryGuideRow}
-            onPress={() => router.push("/settings/battery-optimization" as any)}
+            onPress={() => router.push('/settings/battery-optimization' as any)}
             activeOpacity={0.7}
           >
             <MaterialCommunityIcons name="battery-heart-variant" size={18} color={Colors.primary} />
@@ -518,7 +450,7 @@ export default function OnboardingPermissionsScreen() {
 
           {/* 3. Camera Access (Optional) */}
           <TouchableOpacity
-            style={[styles.card, cameraStatus === "granted" && styles.cardGranted]}
+            style={[styles.card, cameraStatus === 'granted' && styles.cardGranted]}
             onPress={handleToggleCamera}
             activeOpacity={0.75}
             accessibilityRole="button"
@@ -527,19 +459,13 @@ export default function OnboardingPermissionsScreen() {
             <View
               style={[
                 styles.iconBox,
-                cameraStatus === "granted"
-                  ? styles.iconBoxGranted
-                  : styles.iconBoxNeutral,
+                cameraStatus === 'granted' ? styles.iconBoxGranted : styles.iconBoxNeutral,
               ]}
             >
               <Ionicons
                 name="camera-outline"
                 size={22}
-                color={
-                  cameraStatus === "granted"
-                    ? Colors.successDark
-                    : Colors.textSecondary
-                }
+                color={cameraStatus === 'granted' ? Colors.successDark : Colors.textSecondary}
               />
             </View>
 
@@ -547,12 +473,7 @@ export default function OnboardingPermissionsScreen() {
               <View style={styles.cardHeaderLine}>
                 <Text style={styles.cardTitle}>Camera access</Text>
                 <View style={[styles.priorityBadge, styles.priorityOptional]}>
-                  <Text
-                    style={[
-                      styles.priorityBadgeText,
-                      styles.priorityOptionalText,
-                    ]}
-                  >
+                  <Text style={[styles.priorityBadgeText, styles.priorityOptionalText]}>
                     Optional
                   </Text>
                 </View>
@@ -563,33 +484,21 @@ export default function OnboardingPermissionsScreen() {
               </Text>
 
               <View style={styles.statusRow}>
-                {loadingKey === "camera" ? (
+                {loadingKey === 'camera' ? (
                   <ActivityIndicator size="small" color={Colors.primary} />
-                ) : cameraStatus === "granted" ? (
+                ) : cameraStatus === 'granted' ? (
                   <View style={styles.statusPillAllowed}>
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={15}
-                      color={Colors.successDark}
-                    />
+                    <Ionicons name="checkmark-circle" size={15} color={Colors.successDark} />
                     <Text style={styles.statusPillAllowedText}>Allowed</Text>
                   </View>
-                ) : cameraStatus === "needs_settings" ? (
+                ) : cameraStatus === 'needs_settings' ? (
                   <View style={styles.statusPillSettings}>
-                    <Ionicons
-                      name="open-outline"
-                      size={13}
-                      color={Colors.primary}
-                    />
+                    <Ionicons name="open-outline" size={13} color={Colors.primary} />
                     <Text style={styles.statusPillActionText}>Open Settings</Text>
                   </View>
                 ) : (
                   <View style={styles.statusPillAction}>
-                    <Feather
-                      name="plus-circle"
-                      size={13}
-                      color={Colors.primary}
-                    />
+                    <Feather name="plus-circle" size={13} color={Colors.primary} />
                     <Text style={styles.statusPillActionText}>Tap to enable</Text>
                   </View>
                 )}
@@ -599,7 +508,7 @@ export default function OnboardingPermissionsScreen() {
 
           {/* 4. Photos & Images (Optional) */}
           <TouchableOpacity
-            style={[styles.card, photoStatus === "granted" && styles.cardGranted]}
+            style={[styles.card, photoStatus === 'granted' && styles.cardGranted]}
             onPress={handleTogglePhotos}
             activeOpacity={0.75}
             accessibilityRole="button"
@@ -608,19 +517,13 @@ export default function OnboardingPermissionsScreen() {
             <View
               style={[
                 styles.iconBox,
-                photoStatus === "granted"
-                  ? styles.iconBoxGranted
-                  : styles.iconBoxNeutral,
+                photoStatus === 'granted' ? styles.iconBoxGranted : styles.iconBoxNeutral,
               ]}
             >
               <Ionicons
                 name="images-outline"
                 size={22}
-                color={
-                  photoStatus === "granted"
-                    ? Colors.successDark
-                    : Colors.textSecondary
-                }
+                color={photoStatus === 'granted' ? Colors.successDark : Colors.textSecondary}
               />
             </View>
 
@@ -628,12 +531,7 @@ export default function OnboardingPermissionsScreen() {
               <View style={styles.cardHeaderLine}>
                 <Text style={styles.cardTitle}>Photos & gallery</Text>
                 <View style={[styles.priorityBadge, styles.priorityOptional]}>
-                  <Text
-                    style={[
-                      styles.priorityBadgeText,
-                      styles.priorityOptionalText,
-                    ]}
-                  >
+                  <Text style={[styles.priorityBadgeText, styles.priorityOptionalText]}>
                     Optional
                   </Text>
                 </View>
@@ -644,33 +542,21 @@ export default function OnboardingPermissionsScreen() {
               </Text>
 
               <View style={styles.statusRow}>
-                {loadingKey === "photos" ? (
+                {loadingKey === 'photos' ? (
                   <ActivityIndicator size="small" color={Colors.primary} />
-                ) : photoStatus === "granted" ? (
+                ) : photoStatus === 'granted' ? (
                   <View style={styles.statusPillAllowed}>
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={15}
-                      color={Colors.successDark}
-                    />
+                    <Ionicons name="checkmark-circle" size={15} color={Colors.successDark} />
                     <Text style={styles.statusPillAllowedText}>Allowed</Text>
                   </View>
-                ) : photoStatus === "needs_settings" ? (
+                ) : photoStatus === 'needs_settings' ? (
                   <View style={styles.statusPillSettings}>
-                    <Ionicons
-                      name="open-outline"
-                      size={13}
-                      color={Colors.primary}
-                    />
+                    <Ionicons name="open-outline" size={13} color={Colors.primary} />
                     <Text style={styles.statusPillActionText}>Open Settings</Text>
                   </View>
                 ) : (
                   <View style={styles.statusPillAction}>
-                    <Feather
-                      name="plus-circle"
-                      size={13}
-                      color={Colors.primary}
-                    />
+                    <Feather name="plus-circle" size={13} color={Colors.primary} />
                     <Text style={styles.statusPillActionText}>Tap to enable</Text>
                   </View>
                 )}
@@ -684,9 +570,7 @@ export default function OnboardingPermissionsScreen() {
           <TouchableOpacity
             style={[
               styles.continueButton,
-              isNotificationsGranted
-                ? styles.continueButtonActive
-                : styles.continueButtonDisabled,
+              isNotificationsGranted ? styles.continueButtonActive : styles.continueButtonDisabled,
             ]}
             onPress={handleFinish}
             disabled={!isNotificationsGranted}
@@ -707,7 +591,7 @@ export default function OnboardingPermissionsScreen() {
               <Feather
                 name="arrow-right"
                 size={18}
-                color={isNotificationsGranted ? "#FFFFFF" : "#94A3B8"}
+                color={isNotificationsGranted ? '#FFFFFF' : '#94A3B8'}
                 style={styles.arrowIcon}
               />
             </View>
@@ -717,22 +601,12 @@ export default function OnboardingPermissionsScreen() {
           <View style={styles.requirementNotice}>
             {isNotificationsGranted ? (
               <View style={styles.noticeRow}>
-                <Ionicons
-                  name="checkmark-circle"
-                  size={15}
-                  color={Colors.successDark}
-                />
-                <Text style={styles.noticeTextSuccess}>
-                  Required notification access granted
-                </Text>
+                <Ionicons name="checkmark-circle" size={15} color={Colors.successDark} />
+                <Text style={styles.noticeTextSuccess}>Required notification access granted</Text>
               </View>
             ) : (
               <View style={styles.noticeRow}>
-                <Feather
-                  name="alert-circle"
-                  size={14}
-                  color={Colors.warningDark}
-                />
+                <Feather name="alert-circle" size={14} color={Colors.warningDark} />
                 <Text style={styles.noticeTextWarning}>
                   Allow medicine notifications above to continue
                 </Text>
@@ -748,7 +622,7 @@ export default function OnboardingPermissionsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8F9FD",
+    backgroundColor: '#F8F9FD',
   },
   scrollContent: {
     paddingHorizontal: 24,
@@ -763,13 +637,13 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    justifyContent: "center",
-    alignItems: "flex-start",
+    justifyContent: 'center',
+    alignItems: 'flex-start',
   },
   headerRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
     marginBottom: 20,
   },
   headerTextGroup: {
@@ -778,22 +652,22 @@ const styles = StyleSheet.create({
   },
   stepIndicator: {
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: '700',
     color: Colors.primary,
     letterSpacing: 0.6,
     marginBottom: 6,
   },
   screenTitle: {
     fontSize: 27,
-    fontWeight: "800",
-    color: "#0F172A",
+    fontWeight: '800',
+    color: '#0F172A',
     letterSpacing: -0.4,
     lineHeight: 32,
     marginBottom: 6,
   },
   screenSubtitle: {
     fontSize: 14,
-    color: "#64748B",
+    color: '#64748B',
     lineHeight: 20,
   },
   headerIconContainer: {
@@ -801,8 +675,8 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: Radius.lg,
     backgroundColor: Colors.primaryLight,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     marginTop: 4,
   },
   cardsList: {
@@ -810,36 +684,36 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   card: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    backgroundColor: "#FFFFFF",
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FFFFFF',
     borderRadius: Radius.card,
     padding: 16,
     borderWidth: 1,
     borderColor: Colors.border,
-    shadowColor: "#0F172A",
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 8,
     elevation: 2,
   },
   cardGranted: {
-    borderColor: "#D1FAE5",
-    backgroundColor: "#FCFDFD",
+    borderColor: '#D1FAE5',
+    backgroundColor: '#FCFDFD',
   },
   iconBox: {
     width: 44,
     height: 44,
     borderRadius: Radius.md,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 14,
   },
   iconBoxPrimary: {
     backgroundColor: Colors.primaryLight,
   },
   iconBoxNeutral: {
-    backgroundColor: "#F1F5F9",
+    backgroundColor: '#F1F5F9',
   },
   iconBoxGranted: {
     backgroundColor: Colors.successLight,
@@ -848,15 +722,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   cardHeaderLine: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 4,
   },
   cardTitle: {
     fontSize: 15,
-    fontWeight: "700",
-    color: "#0F172A",
+    fontWeight: '700',
+    color: '#0F172A',
     flex: 1,
     marginRight: 8,
   },
@@ -867,7 +741,7 @@ const styles = StyleSheet.create({
   },
   priorityBadgeText: {
     fontSize: 11,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   priorityRequired: {
     backgroundColor: Colors.primaryLight,
@@ -875,37 +749,37 @@ const styles = StyleSheet.create({
   priorityRequiredText: {
     color: Colors.primary,
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: '700',
   },
   priorityRecommended: {
-    backgroundColor: "#FEF3C7",
+    backgroundColor: '#FEF3C7',
   },
   priorityRecommendedText: {
-    color: "#B45309",
+    color: '#B45309',
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: '700',
   },
   priorityOptional: {
-    backgroundColor: "#F1F5F9",
+    backgroundColor: '#F1F5F9',
   },
   priorityOptionalText: {
-    color: "#64748B",
+    color: '#64748B',
     fontSize: 11,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   cardDescription: {
     fontSize: 12,
-    color: "#64748B",
+    color: '#64748B',
     lineHeight: 17,
     marginBottom: 10,
   },
   statusRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   statusPillAllowed: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 5,
     backgroundColor: Colors.successLight,
     paddingHorizontal: 10,
@@ -914,12 +788,12 @@ const styles = StyleSheet.create({
   },
   statusPillAllowedText: {
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: '700',
     color: Colors.successDark,
   },
   statusPillAction: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 5,
     backgroundColor: Colors.primaryLight,
     paddingHorizontal: 10,
@@ -927,40 +801,40 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
   },
   statusPillSettings: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 5,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: '#F1F5F9',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: Radius.pill,
   },
   statusPillActionText: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: '600',
     color: Colors.primary,
   },
   statusPillNeutral: {
-    backgroundColor: "#F1F5F9",
+    backgroundColor: '#F1F5F9',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: Radius.pill,
   },
   statusPillNeutralText: {
     fontSize: 11,
-    fontWeight: "500",
-    color: "#94A3B8",
+    fontWeight: '500',
+    color: '#94A3B8',
   },
   actionSection: {
     marginTop: 4,
-    alignItems: "center",
+    alignItems: 'center',
   },
   continueButton: {
-    width: "100%",
+    width: '100%',
     height: 52,
     borderRadius: Radius.md,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
@@ -971,49 +845,49 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   continueButtonDisabled: {
-    backgroundColor: "#CBD5E1",
+    backgroundColor: '#CBD5E1',
     shadowOpacity: 0,
     elevation: 0,
   },
   buttonInner: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   continueButtonText: {
-    color: "#FFFFFF",
+    color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: '700',
   },
   continueButtonTextDisabled: {
-    color: "#64748B",
+    color: '#64748B',
   },
   arrowIcon: {
     marginLeft: 8,
   },
   requirementNotice: {
     marginTop: 12,
-    alignItems: "center",
+    alignItems: 'center',
   },
   noticeRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
   },
   noticeTextSuccess: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: '600',
     color: Colors.successDark,
   },
   noticeTextWarning: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: '600',
     color: Colors.warningDark,
   },
   batteryGuideRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F1F5F9",
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: Radius.card,
@@ -1024,7 +898,7 @@ const styles = StyleSheet.create({
   batteryGuideText: {
     flex: 1,
     fontSize: 12,
-    fontWeight: "600",
-    color: "#334155",
+    fontWeight: '600',
+    color: '#334155',
   },
 });

@@ -25,12 +25,9 @@ export default function HomeScreen() {
         return true;
       };
 
-      const subscription = BackHandler.addEventListener(
-        'hardwareBackPress',
-        onBackPress
-      );
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
       return () => subscription.remove();
-    }, [])
+    }, []),
   );
 
   useEffect(() => {
@@ -39,13 +36,14 @@ export default function HomeScreen() {
 
   const rawName = profile?.name?.trim() || 'Alex Morgan';
   const firstName = rawName.split(' ')[0] || 'Alex';
-  const userInitials = rawName
-    .split(' ')
-    .filter(Boolean)
-    .map((p) => p[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase() || 'AM';
+  const userInitials =
+    rawName
+      .split(' ')
+      .filter(Boolean)
+      .map((p) => p[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || 'AM';
 
   const getTimeGreeting = () => {
     const hour = new Date().getHours();
@@ -93,25 +91,18 @@ export default function HomeScreen() {
         />
 
         {/* 3. HealthMate AI Mode Card */}
-        <AssistantPromoCard
-          onAskPress={() => router.push('/ai-assistant')}
-        />
+        <AssistantPromoCard onAskPress={() => router.push('/ai-assistant')} />
 
         {/* 4. Next Up Card */}
         {nextUpcomingDose ? (
           <NextMedicationCard
             dose={nextUpcomingDose}
-            onMarkAsTaken={(dose) =>
-              markDoseStatus(dose, 'taken', selectedDate)
-            }
+            onMarkAsTaken={(dose) => markDoseStatus(dose, 'taken', selectedDate)}
           />
         ) : null}
 
         {/* 5. Today's Timeline Card */}
-        <TodayTimeline
-          doses={doses}
-          onViewAllPress={() => router.push('/(tabs)/calendar')}
-        />
+        <TodayTimeline doses={doses} onViewAllPress={() => router.push('/(tabs)/calendar')} />
 
         {/* 6. Shortcuts: Your health, organized */}
         <QuickActionRow

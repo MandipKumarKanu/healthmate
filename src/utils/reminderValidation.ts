@@ -65,7 +65,7 @@ export function validateDoseAmount(amount?: string | null): ValidationResult {
  * - Each entry's dose amount must be valid if specified.
  */
 export function validateReminderTimes(
-  times: Array<{ id?: string; time: string; amount?: string; label?: string }>
+  times: Array<{ id?: string; time: string; amount?: string; label?: string }>,
 ): ValidationResult {
   if (!times || times.length === 0) {
     return {
@@ -125,7 +125,7 @@ export function validateReminderTimes(
 export function isDuplicateReminderTime(
   times: Array<{ id?: string; time: string }>,
   newTime: string,
-  excludeId?: string
+  excludeId?: string,
 ): boolean {
   const normalized = (newTime || '').trim();
   return times.some((t) => t.id !== excludeId && t.time.trim() === normalized);

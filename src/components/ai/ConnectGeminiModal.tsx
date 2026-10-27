@@ -34,10 +34,9 @@ export function ConnectGeminiModal({
   onKeySaved,
   onDisconnected,
 }: ConnectGeminiModalProps) {
-  const {
-    scrollViewRef: modalScrollRef,
-    handleFocusCapture,
-  } = useKeyboardAwareScroll({ extraOffset: 40 });
+  const { scrollViewRef: modalScrollRef, handleFocusCapture } = useKeyboardAwareScroll({
+    extraOffset: 40,
+  });
   const [keyDraft, setKeyDraft] = useState('');
   const [isSecure, setIsSecure] = useState(true);
   const [isLoadingKey, setIsLoadingKey] = useState(false);
@@ -131,9 +130,7 @@ export function ConnectGeminiModal({
       setShowCelebration(true);
     } catch (err: any) {
       setIsVerifying(false);
-      setError(
-        err?.message || 'Verification failed. Please check your internet and try again.'
-      );
+      setError(err?.message || 'Verification failed. Please check your internet and try again.');
     }
   };
 
@@ -163,12 +160,7 @@ export function ConnectGeminiModal({
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="fade"
-      transparent
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <KeyboardAvoidingView
           // Android already resizes this Modal window (softwareKeyboardLayoutMode:
@@ -206,266 +198,216 @@ export function ConnectGeminiModal({
               keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
             >
               <View style={{ flexGrow: 1 }} onFocusCapture={handleFocusCapture}>
-              {showCelebration ? (
-                /* Celebration View (MCQ Choice 4) */
-                <View style={styles.celebrationContainer}>
-                  <View style={styles.celebrationIconCircle}>
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={54}
-                      color={Colors.success}
-                    />
-                  </View>
+                {showCelebration ? (
+                  /* Celebration View (MCQ Choice 4) */
+                  <View style={styles.celebrationContainer}>
+                    <View style={styles.celebrationIconCircle}>
+                      <Ionicons name="checkmark-circle" size={54} color={Colors.success} />
+                    </View>
 
-                  <Text style={styles.celebrationTitle}>
-                    Done! API Key Setup Complete
-                  </Text>
-                  <Text style={styles.celebrationSubtitle}>
-                    You unlocked the full potential! Your Personal AI is now
-                    connected to HealthMate for high-accuracy medicine detection
-                    and dosage parsing.
-                  </Text>
-
-                  <View style={styles.connectedPillRow}>
-                    <View style={styles.connectedDot} />
-                    <Text style={styles.connectedPillText}>
-                      Connected to Gemini 3.5 Flash-Lite
+                    <Text style={styles.celebrationTitle}>Done! API Key Setup Complete</Text>
+                    <Text style={styles.celebrationSubtitle}>
+                      You unlocked the full potential! Your Personal AI is now connected to
+                      HealthMate for high-accuracy medicine detection and dosage parsing.
                     </Text>
-                  </View>
 
-                  <View style={styles.celebrationActions}>
-                    <TouchableOpacity
-                      style={styles.primaryScanBtn}
-                      onPress={() => handleFinish('scan')}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="scan-outline" size={18} color="#FFFFFF" />
-                      <Text style={styles.primaryScanBtnText}>
-                        Start First Scan
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.secondaryDoneBtn}
-                      onPress={() => handleFinish('done')}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.secondaryDoneBtnText}>Done</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ) : (
-                /* Main Configuration View */
-                <>
-                  {/* Status Banner */}
-                  <View
-                    style={[
-                      styles.statusBanner,
-                      currentKey
-                        ? styles.statusBannerConnected
-                        : styles.statusBannerNotConnected,
-                    ]}
-                  >
-                    <View style={styles.statusBannerLeft}>
-                      <View
-                        style={[
-                          styles.statusDot,
-                          currentKey
-                            ? styles.statusDotActive
-                            : styles.statusDotInactive,
-                        ]}
-                      />
-                      <Text style={styles.statusBannerText}>
-                        Status:{' '}
-                        <Text style={styles.statusBannerBold}>
-                          {currentKey
-                            ? `Connected (${maskKey(currentKey)})`
-                            : 'Not Connected'}
-                        </Text>
+                    <View style={styles.connectedPillRow}>
+                      <View style={styles.connectedDot} />
+                      <Text style={styles.connectedPillText}>
+                        Connected to Gemini 3.5 Flash-Lite
                       </Text>
                     </View>
-                  </View>
 
-                  {/* Why AI Card */}
-                  <View style={styles.infoBox}>
-                    <Text style={styles.infoBoxTitle}>
-                      What Personal AI does:
-                    </Text>
-                    <View style={styles.infoBoxRow}>
-                      <Ionicons
-                        name="scan"
-                        size={15}
-                        color={Colors.primary}
-                        style={{ marginTop: 2 }}
-                      />
-                      <Text style={styles.infoBoxText}>
-                        <Text style={{ fontWeight: '600' }}>
-                          Smart Packaging OCR:
-                        </Text>{' '}
-                        Reads noisy medicine labels to extract brand, generic
-                        salt, strength, dosage form, batch, and expiry.
-                      </Text>
-                    </View>
-                    <View style={styles.infoBoxRow}>
-                      <Ionicons
-                        name="shield-checkmark-outline"
-                        size={15}
-                        color={Colors.primary}
-                        style={{ marginTop: 2 }}
-                      />
-                      <Text style={styles.infoBoxText}>
-                        <Text style={{ fontWeight: '600' }}>Secure Storage:</Text>{' '}
-                        Your key is stored securely on this phone and sent to Google
-                        only when you use a Gemini feature.
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Step 1: Get Key Link */}
-                  <View style={styles.instructionCard}>
-                    <View style={styles.instructionHeader}>
-                      <Text style={styles.instructionStep}>
-                        Step 1: Get free API Key
-                      </Text>
+                    <View style={styles.celebrationActions}>
                       <TouchableOpacity
-                        style={styles.openLinkBtn}
-                        onPress={handleOpenAiStudio}
+                        style={styles.primaryScanBtn}
+                        onPress={() => handleFinish('scan')}
                         activeOpacity={0.8}
                       >
-                        <Text style={styles.openLinkBtnText}>
-                          Open AI Studio
-                        </Text>
-                        <Feather
-                          name="external-link"
-                          size={13}
-                          color={Colors.primary}
-                        />
+                        <Ionicons name="scan-outline" size={18} color="#FFFFFF" />
+                        <Text style={styles.primaryScanBtnText}>Start First Scan</Text>
                       </TouchableOpacity>
-                    </View>
-                    <Text style={styles.instructionSub}>
-                      1. Tap above to open Google AI Studio in browser.{'\n'}
-                      2. Sign in with Google & tap &quot;Create API Key&quot;.{'\n'}
-                      3. Copy your key and paste it below.
-                    </Text>
-                  </View>
 
-                  {/* Step 2: Input Field */}
-                  <View style={styles.inputSection}>
-                    <View style={styles.inputHeaderRow}>
-                      <Text style={styles.inputLabel}>
-                        Step 2: Paste Gemini API Key
-                      </Text>
                       <TouchableOpacity
-                        style={styles.pasteBtn}
-                        onPress={handlePasteKey}
-                        activeOpacity={0.7}
+                        style={styles.secondaryDoneBtn}
+                        onPress={() => handleFinish('done')}
+                        activeOpacity={0.8}
                       >
-                        <Ionicons
-                          name="clipboard-outline"
-                          size={14}
-                          color={Colors.primary}
-                        />
-                        <Text style={styles.pasteBtnText}>Paste</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    <View style={styles.inputWrapper}>
-                      <TextInput
-                        style={styles.textInput}
-                        placeholder="AIzaSy..."
-                        placeholderTextColor={Colors.textTertiary}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        secureTextEntry={isSecure}
-                        value={keyDraft}
-                        onChangeText={(t) => {
-                          setKeyDraft(t);
-                          setError(null);
-                        }}
-                      />
-                      <TouchableOpacity
-                        style={styles.eyeBtn}
-                        onPress={() => setIsSecure(!isSecure)}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      >
-                        <Feather
-                          name={isSecure ? 'eye' : 'eye-off'}
-                          size={18}
-                          color={Colors.textSecondary}
-                        />
+                        <Text style={styles.secondaryDoneBtnText}>Done</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
-
-                  {/* Error Alert */}
-                  {error ? (
-                    <View style={styles.errorAlert}>
-                      <Ionicons
-                        name="alert-circle"
-                        size={18}
-                        color={Colors.error}
-                      />
-                      <Text style={styles.errorText}>{error}</Text>
-                    </View>
-                  ) : null}
-
-                  {/* Action Buttons */}
-                  <View style={styles.buttonGroup}>
-                    <TouchableOpacity
+                ) : (
+                  /* Main Configuration View */
+                  <>
+                    {/* Status Banner */}
+                    <View
                       style={[
-                        styles.verifyButton,
-                        (!keyDraft.trim() || isVerifying) &&
-                          styles.verifyButtonDisabled,
+                        styles.statusBanner,
+                        currentKey ? styles.statusBannerConnected : styles.statusBannerNotConnected,
                       ]}
-                      onPress={handleVerifyAndSave}
-                      disabled={!keyDraft.trim() || isVerifying || isLoadingKey}
-                      activeOpacity={0.8}
                     >
-                      {isLoadingKey ? (
-                        <>
-                          <ActivityIndicator size="small" color="#FFFFFF" />
-                          <Text style={styles.verifyButtonText}>Loading saved key...</Text>
-                        </>
-                      ) : isVerifying ? (
-                        <>
-                          <ActivityIndicator size="small" color="#FFFFFF" />
-                          <Text style={styles.verifyButtonText}>
-                            Verifying with Gemini...
-                          </Text>
-                        </>
-                      ) : (
-                        <>
-                          <Ionicons
-                            name="shield-checkmark-outline"
-                            size={18}
-                            color="#FFFFFF"
-                          />
-                          <Text style={styles.verifyButtonText}>
-                            {currentKey ? 'Update & Verify Key' : 'Verify & Connect AI'}
-                          </Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-
-                    {currentKey ? (
-                      <TouchableOpacity
-                        style={styles.disconnectButton}
-                        onPress={handleDisconnect}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons
-                          name="trash-outline"
-                          size={15}
-                          color={Colors.error}
+                      <View style={styles.statusBannerLeft}>
+                        <View
+                          style={[
+                            styles.statusDot,
+                            currentKey ? styles.statusDotActive : styles.statusDotInactive,
+                          ]}
                         />
-                        <Text style={styles.disconnectButtonText}>
-                          Disconnect AI Key
+                        <Text style={styles.statusBannerText}>
+                          Status:{' '}
+                          <Text style={styles.statusBannerBold}>
+                            {currentKey ? `Connected (${maskKey(currentKey)})` : 'Not Connected'}
+                          </Text>
                         </Text>
-                      </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    {/* Why AI Card */}
+                    <View style={styles.infoBox}>
+                      <Text style={styles.infoBoxTitle}>What Personal AI does:</Text>
+                      <View style={styles.infoBoxRow}>
+                        <Ionicons
+                          name="scan"
+                          size={15}
+                          color={Colors.primary}
+                          style={{ marginTop: 2 }}
+                        />
+                        <Text style={styles.infoBoxText}>
+                          <Text style={{ fontWeight: '600' }}>Smart Packaging OCR:</Text> Reads
+                          noisy medicine labels to extract brand, generic salt, strength, dosage
+                          form, batch, and expiry.
+                        </Text>
+                      </View>
+                      <View style={styles.infoBoxRow}>
+                        <Ionicons
+                          name="shield-checkmark-outline"
+                          size={15}
+                          color={Colors.primary}
+                          style={{ marginTop: 2 }}
+                        />
+                        <Text style={styles.infoBoxText}>
+                          <Text style={{ fontWeight: '600' }}>Secure Storage:</Text> Your key is
+                          stored securely on this phone and sent to Google only when you use a
+                          Gemini feature.
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Step 1: Get Key Link */}
+                    <View style={styles.instructionCard}>
+                      <View style={styles.instructionHeader}>
+                        <Text style={styles.instructionStep}>Step 1: Get free API Key</Text>
+                        <TouchableOpacity
+                          style={styles.openLinkBtn}
+                          onPress={handleOpenAiStudio}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={styles.openLinkBtnText}>Open AI Studio</Text>
+                          <Feather name="external-link" size={13} color={Colors.primary} />
+                        </TouchableOpacity>
+                      </View>
+                      <Text style={styles.instructionSub}>
+                        1. Tap above to open Google AI Studio in browser.{'\n'}
+                        2. Sign in with Google & tap &quot;Create API Key&quot;.{'\n'}
+                        3. Copy your key and paste it below.
+                      </Text>
+                    </View>
+
+                    {/* Step 2: Input Field */}
+                    <View style={styles.inputSection}>
+                      <View style={styles.inputHeaderRow}>
+                        <Text style={styles.inputLabel}>Step 2: Paste Gemini API Key</Text>
+                        <TouchableOpacity
+                          style={styles.pasteBtn}
+                          onPress={handlePasteKey}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="clipboard-outline" size={14} color={Colors.primary} />
+                          <Text style={styles.pasteBtnText}>Paste</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      <View style={styles.inputWrapper}>
+                        <TextInput
+                          style={styles.textInput}
+                          placeholder="AIzaSy..."
+                          placeholderTextColor={Colors.textTertiary}
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                          secureTextEntry={isSecure}
+                          value={keyDraft}
+                          onChangeText={(t) => {
+                            setKeyDraft(t);
+                            setError(null);
+                          }}
+                        />
+                        <TouchableOpacity
+                          style={styles.eyeBtn}
+                          onPress={() => setIsSecure(!isSecure)}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Feather
+                            name={isSecure ? 'eye' : 'eye-off'}
+                            size={18}
+                            color={Colors.textSecondary}
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    {/* Error Alert */}
+                    {error ? (
+                      <View style={styles.errorAlert}>
+                        <Ionicons name="alert-circle" size={18} color={Colors.error} />
+                        <Text style={styles.errorText}>{error}</Text>
+                      </View>
                     ) : null}
-                  </View>
-                </>
-              )}
+
+                    {/* Action Buttons */}
+                    <View style={styles.buttonGroup}>
+                      <TouchableOpacity
+                        style={[
+                          styles.verifyButton,
+                          (!keyDraft.trim() || isVerifying) && styles.verifyButtonDisabled,
+                        ]}
+                        onPress={handleVerifyAndSave}
+                        disabled={!keyDraft.trim() || isVerifying || isLoadingKey}
+                        activeOpacity={0.8}
+                      >
+                        {isLoadingKey ? (
+                          <>
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                            <Text style={styles.verifyButtonText}>Loading saved key...</Text>
+                          </>
+                        ) : isVerifying ? (
+                          <>
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                            <Text style={styles.verifyButtonText}>Verifying with Gemini...</Text>
+                          </>
+                        ) : (
+                          <>
+                            <Ionicons name="shield-checkmark-outline" size={18} color="#FFFFFF" />
+                            <Text style={styles.verifyButtonText}>
+                              {currentKey ? 'Update & Verify Key' : 'Verify & Connect AI'}
+                            </Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+
+                      {currentKey ? (
+                        <TouchableOpacity
+                          style={styles.disconnectButton}
+                          onPress={handleDisconnect}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="trash-outline" size={15} color={Colors.error} />
+                          <Text style={styles.disconnectButtonText}>Disconnect AI Key</Text>
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+                  </>
+                )}
               </View>
             </ScrollView>
           </View>

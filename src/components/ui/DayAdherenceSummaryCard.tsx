@@ -9,10 +9,7 @@ interface DayAdherenceSummaryCardProps {
   dateLabel?: string;
 }
 
-export function DayAdherenceSummaryCard({
-  summary,
-  dateLabel,
-}: DayAdherenceSummaryCardProps) {
+export function DayAdherenceSummaryCard({ summary, dateLabel }: DayAdherenceSummaryCardProps) {
   const getFormattedDate = () => {
     if (dateLabel) return dateLabel;
     const [y, m, d] = summary.date.split('-').map(Number);
@@ -31,33 +28,25 @@ export function DayAdherenceSummaryCard({
       <View style={styles.statsRow}>
         {/* Taken */}
         <View style={styles.statCol}>
-          <Text style={[styles.statValue, { color: Colors.success }]}>
-            {summary.taken}
-          </Text>
+          <Text style={[styles.statValue, { color: Colors.success }]}>{summary.taken}</Text>
           <Text style={styles.statLabel}>Taken</Text>
         </View>
 
         {/* Remaining / Upcoming */}
         <View style={styles.statCol}>
-          <Text style={[styles.statValue, { color: Colors.primary }]}>
-            {summary.remaining}
-          </Text>
+          <Text style={[styles.statValue, { color: Colors.primary }]}>{summary.remaining}</Text>
           <Text style={styles.statLabel}>Remaining</Text>
         </View>
 
         {/* Missed */}
         <View style={styles.statCol}>
-          <Text style={[styles.statValue, { color: Colors.error }]}>
-            {summary.missed}
-          </Text>
+          <Text style={[styles.statValue, { color: Colors.error }]}>{summary.missed}</Text>
           <Text style={styles.statLabel}>Missed</Text>
         </View>
 
         {/* Skipped */}
         <View style={styles.statCol}>
-          <Text style={[styles.statValue, { color: Colors.textPrimary }]}>
-            {summary.skipped}
-          </Text>
+          <Text style={[styles.statValue, { color: Colors.textPrimary }]}>{summary.skipped}</Text>
           <Text style={styles.statLabel}>Skipped</Text>
         </View>
       </View>

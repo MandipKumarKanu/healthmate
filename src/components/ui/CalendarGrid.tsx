@@ -1,13 +1,10 @@
-import React, { useState, useEffect } from "react";
-import { StyleSheet, View, Text, TouchableOpacity } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { Colors } from "../../theme/colors";
-import { Radius, Spacing } from "../../theme/tokens";
-import { ReminderSchedule } from "../../types";
-import {
-  hasReminderForDate,
-  isScheduleDueOnDate,
-} from "../../utils/scheduleRecurrence";
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Colors } from '../../theme/colors';
+import { Radius, Spacing } from '../../theme/tokens';
+import { ReminderSchedule } from '../../types';
+import { hasReminderForDate, isScheduleDueOnDate } from '../../utils/scheduleRecurrence';
 
 interface CalendarGridProps {
   selectedDate: string; // 'YYYY-MM-DD'
@@ -17,21 +14,21 @@ interface CalendarGridProps {
 }
 
 const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ];
 
-const WEEK_DAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+const WEEK_DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
 export function CalendarGrid({
   selectedDate,
@@ -40,9 +37,7 @@ export function CalendarGrid({
   schedules = [],
 }: CalendarGridProps) {
   // Initialize current view from selectedDate
-  const [selectedYear, selectedMonth, selectedDay] = selectedDate
-    .split("-")
-    .map(Number);
+  const [selectedYear, selectedMonth, selectedDay] = selectedDate.split('-').map(Number);
   const selectedObj = new Date(selectedYear, selectedMonth - 1, selectedDay);
   const [viewYear, setViewYear] = useState(selectedObj.getFullYear());
   const [viewMonth, setViewMonth] = useState(selectedObj.getMonth()); // 0-indexed
@@ -53,7 +48,7 @@ export function CalendarGrid({
   // viewYear/viewMonth without touching selectedDate, so month navigation
   // is never fought or reset by this effect.
   useEffect(() => {
-    const [y, m, d] = selectedDate.split("-").map(Number);
+    const [y, m, d] = selectedDate.split('-').map(Number);
     if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return;
     setViewYear(y);
     setViewMonth(m - 1); // 0-indexed
@@ -90,8 +85,8 @@ export function CalendarGrid({
 
   // Days of month
   for (let d = 1; d <= daysInMonth; d++) {
-    const monthStr = String(viewMonth + 1).padStart(2, "0");
-    const dayStr = String(d).padStart(2, "0");
+    const monthStr = String(viewMonth + 1).padStart(2, '0');
+    const dayStr = String(d).padStart(2, '0');
     days.push({
       day: d,
       dateStr: `${viewYear}-${monthStr}-${dayStr}`,
@@ -120,22 +115,14 @@ export function CalendarGrid({
             onPress={handlePrevMonth}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Ionicons
-              name="chevron-back"
-              size={18}
-              color={Colors.textPrimary}
-            />
+            <Ionicons name="chevron-back" size={18} color={Colors.textPrimary} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.arrowButton}
             onPress={handleNextMonth}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Ionicons
-              name="chevron-forward"
-              size={18}
-              color={Colors.textPrimary}
-            />
+            <Ionicons name="chevron-forward" size={18} color={Colors.textPrimary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -159,8 +146,7 @@ export function CalendarGrid({
           const isSelected = item.dateStr === selectedDate;
           const dateKey = item.dateStr;
           const hasScheduledReminder = hasReminderForDate(schedules, dateKey);
-          const hasReminder =
-            datesWithReminders.has(dateKey) || hasScheduledReminder;
+          const hasReminder = datesWithReminders.has(dateKey) || hasScheduledReminder;
 
           return (
             <TouchableOpacity
@@ -169,24 +155,15 @@ export function CalendarGrid({
               onPress={() => onSelectDate(item.dateStr!)}
               activeOpacity={0.7}
             >
-              <View
-                style={[
-                  styles.dayNumberCircle,
-                  isSelected && styles.selectedCircle,
-                ]}
-              >
-                <Text
-                  style={[styles.dayText, isSelected && styles.selectedDayText]}
-                >
+              <View style={[styles.dayNumberCircle, isSelected && styles.selectedCircle]}>
+                <Text style={[styles.dayText, isSelected && styles.selectedDayText]}>
                   {item.day}
                 </Text>
               </View>
 
               {/* Indicator dot */}
               <View style={styles.dotContainer}>
-                {hasReminder && !isSelected ? (
-                  <View style={styles.reminderDot} />
-                ) : null}
+                {hasReminder && !isSelected ? <View style={styles.reminderDot} /> : null}
               </View>
             </TouchableOpacity>
           );
@@ -206,72 +183,72 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: Spacing.md,
   },
   monthSelector: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   monthText: {
     fontSize: 17,
-    fontWeight: "700",
+    fontWeight: '700',
     color: Colors.textPrimary,
   },
   navArrows: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
   },
   arrowButton: {
     padding: 4,
   },
   weekRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: Spacing.sm,
   },
   weekDayText: {
     flex: 1,
-    textAlign: "center",
+    textAlign: 'center',
     fontSize: 12,
-    fontWeight: "500",
+    fontWeight: '500',
     color: Colors.textTertiary,
   },
   daysGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+    flexDirection: 'row',
+    flexWrap: 'wrap',
   },
   dayCell: {
-    width: "14.28%",
-    alignItems: "center",
+    width: '14.28%',
+    alignItems: 'center',
     paddingVertical: 5,
   },
   dayNumberCircle: {
     width: 34,
     height: 34,
     borderRadius: 17,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   selectedCircle: {
     backgroundColor: Colors.primary,
   },
   dayText: {
     fontSize: 15,
-    fontWeight: "500",
+    fontWeight: '500',
     color: Colors.textPrimary,
   },
   selectedDayText: {
     color: Colors.textInverse,
-    fontWeight: "700",
+    fontWeight: '700',
   },
   dotContainer: {
     height: 6,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     marginTop: 2,
   },
   reminderDot: {

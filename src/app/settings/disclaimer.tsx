@@ -27,36 +27,36 @@ export default function DisclaimerScreen() {
             <Text style={styles.warningTitle}>Not Medical Advice</Text>
           </View>
           <Text style={styles.warningBody}>
-            HealthMate AI is strictly an organizational aid and educational reference
-            for medicine packages and routine reminders. It is NOT a clinical tool,
-            diagnostic system, or prescribing service.
+            HealthMate AI is strictly an organizational aid and educational reference for medicine
+            packages and routine reminders. It is NOT a clinical tool, diagnostic system, or
+            prescribing service.
           </Text>
         </AppCard>
 
         <AppCard style={styles.card}>
           <Text style={styles.sectionTitle}>Prescription Label Supremacy</Text>
           <Text style={styles.paragraph}>
-            Always follow the physical instructions given by your physician and
-            printed on your pharmacy prescription label. Never alter, skip, or
-            double your dose based on reminders or information shown in this app.
+            Always follow the physical instructions given by your physician and printed on your
+            pharmacy prescription label. Never alter, skip, or double your dose based on reminders
+            or information shown in this app.
           </Text>
 
           <View style={styles.divider} />
 
           <Text style={styles.sectionTitle}>Emergency Situations</Text>
           <Text style={styles.paragraph}>
-            If you suspect an adverse drug interaction, overdose, severe allergic
-            reaction, or medical emergency, immediately contact your local
-            emergency medical services or emergency poison control center.
+            If you suspect an adverse drug interaction, overdose, severe allergic reaction, or
+            medical emergency, immediately contact your local emergency medical services or
+            emergency poison control center.
           </Text>
 
           <View style={styles.divider} />
 
           <Text style={styles.sectionTitle}>OCR & Automated Text Notice</Text>
           <Text style={styles.paragraph}>
-            Camera packaging recognition is provided for data entry convenience.
-            OCR can misread characters, strengths, and expiry dates. Always verify
-            detected details yourself before confirming or saving.
+            Camera packaging recognition is provided for data entry convenience. OCR can misread
+            characters, strengths, and expiry dates. Always verify detected details yourself before
+            confirming or saving.
           </Text>
         </AppCard>
       </View>

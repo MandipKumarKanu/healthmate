@@ -4,13 +4,7 @@ import { Colors } from '../../theme/colors';
 import { Radius } from '../../theme/tokens';
 
 export type StatusBadgeType =
-  | 'taken'
-  | 'missed'
-  | 'skipped'
-  | 'upcoming'
-  | 'expired'
-  | 'reminders-on'
-  | 'low-stock';
+  'taken' | 'missed' | 'skipped' | 'upcoming' | 'expired' | 'reminders-on' | 'low-stock';
 
 interface StatusBadgeProps {
   status: StatusBadgeType;
@@ -70,9 +64,7 @@ export function StatusBadge({ status, label, style }: StatusBadgeProps) {
 
   return (
     <View style={[styles.badge, { backgroundColor: config.bg }, style]}>
-      <Text style={[styles.badgeText, { color: config.textColor }]}>
-        {config.text}
-      </Text>
+      <Text style={[styles.badgeText, { color: config.textColor }]}>{config.text}</Text>
     </View>
   );
 }

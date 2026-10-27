@@ -4,81 +4,73 @@ const {
   withMainApplication,
   withDangerousMod,
   createRunOncePlugin,
-} = require("@expo/config-plugins");
-const fs = require("fs");
-const path = require("path");
+} = require('@expo/config-plugins');
+const fs = require('fs');
+const path = require('path');
 
 function withAlarmPermissions(config) {
   return withAndroidManifest(config, (config) => {
     const androidManifest = config.modResults.manifest;
 
     const permissions = [
-      "android.permission.INTERNET",
-      "android.permission.ACCESS_NETWORK_STATE",
-      "android.permission.USE_FULL_SCREEN_INTENT",
-      "android.permission.FOREGROUND_SERVICE",
-      "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
-      "android.permission.WAKE_LOCK",
-      "android.permission.SCHEDULE_EXACT_ALARM",
-      "android.permission.RECEIVE_BOOT_COMPLETED",
-      "android.permission.VIBRATE",
-      "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+      'android.permission.INTERNET',
+      'android.permission.ACCESS_NETWORK_STATE',
+      'android.permission.USE_FULL_SCREEN_INTENT',
+      'android.permission.FOREGROUND_SERVICE',
+      'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK',
+      'android.permission.WAKE_LOCK',
+      'android.permission.SCHEDULE_EXACT_ALARM',
+      'android.permission.RECEIVE_BOOT_COMPLETED',
+      'android.permission.VIBRATE',
+      'android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS',
     ];
 
-    androidManifest["uses-permission"] =
-      androidManifest["uses-permission"] || [];
+    androidManifest['uses-permission'] = androidManifest['uses-permission'] || [];
     for (const perm of permissions) {
-      if (
-        !androidManifest["uses-permission"].some(
-          (p) => p.$["android:name"] === perm,
-        )
-      ) {
-        androidManifest["uses-permission"].push({
-          $: { "android:name": perm },
+      if (!androidManifest['uses-permission'].some((p) => p.$['android:name'] === perm)) {
+        androidManifest['uses-permission'].push({
+          $: { 'android:name': perm },
         });
       }
     }
 
     const app = androidManifest.application[0];
-    app.$["android:usesCleartextTraffic"] = "true";
-    app.$["android:networkSecurityConfig"] = "@xml/network_security_config";
+    app.$['android:usesCleartextTraffic'] = 'true';
+    app.$['android:networkSecurityConfig'] = '@xml/network_security_config';
     app.service = app.service || [];
-    if (
-      !app.service.some((s) => s.$["android:name"] === ".alarm.AlarmService")
-    ) {
+    if (!app.service.some((s) => s.$['android:name'] === '.alarm.AlarmService')) {
       app.service.push({
         $: {
-          "android:name": ".alarm.AlarmService",
-          "android:enabled": "true",
-          "android:exported": "false",
-          "android:foregroundServiceType": "mediaPlayback",
+          'android:name': '.alarm.AlarmService',
+          'android:enabled': 'true',
+          'android:exported': 'false',
+          'android:foregroundServiceType': 'mediaPlayback',
         },
       });
     }
 
     app.receiver = app.receiver || [];
     const receiverIndex = app.receiver.findIndex(
-      (r) => r.$["android:name"] === ".alarm.AlarmReceiver",
+      (r) => r.$['android:name'] === '.alarm.AlarmReceiver',
     );
     const receiverObj = {
       $: {
-        "android:name": ".alarm.AlarmReceiver",
-        "android:enabled": "true",
-        "android:exported": "false",
+        'android:name': '.alarm.AlarmReceiver',
+        'android:enabled': 'true',
+        'android:exported': 'false',
       },
-      "intent-filter": [
+      'intent-filter': [
         {
           action: [
-            { $: { "android:name": "android.intent.action.BOOT_COMPLETED" } },
+            { $: { 'android:name': 'android.intent.action.BOOT_COMPLETED' } },
             {
               $: {
-                "android:name": "android.intent.action.MY_PACKAGE_REPLACED",
+                'android:name': 'android.intent.action.MY_PACKAGE_REPLACED',
               },
             },
             {
               $: {
-                "android:name":
-                  "android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED",
+                'android:name': 'android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED',
               },
             },
           ],
@@ -92,8 +84,8 @@ function withAlarmPermissions(config) {
     }
 
     if (app.activity && app.activity[0]) {
-      app.activity[0].$["android:showWhenLocked"] = "true";
-      app.activity[0].$["android:turnScreenOn"] = "true";
+      app.activity[0].$['android:showWhenLocked'] = 'true';
+      app.activity[0].$['android:turnScreenOn'] = 'true';
     }
 
     return config;
@@ -103,7 +95,7 @@ function withAlarmPermissions(config) {
 function withAlarmMainActivity(config) {
   return withMainActivity(config, (config) => {
     let contents = config.modResults.contents;
-    if (!contents.includes("setShowWhenLocked")) {
+    if (!contents.includes('setShowWhenLocked')) {
       const lockScreenCode = `
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
       setShowWhenLocked(true)
@@ -144,13 +136,13 @@ function withAlarmMainActivity(config) {
 `;
       // Insert lockScreenCode before super.onCreate(null)
       contents = contents.replace(
-        "super.onCreate(null)",
-        `${lockScreenCode}\n    super.onCreate(null)`
+        'super.onCreate(null)',
+        `${lockScreenCode}\n    super.onCreate(null)`,
       );
       // Insert onNewIntent immediately after onCreate closing brace
       contents = contents.replace(
         /(super\.onCreate\(null\)\s*\n\s*\})/,
-        `$1\n\n${onNewIntentCode}`
+        `$1\n\n${onNewIntentCode}`,
       );
       config.modResults.contents = contents;
     }
@@ -161,10 +153,10 @@ function withAlarmMainActivity(config) {
 function withAlarmMainApplication(config) {
   return withMainApplication(config, (config) => {
     let contents = config.modResults.contents;
-    if (!contents.includes("AlarmPackage()")) {
+    if (!contents.includes('AlarmPackage()')) {
       contents = contents.replace(
-        "PackageList(this).packages.apply {",
-        "PackageList(this).packages.apply {\n          add(com.healthmate.app.alarm.AlarmPackage())",
+        'PackageList(this).packages.apply {',
+        'PackageList(this).packages.apply {\n          add(com.healthmate.app.alarm.AlarmPackage())',
       );
       config.modResults.contents = contents;
     }
@@ -174,23 +166,23 @@ function withAlarmMainApplication(config) {
 
 function withAlarmNativeFiles(config) {
   return withDangerousMod(config, [
-    "android",
+    'android',
     async (config) => {
       const projectRoot = config.modRequest.projectRoot;
-      const srcDir = path.join(projectRoot, "plugins/alarm-native");
+      const srcDir = path.join(projectRoot, 'plugins/alarm-native');
 
       const targetJavaDir = path.join(
         projectRoot,
-        "android/app/src/main/java/com/healthmate/app/alarm",
+        'android/app/src/main/java/com/healthmate/app/alarm',
       );
       fs.mkdirSync(targetJavaDir, { recursive: true });
 
       const ktFiles = [
-        "AlarmService.kt",
-        "AlarmReceiver.kt",
-        "AlarmModule.kt",
-        "AlarmPackage.kt",
-        "AlarmArming.kt",
+        'AlarmService.kt',
+        'AlarmReceiver.kt',
+        'AlarmModule.kt',
+        'AlarmPackage.kt',
+        'AlarmArming.kt',
       ];
       for (const file of ktFiles) {
         const srcFile = path.join(srcDir, file);
@@ -199,21 +191,15 @@ function withAlarmNativeFiles(config) {
         }
       }
 
-      const targetResDir = path.join(
-        projectRoot,
-        "android/app/src/main/res/raw",
-      );
+      const targetResDir = path.join(projectRoot, 'android/app/src/main/res/raw');
       fs.mkdirSync(targetResDir, { recursive: true });
 
-      const audioSrc = path.join(srcDir, "alarm_melody.wav");
+      const audioSrc = path.join(srcDir, 'alarm_melody.wav');
       if (fs.existsSync(audioSrc)) {
-        fs.copyFileSync(audioSrc, path.join(targetResDir, "alarm_melody.wav"));
+        fs.copyFileSync(audioSrc, path.join(targetResDir, 'alarm_melody.wav'));
       }
 
-      const targetXmlDir = path.join(
-        projectRoot,
-        "android/app/src/main/res/xml",
-      );
+      const targetXmlDir = path.join(projectRoot, 'android/app/src/main/res/xml');
       fs.mkdirSync(targetXmlDir, { recursive: true });
 
       const networkSecurityConfigContent = `<?xml version="1.0" encoding="utf-8"?>
@@ -226,9 +212,9 @@ function withAlarmNativeFiles(config) {
 </network-security-config>
 `;
       fs.writeFileSync(
-        path.join(targetXmlDir, "network_security_config.xml"),
+        path.join(targetXmlDir, 'network_security_config.xml'),
         networkSecurityConfigContent,
-        "utf8"
+        'utf8',
       );
 
       return config;
@@ -244,8 +230,4 @@ const withAlarmModule = (config) => {
   return config;
 };
 
-module.exports = createRunOncePlugin(
-  withAlarmModule,
-  "withAlarmModule",
-  "1.0.0",
-);
+module.exports = createRunOncePlugin(withAlarmModule, 'withAlarmModule', '1.0.0');

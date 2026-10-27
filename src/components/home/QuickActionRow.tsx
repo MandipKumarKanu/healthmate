@@ -20,17 +20,8 @@ export function QuickActionRow({
 
       <View style={styles.card}>
         {/* Health Insights */}
-        <TouchableOpacity
-          style={styles.row}
-          onPress={onInsightsPress}
-          activeOpacity={0.7}
-        >
-          <MaterialCommunityIcons
-            name="chart-line"
-            size={22}
-            color="#0788F5"
-            style={styles.icon}
-          />
+        <TouchableOpacity style={styles.row} onPress={onInsightsPress} activeOpacity={0.7}>
+          <MaterialCommunityIcons name="chart-line" size={22} color="#0788F5" style={styles.icon} />
           <View style={styles.textContainer}>
             <Text style={styles.title}>Health Insights</Text>
             <Text style={styles.subtitle}>Your adherence at a glance</Text>
@@ -41,17 +32,8 @@ export function QuickActionRow({
         <View style={styles.divider} />
 
         {/* Scan Medicine */}
-        <TouchableOpacity
-          style={styles.row}
-          onPress={onScanPress}
-          activeOpacity={0.7}
-        >
-          <Ionicons
-            name="scan-outline"
-            size={22}
-            color="#0788F5"
-            style={styles.icon}
-          />
+        <TouchableOpacity style={styles.row} onPress={onScanPress} activeOpacity={0.7}>
+          <Ionicons name="scan-outline" size={22} color="#0788F5" style={styles.icon} />
           <View style={styles.textContainer}>
             <Text style={styles.title}>Scan Medicine</Text>
           </View>
@@ -61,17 +43,8 @@ export function QuickActionRow({
         <View style={styles.divider} />
 
         {/* View Calendar */}
-        <TouchableOpacity
-          style={styles.row}
-          onPress={onCalendarPress}
-          activeOpacity={0.7}
-        >
-          <Ionicons
-            name="calendar-outline"
-            size={22}
-            color="#0788F5"
-            style={styles.icon}
-          />
+        <TouchableOpacity style={styles.row} onPress={onCalendarPress} activeOpacity={0.7}>
+          <Ionicons name="calendar-outline" size={22} color="#0788F5" style={styles.icon} />
           <View style={styles.textContainer}>
             <Text style={styles.title}>View Calendar</Text>
           </View>

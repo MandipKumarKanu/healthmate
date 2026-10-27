@@ -15,9 +15,12 @@ interface FetchSpy {
 const mockFetch = jest.fn() as unknown as FetchSpy;
 (globalThis as { fetch?: unknown }).fetch = mockFetch as unknown;
 (globalThis as { AbortController?: unknown }).AbortController =
-  (globalThis as { AbortController?: unknown }).AbortController ?? class {
+  (globalThis as { AbortController?: unknown }).AbortController ??
+  class {
     signal = { aborted: false, onabort: null };
-    abort() { this.signal.aborted = true; }
+    abort() {
+      this.signal.aborted = true;
+    }
   };
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -29,7 +32,10 @@ const { aiAssistantService } = require('../src/services/aiAssistantService') as 
     saveApiKey(key: string): Promise<void>;
     deleteApiKey(): Promise<void>;
     verifyApiKey(key: string): Promise<{ valid: boolean; error?: string }>;
-    askGemini(question: string, history?: { role: string; content: string }[]): Promise<{ text: string; model: string; usedNetwork: boolean }>;
+    askGemini(
+      question: string,
+      history?: { role: string; content: string }[],
+    ): Promise<{ text: string; model: string; usedNetwork: boolean }>;
     parseMedicinePackagingWithAI(rawOcrText: string): Promise<{
       medicineName: string;
       genericName?: string;
@@ -89,8 +95,9 @@ describe('aiAssistantService (Gemini)', () => {
   });
 
   it('refuses to answer without a key (offline-first behavior unchanged)', async () => {
-    await expect(aiAssistantService.askGemini('What does 10mg mean?'))
-      .rejects.toMatchObject({ code: 'NO_KEY' });
+    await expect(aiAssistantService.askGemini('What does 10mg mean?')).rejects.toMatchObject({
+      code: 'NO_KEY',
+    });
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
@@ -109,8 +116,9 @@ describe('aiAssistantService (Gemini)', () => {
   it('reports secure storage read failure without caching it as a missing key', async () => {
     secureStoreMock.getItemAsync.mockRejectedValueOnce(new Error('storage unavailable'));
 
-    await expect(aiAssistantService.getApiKey())
-      .rejects.toMatchObject({ code: 'SECURE_STORE_READ' });
+    await expect(aiAssistantService.getApiKey()).rejects.toMatchObject({
+      code: 'SECURE_STORE_READ',
+    });
 
     // The failed read must not be cached; a later read can succeed.
     await aiAssistantService.saveApiKey('sk-retry-key');
@@ -120,21 +128,26 @@ describe('aiAssistantService (Gemini)', () => {
   it('rejects a key save when secure storage fails instead of reporting success', async () => {
     secureStoreMock.setItemAsync.mockRejectedValueOnce(new Error('storage unavailable'));
 
-    await expect(aiAssistantService.saveApiKey('sk-not-persisted'))
-      .rejects.toThrow('could not save the Gemini key securely');
+    await expect(aiAssistantService.saveApiKey('sk-not-persisted')).rejects.toThrow(
+      'could not save the Gemini key securely',
+    );
 
     await expect(aiAssistantService.getApiKey()).resolves.toBeNull();
   });
 
   it('calls generateContent with the current model, key, and safety system prompt', async () => {
     await aiAssistantService.saveApiKey('sk-live-key');
-    mockFetch.mockResolvedValueOnce(okResponse(geminiBodyWithText('A milligram is a unit of mass.')));
+    mockFetch.mockResolvedValueOnce(
+      okResponse(geminiBodyWithText('A milligram is a unit of mass.')),
+    );
 
     const result = await aiAssistantService.askGemini('What does mg mean on a label?');
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const [url, init] = mockFetch.mock.calls[0];
-    expect(String(url)).toContain('https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent');
+    expect(String(url)).toContain(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent',
+    );
     const headers = (init as { headers: Record<string, string> }).headers;
     expect(headers['x-goog-api-key']).toBe('sk-live-key');
 
@@ -142,10 +155,15 @@ describe('aiAssistantService (Gemini)', () => {
     const parsed = JSON.parse(body);
     // System instruction present (safety rules)
     expect(parsed.systemInstruction?.parts?.[0]?.text).toContain('pharmacist');
-    expect(parsed.systemInstruction?.parts?.[0]?.text).toContain('NEVER give personalized medical advice');
+    expect(parsed.systemInstruction?.parts?.[0]?.text).toContain(
+      'NEVER give personalized medical advice',
+    );
     // Question routed as user role
     expect(parsed.contents).toEqual([
-      expect.objectContaining({ role: 'user', parts: [expect.objectContaining({ text: 'What does mg mean on a label?' })] }),
+      expect.objectContaining({
+        role: 'user',
+        parts: [expect.objectContaining({ text: 'What does mg mean on a label?' })],
+      }),
     ]);
 
     expect(result.text).toBe('A milligram is a unit of mass.');
@@ -161,15 +179,22 @@ describe('aiAssistantService (Gemini)', () => {
     ]);
 
     const body = JSON.parse((mockFetch.mock.calls[0][1] as { body: string }).body);
-    expect(body.contents.map((c: { role: string }) => c.role)).toEqual(['user', 'assistant', 'user']);
+    expect(body.contents.map((c: { role: string }) => c.role)).toEqual([
+      'user',
+      'assistant',
+      'user',
+    ]);
   });
 
   it('raises BAD_KEY when Gemini rejects an invalid key', async () => {
     await aiAssistantService.saveApiKey('sk-bad-key');
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 401, json: () => Promise.resolve({ error: { message: 'API key not valid' } }) });
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      json: () => Promise.resolve({ error: { message: 'API key not valid' } }),
+    });
 
-    await expect(aiAssistantService.askGemini('hello'))
-      .rejects.toMatchObject({ code: 'BAD_KEY' });
+    await expect(aiAssistantService.askGemini('hello')).rejects.toMatchObject({ code: 'BAD_KEY' });
     await expect(aiAssistantService.getApiKey()).resolves.toBeNull();
   });
 
@@ -180,13 +205,17 @@ describe('aiAssistantService (Gemini)', () => {
       status: 404,
       json: () => Promise.resolve({ error: { message: 'model not found' } }),
     });
-    mockFetch.mockResolvedValueOnce(okResponse(geminiBodyWithText('A label describes a medicine.')));
+    mockFetch.mockResolvedValueOnce(
+      okResponse(geminiBodyWithText('A label describes a medicine.')),
+    );
 
     const result = await aiAssistantService.askGemini('What is a label?');
 
     expect(result.model).toBe('gemini-flash-latest');
     expect(mockFetch).toHaveBeenCalledTimes(2);
-    expect(String(mockFetch.mock.calls[1][0])).toContain('/models/gemini-flash-latest:generateContent');
+    expect(String(mockFetch.mock.calls[1][0])).toContain(
+      '/models/gemini-flash-latest:generateContent',
+    );
   });
 
   it('surfaces Gemini quota errors from packaging interpretation instead of silently hiding them', async () => {
@@ -206,9 +235,10 @@ describe('aiAssistantService (Gemini)', () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 400,
-      json: () => Promise.resolve({
-        error: { message: 'API key not valid. Please pass a valid API key.' },
-      }),
+      json: () =>
+        Promise.resolve({
+          error: { message: 'API key not valid. Please pass a valid API key.' },
+        }),
     });
 
     const result = await aiAssistantService.verifyApiKey('sk-invalid');
@@ -219,26 +249,31 @@ describe('aiAssistantService (Gemini)', () => {
 
   it('surfaces a categorized RATE_LIMIT code on 429 responses', async () => {
     await aiAssistantService.saveApiKey('sk-throttled');
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 429, json: () => Promise.resolve({ error: { message: 'resource_exhausted' } }) });
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      json: () => Promise.resolve({ error: { message: 'resource_exhausted' } }),
+    });
 
-    await expect(aiAssistantService.askGemini('hello'))
-      .rejects.toMatchObject({ code: 'RATE_LIMIT' });
+    await expect(aiAssistantService.askGemini('hello')).rejects.toMatchObject({
+      code: 'RATE_LIMIT',
+    });
   });
 
   it('categorizes transport failures as NETWORK so screens can fall back', async () => {
     await aiAssistantService.saveApiKey('sk-network');
     mockFetch.mockRejectedValueOnce(new Error('Network request failed'));
 
-    await expect(aiAssistantService.askGemini('hello'))
-      .rejects.toMatchObject({ code: 'NETWORK' });
+    await expect(aiAssistantService.askGemini('hello')).rejects.toMatchObject({ code: 'NETWORK' });
   });
 
   it('returns EMPTY_ANSWER when candidates arrive without usable content parts', async () => {
     await aiAssistantService.saveApiKey('sk-malformed');
     mockFetch.mockResolvedValueOnce(okResponse({ candidates: [{ finishReason: 'SAFETY' }] }));
 
-    await expect(aiAssistantService.askGemini('hello'))
-      .rejects.toMatchObject({ code: 'EMPTY_ANSWER' });
+    await expect(aiAssistantService.askGemini('hello')).rejects.toMatchObject({
+      code: 'EMPTY_ANSWER',
+    });
   });
 
   it('prefers the last working model so the next message skips the try-chain', async () => {

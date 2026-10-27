@@ -15,12 +15,7 @@ export function MedicalDisclaimer({
   return (
     <View style={styles.container}>
       <View style={styles.contentRow}>
-        <Feather
-          name="shield"
-          size={14}
-          color="#8A8991"
-          style={styles.icon}
-        />
+        <Feather name="shield" size={14} color="#8A8991" style={styles.icon} />
         <Text style={styles.text}>{text}</Text>
       </View>
       {subtext ? <Text style={styles.subtext}>{subtext}</Text> : null}

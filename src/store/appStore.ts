@@ -1,16 +1,13 @@
-import { create } from "zustand";
-import { UserProfile, UserPreferences, OnboardingDraft, SnoozeIntervalMinutes } from "../types";
-import { profileRepository } from "../database/repositories/profileRepository";
-import { adherenceRepository } from "../database/repositories/adherenceRepository";
-import { seedInitialDataIfNeeded, getTodayDateString } from "../database/seed";
-import { resetDatabase } from "../database/client";
-import { notificationService } from "../services/notificationService";
-import {
-  cleanupOrphanScanImages,
-  deleteAllScanImages,
-} from "../services/scanImageStorage";
-import { useMedicineStore } from "./medicineStore";
-import { useReminderStore } from "./reminderStore";
+import { create } from 'zustand';
+import { UserProfile, UserPreferences, OnboardingDraft, SnoozeIntervalMinutes } from '../types';
+import { profileRepository } from '../database/repositories/profileRepository';
+import { adherenceRepository } from '../database/repositories/adherenceRepository';
+import { seedInitialDataIfNeeded, getTodayDateString } from '../database/seed';
+import { resetDatabase } from '../database/client';
+import { notificationService } from '../services/notificationService';
+import { cleanupOrphanScanImages, deleteAllScanImages } from '../services/scanImageStorage';
+import { useMedicineStore } from './medicineStore';
+import { useReminderStore } from './reminderStore';
 
 interface AppState {
   profile: UserProfile | null;
@@ -30,7 +27,7 @@ interface AppState {
       gender?: string;
       height?: number;
       weight?: number;
-      unitSystem?: "metric" | "imperial";
+      unitSystem?: 'metric' | 'imperial';
     },
     onboardingCompleted?: boolean,
   ) => void;
@@ -55,12 +52,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     lastActiveDate: getTodayDateString(),
   },
   onboardingDraft: {
-    name: "",
-    age: "",
+    name: '',
+    age: '',
     gender: null,
-    height: "",
-    weight: "",
-    unitSystem: "metric",
+    height: '',
+    weight: '',
+    unitSystem: 'metric',
   },
   selectedDate: getTodayDateString(),
   isInitialized: false,
@@ -73,25 +70,25 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       adherenceRepository.persistMissedDoses();
     } catch (error) {
-      console.warn("Missed-dose sweep failed:", error);
+      console.warn('Missed-dose sweep failed:', error);
     }
     // Reclaim scan images no longer referenced by any scan row.
     // Fire-and-forget; a failure must never block app startup.
     try {
       cleanupOrphanScanImages();
     } catch (error) {
-      console.warn("Scan-image cleanup failed:", error);
+      console.warn('Scan-image cleanup failed:', error);
     }
     const profile = profileRepository.getProfile();
     const preferences = profileRepository.getPreferences();
     const savedDraft = profileRepository.getOnboardingDraft();
     const initialDraft: OnboardingDraft = savedDraft ?? {
-      name: profile?.name || "",
-      age: profile?.age ? String(profile.age) : "",
+      name: profile?.name || '',
+      age: profile?.age ? String(profile.age) : '',
       gender: (profile?.gender as any) || null,
-      height: profile?.height ? String(profile.height) : "",
-      weight: profile?.weight ? String(profile.weight) : "",
-      unitSystem: profile?.unitSystem || "metric",
+      height: profile?.height ? String(profile.height) : '',
+      weight: profile?.weight ? String(profile.weight) : '',
+      unitSystem: profile?.unitSystem || 'metric',
     };
     set({
       profile,
@@ -113,12 +110,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     profileRepository.clearOnboardingDraft();
     set({
       onboardingDraft: {
-        name: "",
-        age: "",
+        name: '',
+        age: '',
         gender: null,
-        height: "",
-        weight: "",
-        unitSystem: "metric",
+        height: '',
+        weight: '',
+        unitSystem: 'metric',
       },
     });
   },
@@ -149,7 +146,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   completeOnboarding: () => {
     profileRepository.setOnboardingCompleted(true);
-    profileRepository.setOnboardingStep("completed");
+    profileRepository.setOnboardingStep('completed');
     get().clearOnboardingDraft();
     const updated = profileRepository.getProfile();
     set({ profile: updated });
@@ -177,10 +174,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setSnoozeInterval: (minutes: SnoozeIntervalMinutes) => {
     const valid: SnoozeIntervalMinutes =
-      minutes === 5 || minutes === 10 || minutes === 15 || minutes === 20
-        ? minutes
-        : 10;
-    profileRepository.updatePreference("snooze_interval_minutes", String(valid));
+      minutes === 5 || minutes === 10 || minutes === 15 || minutes === 20 ? minutes : 10;
+    profileRepository.updatePreference('snooze_interval_minutes', String(valid));
     set((state) => ({
       preferences: {
         ...state.preferences,

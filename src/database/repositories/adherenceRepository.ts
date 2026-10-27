@@ -1,20 +1,13 @@
-import { getDatabase } from "../client";
-import { medicineRepository } from "./medicineRepository";
-import { scheduleRepository } from "./scheduleRepository";
-import {
-  refillService,
-} from "../../services/refillService";
+import { getDatabase } from '../client';
+import { medicineRepository } from './medicineRepository';
+import { scheduleRepository } from './scheduleRepository';
+import { refillService } from '../../services/refillService';
 import {
   parseDateParts,
   isScheduleDueOnDate,
   getTodayDateString,
-} from "../../utils/scheduleRecurrence";
-import {
-  ScheduledDose,
-  DoseStatus,
-  DayAdherenceSummary,
-  ReminderSchedule,
-} from "../../types";
+} from '../../utils/scheduleRecurrence';
+import { ScheduledDose, DoseStatus, DayAdherenceSummary, ReminderSchedule } from '../../types';
 
 export { parseDateParts, isScheduleDueOnDate };
 
@@ -33,35 +26,32 @@ export function getDefaultDoseStatus(
   time: string,
   now: Date = new Date(),
 ): DoseStatus {
-  if (!parseDateParts(date) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time))
-    return "upcoming";
+  if (!parseDateParts(date) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return 'upcoming';
 
   const today = [
     now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, "0"),
-    String(now.getDate()).padStart(2, "0"),
-  ].join("-");
-  if (date < today) return "missed";
-  if (date > today) return "upcoming";
+    String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0'),
+  ].join('-');
+  if (date < today) return 'missed';
+  if (date > today) return 'upcoming';
 
-  const [hours, minutes] = time.split(":").map(Number);
-  return hours * 60 + minutes <= now.getHours() * 60 + now.getMinutes()
-    ? "missed"
-    : "upcoming";
+  const [hours, minutes] = time.split(':').map(Number);
+  return hours * 60 + minutes <= now.getHours() * 60 + now.getMinutes() ? 'missed' : 'upcoming';
 }
 
 export function calculateDayAdherenceSummary(
   date: string,
-  doses: Pick<ScheduledDose, "status">[],
+  doses: Pick<ScheduledDose, 'status'>[],
 ): DayAdherenceSummary {
   let taken = 0;
   let missed = 0;
   let skipped = 0;
   let remaining = 0;
   for (const dose of doses) {
-    if (dose.status === "taken") taken++;
-    else if (dose.status === "missed") missed++;
-    else if (dose.status === "skipped") skipped++;
+    if (dose.status === 'taken') taken++;
+    else if (dose.status === 'missed') missed++;
+    else if (dose.status === 'skipped') skipped++;
     else remaining++;
   }
   const total = doses.length;
@@ -83,19 +73,13 @@ export const MISSED_SWEEP_LOOKBACK_DAYS = 7;
  * True when a dose scheduled for `date`/`time` should already have been taken
  * (or flagged missed) as of `now` — including today's doses whose time passed.
  */
-function isDoseOverdue(
-  date: string,
-  time: string,
-  today: string,
-  nowMinutes: number,
-): boolean {
+function isDoseOverdue(date: string, time: string, today: string, nowMinutes: number): boolean {
   if (date < today) return true;
   if (date > today) return false;
-  const [hours, minutes] = time.split(":").map(Number);
+  const [hours, minutes] = time.split(':').map(Number);
   if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return false;
   return hours * 60 + minutes <= nowMinutes;
 }
-
 
 export const adherenceRepository = {
   /**
@@ -121,11 +105,7 @@ export const adherenceRepository = {
 
     const dates: string[] = [];
     for (let offset = lookbackDays; offset >= 0; offset--) {
-      const d = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate() - offset,
-      );
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - offset);
       dates.push(getTodayDateString(d));
     }
 
@@ -144,25 +124,17 @@ export const adherenceRepository = {
             continue;
           }
           const existing = db.getFirstSync<{ status: string }>(
-            "SELECT status FROM adherence_logs WHERE dose_date = ? AND dose_time = ? AND schedule_id = ?;",
+            'SELECT status FROM adherence_logs WHERE dose_date = ? AND dose_time = ? AND schedule_id = ?;',
             [date, timeEntry.time, schedule.id],
           );
           if (existing) continue;
 
-          const logId = `log_${schedule.id}_${date}_${timeEntry.time.replace(":", "")}`;
+          const logId = `log_${schedule.id}_${date}_${timeEntry.time.replace(':', '')}`;
           db.runSync(
             `INSERT OR REPLACE INTO adherence_logs (
               id, schedule_id, medicine_id, dose_date, dose_time, status, logged_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?);`,
-            [
-              logId,
-              schedule.id,
-              medicine.id,
-              date,
-              timeEntry.time,
-              "missed",
-              now.toISOString(),
-            ],
+            [logId, schedule.id, medicine.id, date, timeEntry.time, 'missed', now.toISOString()],
           );
           persisted.push(logId);
         }
@@ -177,11 +149,9 @@ export const adherenceRepository = {
     const db = getDatabase();
     const schedules = scheduleRepository.getSchedulesForDate(date);
     const medicines = medicineRepository.getAll();
-    const medMap = new Map(
-      medicines.map((medicine) => [medicine.id, medicine]),
-    );
+    const medMap = new Map(medicines.map((medicine) => [medicine.id, medicine]));
     const logs = db.getAllSync<AdherenceLogRow>(
-      "SELECT * FROM adherence_logs WHERE dose_date = ?;",
+      'SELECT * FROM adherence_logs WHERE dose_date = ?;',
       [date],
     );
 
@@ -189,11 +159,8 @@ export const adherenceRepository = {
     const coveredLogKeys = new Set<string>();
 
     for (const log of logs) {
-      if (["taken", "missed", "skipped", "upcoming"].includes(log.status)) {
-        logMap.set(
-          `${log.schedule_id}_${log.dose_time}`,
-          log.status as DoseStatus,
-        );
+      if (['taken', 'missed', 'skipped', 'upcoming'].includes(log.status)) {
+        logMap.set(`${log.schedule_id}_${log.dose_time}`, log.status as DoseStatus);
       }
     }
 
@@ -232,7 +199,7 @@ export const adherenceRepository = {
         const medicine = medMap.get(log.medicine_id);
         if (!medicine) continue;
         doses.push({
-          id: `${log.schedule_id}_log_${log.dose_time.replace(":", "")}_${date}`,
+          id: `${log.schedule_id}_log_${log.dose_time.replace(':', '')}_${date}`,
           scheduleId: log.schedule_id,
           medicineId: log.medicine_id,
           medicineName: medicine.name,
@@ -240,7 +207,7 @@ export const adherenceRepository = {
           dosageForm: medicine.dosageForm,
           date,
           time: log.dose_time,
-          amount: "1 dose",
+          amount: '1 dose',
           status: log.status as DoseStatus,
           loggedAt: log.logged_at,
         });
@@ -257,58 +224,44 @@ export const adherenceRepository = {
     time: string,
     status: DoseStatus,
   ): void {
-    if (!parseDateParts(date))
-      throw new Error("Invalid dose date. Expected YYYY-MM-DD.");
+    if (!parseDateParts(date)) throw new Error('Invalid dose date. Expected YYYY-MM-DD.');
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time))
-      throw new Error("Invalid dose time. Expected HH:mm.");
-    if (!["taken", "missed", "skipped", "upcoming"].includes(status))
-      throw new Error("Invalid dose status.");
+      throw new Error('Invalid dose time. Expected HH:mm.');
+    if (!['taken', 'missed', 'skipped', 'upcoming'].includes(status))
+      throw new Error('Invalid dose status.');
 
     const schedulesForDate = scheduleRepository.getSchedulesForDate(date);
     const schedule =
-      schedulesForDate.find((s) => s.id === scheduleId) ??
-      scheduleRepository.getById(scheduleId);
+      schedulesForDate.find((s) => s.id === scheduleId) ?? scheduleRepository.getById(scheduleId);
 
     if (!schedule || schedule.medicineId !== medicineId) {
-      throw new Error(
-        "Cannot log a dose for an unknown schedule or mismatched medicine.",
-      );
+      throw new Error('Cannot log a dose for an unknown schedule or mismatched medicine.');
     }
     if (
       !isScheduleDueOnDate(schedule, date) ||
       !schedule.times.some((entry) => entry.time === time)
     ) {
-      throw new Error(
-        "The selected schedule has no dose at that date and time.",
-      );
+      throw new Error('The selected schedule has no dose at that date and time.');
     }
 
-    const logId = `log_${scheduleId}_${date}_${time.replace(":", "")}`;
+    const logId = `log_${scheduleId}_${date}_${time.replace(':', '')}`;
 
     // Stock accounting: only transition into/out of 'taken' consumes a unit.
     // Re-logging an already-taken dose, or logging a never-taken dose again,
     // must not double-count (or compensate twice).
     const previousStatus = getDatabase().getFirstSync<{ status: DoseStatus }>(
-      "SELECT status FROM adherence_logs WHERE dose_date = ? AND dose_time = ? AND schedule_id = ?;",
+      'SELECT status FROM adherence_logs WHERE dose_date = ? AND dose_time = ? AND schedule_id = ?;',
       [date, time, scheduleId],
     );
     let stockDelta: number | null = null;
-    if (status === "taken" && previousStatus?.status !== "taken") stockDelta = -1;
-    else if (status !== "taken" && previousStatus?.status === "taken") stockDelta = 1;
+    if (status === 'taken' && previousStatus?.status !== 'taken') stockDelta = -1;
+    else if (status !== 'taken' && previousStatus?.status === 'taken') stockDelta = 1;
 
     getDatabase().runSync(
       `INSERT OR REPLACE INTO adherence_logs (
         id, schedule_id, medicine_id, dose_date, dose_time, status, logged_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?);`,
-      [
-        logId,
-        scheduleId,
-        medicineId,
-        date,
-        time,
-        status,
-        new Date().toISOString(),
-      ],
+      [logId, scheduleId, medicineId, date, time, status, new Date().toISOString()],
     );
 
     if (stockDelta !== null) {
@@ -317,11 +270,7 @@ export const adherenceRepository = {
         const med = medicineRepository.getById(medicineId);
         // Fire-and-forget: logging stays synchronous.
         void refillService
-          .notifyRefillNeeded(
-            med?.name ?? "Your medicine",
-            change.stock,
-            med?.unitDosage,
-          )
+          .notifyRefillNeeded(med?.name ?? 'Your medicine', change.stock, med?.unitDosage)
           .then(() => refillService.markReminded(medicineId))
           .catch(() => undefined);
       }
@@ -342,9 +291,9 @@ export const adherenceRepository = {
       date.setDate(date.getDate() - offset);
       const dateStr = [
         date.getFullYear(),
-        String(date.getMonth() + 1).padStart(2, "0"),
-        String(date.getDate()).padStart(2, "0"),
-      ].join("-");
+        String(date.getMonth() + 1).padStart(2, '0'),
+        String(date.getDate()).padStart(2, '0'),
+      ].join('-');
       summaries.push(this.getDayAdherenceSummary(dateStr));
     }
     return summaries;

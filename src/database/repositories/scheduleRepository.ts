@@ -1,11 +1,11 @@
-import { getDatabase } from "../client";
-import { ReminderSchedule, ReminderTime, RecurrenceType } from "../../types";
+import { getDatabase } from '../client';
+import { ReminderSchedule, ReminderTime, RecurrenceType } from '../../types';
 import {
   getTodayDateString,
   getPreviousDayString,
   isScheduleDueOnDate,
   parseDateParts,
-} from "../../utils/scheduleRecurrence";
+} from '../../utils/scheduleRecurrence';
 
 interface ScheduleRow {
   id: string;
@@ -69,9 +69,9 @@ function addDayUtc(dateStr: string, days: number): string {
   const d = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2] + days));
   return [
     d.getUTCFullYear(),
-    String(d.getUTCMonth() + 1).padStart(2, "0"),
-    String(d.getUTCDate()).padStart(2, "0"),
-  ].join("-");
+    String(d.getUTCMonth() + 1).padStart(2, '0'),
+    String(d.getUTCDate()).padStart(2, '0'),
+  ].join('-');
 }
 
 function mapHistoryRowToSchedule(row: ScheduleHistoryRow): ReminderSchedule {
@@ -99,33 +99,28 @@ function mapHistoryRowToSchedule(row: ScheduleHistoryRow): ReminderSchedule {
 export const scheduleRepository = {
   getAll(): ReminderSchedule[] {
     const db = getDatabase();
-    const rows = db.getAllSync<ScheduleRow>(
-      "SELECT * FROM schedules ORDER BY created_at DESC;",
-    );
+    const rows = db.getAllSync<ScheduleRow>('SELECT * FROM schedules ORDER BY created_at DESC;');
     return rows.map(mapRowToSchedule);
   },
 
   getHistoricalSchedules(): ReminderSchedule[] {
     const db = getDatabase();
     const rows = db.getAllSync<ScheduleHistoryRow>(
-      "SELECT * FROM schedule_history ORDER BY created_at DESC;",
+      'SELECT * FROM schedule_history ORDER BY created_at DESC;',
     );
     return rows.map(mapHistoryRowToSchedule);
   },
 
   getById(id: string): ReminderSchedule | null {
     const db = getDatabase();
-    const row = db.getFirstSync<ScheduleRow>(
-      "SELECT * FROM schedules WHERE id = ?;",
-      [id],
-    );
+    const row = db.getFirstSync<ScheduleRow>('SELECT * FROM schedules WHERE id = ?;', [id]);
     return row ? mapRowToSchedule(row) : null;
   },
 
   getByMedicineId(medicineId: string): ReminderSchedule | null {
     const db = getDatabase();
     const row = db.getFirstSync<ScheduleRow>(
-      "SELECT * FROM schedules WHERE medicine_id = ? LIMIT 1;",
+      'SELECT * FROM schedules WHERE medicine_id = ? LIMIT 1;',
       [medicineId],
     );
     return row ? mapRowToSchedule(row) : null;
@@ -133,14 +128,10 @@ export const scheduleRepository = {
 
   getSchedulesForDate(date: string): ReminderSchedule[] {
     const db = getDatabase();
-    const activeRows = db.getAllSync<ScheduleRow>(
-      "SELECT * FROM schedules WHERE enabled = 1;",
-    );
+    const activeRows = db.getAllSync<ScheduleRow>('SELECT * FROM schedules WHERE enabled = 1;');
     const activeSchedules = activeRows.map(mapRowToSchedule);
 
-    const histRows = db.getAllSync<ScheduleHistoryRow>(
-      "SELECT * FROM schedule_history;",
-    );
+    const histRows = db.getAllSync<ScheduleHistoryRow>('SELECT * FROM schedule_history;');
     const histSchedules = histRows.map(mapHistoryRowToSchedule);
 
     const result: ReminderSchedule[] = [];
@@ -174,28 +165,22 @@ export const scheduleRepository = {
     let newStartDate = schedule.startDate;
 
     if (existing) {
-      const timesChanged =
-        JSON.stringify(existing.times) !== JSON.stringify(schedule.times);
+      const timesChanged = JSON.stringify(existing.times) !== JSON.stringify(schedule.times);
       const recurrenceChanged = existing.recurrence !== schedule.recurrence;
       const datesChanged =
-        existing.startDate !== schedule.startDate ||
-        existing.endDate !== schedule.endDate;
+        existing.startDate !== schedule.startDate || existing.endDate !== schedule.endDate;
 
       if (timesChanged || recurrenceChanged || datesChanged) {
         // Effective date of the edit: use updatedAt date if provided, otherwise today
-        const editDate = schedule.updatedAt
-          ? schedule.updatedAt.split("T")[0]
-          : today;
+        const editDate = schedule.updatedAt ? schedule.updatedAt.split('T')[0] : today;
 
         if (existing.startDate < editDate) {
           const histEndDate = getPreviousDayString(editDate);
           const effectiveEndDate =
-            existing.endDate && existing.endDate < histEndDate
-              ? existing.endDate
-              : histEndDate;
+            existing.endDate && existing.endDate < histEndDate ? existing.endDate : histEndDate;
 
           if (existing.startDate <= effectiveEndDate) {
-            const histId = `${existing.id}_hist_${(existing.updatedAt || existing.createdAt || editDate).replace(/[:.-]/g, "_")}`;
+            const histId = `${existing.id}_hist_${(existing.updatedAt || existing.createdAt || editDate).replace(/[:.-]/g, '_')}`;
             db.runSync(
               `INSERT OR REPLACE INTO schedule_history (
                 id, schedule_id, medicine_id, recurrence, start_date, end_date,
@@ -254,9 +239,8 @@ export const scheduleRepository = {
 
     // Archive the schedule into schedule_history so past adherence logs retain their dose identity
     const today = getTodayDateString();
-    const histEndDate =
-      existing.endDate && existing.endDate < today ? existing.endDate : today;
-    const histId = `${existing.id}_del_${new Date().toISOString().replace(/[:.-]/g, "_")}`;
+    const histEndDate = existing.endDate && existing.endDate < today ? existing.endDate : today;
+    const histId = `${existing.id}_del_${new Date().toISOString().replace(/[:.-]/g, '_')}`;
     db.runSync(
       `INSERT OR REPLACE INTO schedule_history (
         id, schedule_id, medicine_id, recurrence, start_date, end_date,
@@ -276,17 +260,18 @@ export const scheduleRepository = {
     );
 
     // CRITICAL: Preserve historical adherence_logs for past records
-    const result = db.runSync("DELETE FROM schedules WHERE id = ?;", [id]);
+    const result = db.runSync('DELETE FROM schedules WHERE id = ?;', [id]);
     this.compactScheduleHistory(id);
     return result.changes > 0;
   },
 
   toggleEnabled(id: string, enabled: boolean): void {
     const db = getDatabase();
-    db.runSync(
-      "UPDATE schedules SET enabled = ?, updated_at = ? WHERE id = ?;",
-      [enabled ? 1 : 0, new Date().toISOString(), id],
-    );
+    db.runSync('UPDATE schedules SET enabled = ?, updated_at = ? WHERE id = ?;', [
+      enabled ? 1 : 0,
+      new Date().toISOString(),
+      id,
+    ]);
   },
 
   /**
@@ -307,14 +292,13 @@ export const scheduleRepository = {
     const db = getDatabase();
     const rows = db
       .getAllSync<ScheduleHistoryRow>(
-        "SELECT * FROM schedule_history WHERE schedule_id = ? ORDER BY start_date ASC;",
+        'SELECT * FROM schedule_history WHERE schedule_id = ? ORDER BY start_date ASC;',
         [scheduleId],
       )
       .slice()
       .sort(
         (a, b) =>
-          a.start_date.localeCompare(b.start_date) ||
-          a.created_at.localeCompare(b.created_at),
+          a.start_date.localeCompare(b.start_date) || a.created_at.localeCompare(b.created_at),
       );
 
     // Merge pass: fold contiguous/overlapping identical versions together.
@@ -329,16 +313,12 @@ export const scheduleRepository = {
         row.start_date <= addDayUtc(prev.end_date, 1)
       ) {
         // Extend the surviving segment to the later end; delete the merged row.
-        const newEnd =
-          row.end_date > prev.end_date ? row.end_date : prev.end_date;
+        const newEnd = row.end_date > prev.end_date ? row.end_date : prev.end_date;
         if (newEnd !== prev.end_date) {
-          db.runSync(
-            "UPDATE schedule_history SET end_date = ? WHERE id = ?;",
-            [newEnd, prev.id],
-          );
+          db.runSync('UPDATE schedule_history SET end_date = ? WHERE id = ?;', [newEnd, prev.id]);
           prev.end_date = newEnd;
         }
-        db.runSync("DELETE FROM schedule_history WHERE id = ?;", [row.id]);
+        db.runSync('DELETE FROM schedule_history WHERE id = ?;', [row.id]);
       } else {
         merged.push({ ...row });
       }
@@ -349,18 +329,10 @@ export const scheduleRepository = {
     if (merged.length > MAX_HISTORY_ROWS_PER_SCHEDULE) {
       const byNewest = merged
         .slice()
-        .sort((a, b) =>
-          (b.updated_at || b.created_at).localeCompare(
-            a.updated_at || a.created_at,
-          ),
-        );
-      const toDrop = new Set(
-        byNewest
-          .slice(MAX_HISTORY_ROWS_PER_SCHEDULE)
-          .map((row) => row.id),
-      );
+        .sort((a, b) => (b.updated_at || b.created_at).localeCompare(a.updated_at || a.created_at));
+      const toDrop = new Set(byNewest.slice(MAX_HISTORY_ROWS_PER_SCHEDULE).map((row) => row.id));
       for (const id of toDrop) {
-        db.runSync("DELETE FROM schedule_history WHERE id = ?;", [id]);
+        db.runSync('DELETE FROM schedule_history WHERE id = ?;', [id]);
       }
     }
   },

@@ -12,7 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { AppAlert as Alert } from "../../services/appAlert";
+import { AppAlert as Alert } from '../../services/appAlert';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
@@ -101,7 +101,7 @@ export default function SetReminderScreen() {
       setMedicines(list);
       return list;
     } catch (e) {
-      console.warn("Failed to load medicines:", e);
+      console.warn('Failed to load medicines:', e);
       return [];
     }
   }, []);
@@ -115,7 +115,7 @@ export default function SetReminderScreen() {
       } else if (!selectedMed && list.length > 0) {
         setSelectedMed(list[0]);
       }
-    }, [loadMedicines, medicineId, selectedMed])
+    }, [loadMedicines, medicineId, selectedMed]),
   );
 
   useEffect(() => {
@@ -127,7 +127,7 @@ export default function SetReminderScreen() {
           existingSched.times.map((t) => ({
             ...t,
             label: t.label || getTimeLabel(t.time),
-          }))
+          })),
         );
         if (existingSched.times.length > 0 && existingSched.times[0].amount) {
           setAmount(existingSched.times[0].amount);
@@ -150,13 +150,13 @@ export default function SetReminderScreen() {
     const isDuplicate = isDuplicateReminderTime(
       times,
       selectedTime,
-      targetId === 'new' ? undefined : targetId
+      targetId === 'new' ? undefined : targetId,
     );
 
     if (isDuplicate) {
       Alert.alert(
         'Duplicate Reminder Time',
-        `A dose is already scheduled for ${formatTime12Hour(selectedTime)}. Each dose reminder must have a distinct time.`
+        `A dose is already scheduled for ${formatTime12Hour(selectedTime)}. Each dose reminder must have a distinct time.`,
       );
       return;
     }
@@ -174,14 +174,15 @@ export default function SetReminderScreen() {
         prev
           .map((item) => {
             if (item.id !== targetId) return item;
-            const isDefaultLabel = !item.label || ['Morning', 'Afternoon', 'Evening', 'Night'].includes(item.label);
+            const isDefaultLabel =
+              !item.label || ['Morning', 'Afternoon', 'Evening', 'Night'].includes(item.label);
             return {
               ...item,
               time: selectedTime,
               label: isDefaultLabel ? getTimeLabel(selectedTime) : item.label,
             };
           })
-          .sort((a, b) => a.time.localeCompare(b.time))
+          .sort((a, b) => a.time.localeCompare(b.time)),
       );
     }
   };
@@ -193,7 +194,7 @@ export default function SetReminderScreen() {
       Number.isFinite(parts[0]) ? parts[0] : 8,
       Number.isFinite(parts[1]) ? parts[1] : 0,
       0,
-      0
+      0,
     );
 
     setTempPickerDate(dateObj);
@@ -251,7 +252,7 @@ export default function SetReminderScreen() {
     if (isDuplicateReminderTime(times, presetTime)) {
       Alert.alert(
         'Duplicate Reminder Time',
-        `A dose is already scheduled for ${formatTime12Hour(presetTime)}.`
+        `A dose is already scheduled for ${formatTime12Hour(presetTime)}.`,
       );
       return;
     }
@@ -309,7 +310,11 @@ export default function SetReminderScreen() {
     }
 
     setIsSaving(true);
-    setSaveProgress(notificationsEnabled ? 'Checking notification and alarm access…' : 'Saving reminder schedule…');
+    setSaveProgress(
+      notificationsEnabled
+        ? 'Checking notification and alarm access…'
+        : 'Saving reminder schedule…',
+    );
     try {
       let canNotify = notificationsEnabled;
       if (notificationsEnabled) {
@@ -324,9 +329,10 @@ export default function SetReminderScreen() {
 
       // Use the date visible in the calendar when the route did not supply one.
       // This keeps the in-memory reminder list in sync with the saved SQLite row.
-      const refreshDate =
-        date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : selectedDate;
-      setSaveProgress(canNotify ? 'Saving schedule and preparing alarms…' : 'Saving reminder schedule…');
+      const refreshDate = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : selectedDate;
+      setSaveProgress(
+        canNotify ? 'Saving schedule and preparing alarms…' : 'Saving reminder schedule…',
+      );
       const existingSchedule = scheduleRepository.getByMedicineId(selectedMed.id);
       const scheduleId = existingSchedule?.id ?? `sched_${selectedMed.id}`;
       const now = new Date().toISOString();
@@ -338,9 +344,7 @@ export default function SetReminderScreen() {
           recurrence,
           startDate:
             existingSchedule?.startDate ??
-            (date && /^\d{4}-\d{2}-\d{2}$/.test(date)
-              ? date
-              : getTodayDateString()),
+            (date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : getTodayDateString()),
           endDate: existingSchedule?.endDate,
           times,
           enabled: true,
@@ -370,11 +374,9 @@ export default function SetReminderScreen() {
           internal:
             'Your schedule is saved, but at least one alarm could not be scheduled (internal or network error). Try re-saving this schedule; if it keeps failing, check your connection and device storage.',
         };
-        Alert.alert(
-          'Schedule saved without alarms',
-          failureMessages[saveResult.alarmFailure],
-          [{ text: 'OK', onPress: () => router.back() }],
-        );
+        Alert.alert('Schedule saved without alarms', failureMessages[saveResult.alarmFailure], [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
         return;
       }
 
@@ -407,7 +409,7 @@ export default function SetReminderScreen() {
   const filteredMedicines = medicines.filter((m) =>
     `${m.name} ${m.strength} ${m.category || ''}`
       .toLowerCase()
-      .includes(modalSearch.trim().toLowerCase())
+      .includes(modalSearch.trim().toLowerCase()),
   );
 
   return (
@@ -426,11 +428,7 @@ export default function SetReminderScreen() {
           {selectedMed ? (
             <View style={styles.selectedMedContainer}>
               <View style={styles.medRow}>
-                <MedicineIcon
-                  form={selectedMed.dosageForm}
-                  name={selectedMed.name}
-                  size={46}
-                />
+                <MedicineIcon form={selectedMed.dosageForm} name={selectedMed.name} size={46} />
                 <View style={styles.medInfo}>
                   <Text style={styles.medName}>{selectedMed.name}</Text>
                   <Text style={styles.medSub}>
@@ -498,7 +496,11 @@ export default function SetReminderScreen() {
           <TouchableOpacity
             onPress={() => setEditingTimes((value) => !value)}
             accessibilityRole="button"
-            accessibilityLabel={editingTimes ? 'Finish editing reminder times' : 'Edit reminder times and dose amounts'}
+            accessibilityLabel={
+              editingTimes
+                ? 'Finish editing reminder times'
+                : 'Edit reminder times and dose amounts'
+            }
           >
             <Text style={styles.editAction}>{editingTimes ? 'Done' : 'Edit'}</Text>
           </TouchableOpacity>
@@ -514,9 +516,7 @@ export default function SetReminderScreen() {
                     value={t.label ?? ''}
                     onChangeText={(label) =>
                       setTimes((previous) =>
-                        previous.map((item) =>
-                          item.id === t.id ? { ...item, label } : item
-                        )
+                        previous.map((item) => (item.id === t.id ? { ...item, label } : item)),
                       )
                     }
                     placeholder="Dose name (e.g. Morning)"
@@ -602,7 +602,9 @@ export default function SetReminderScreen() {
                       accessibilityRole="button"
                       accessibilityLabel={`Add preset ${getTimeLabel(preset)} at ${formatTime12Hour(preset)}`}
                     >
-                      <Text style={[styles.presetChipText, isAdded && styles.presetChipTextDisabled]}>
+                      <Text
+                        style={[styles.presetChipText, isAdded && styles.presetChipTextDisabled]}
+                      >
                         {isAdded ? '✓ ' : '+ '}
                         {getTimeLabel(preset)} · {formatTime12Hour(preset)}
                       </Text>
@@ -643,9 +645,7 @@ export default function SetReminderScreen() {
           >
             <View style={{ flex: 1 }}>
               <Text style={styles.toggleTitle}>Send Notifications</Text>
-              <Text style={styles.toggleSub}>
-                Receive alerts on this device at scheduled times
-              </Text>
+              <Text style={styles.toggleSub}>Receive alerts on this device at scheduled times</Text>
             </View>
             <Ionicons
               name={notificationsEnabled ? 'checkbox' : 'square-outline'}
@@ -750,10 +750,7 @@ export default function SetReminderScreen() {
                         );
                       })}
                     </ScrollView>
-                    <View
-                      pointerEvents="none"
-                      style={styles.timeWheelSelection}
-                    />
+                    <View pointerEvents="none" style={styles.timeWheelSelection} />
                   </View>
                 </View>
 
@@ -796,10 +793,7 @@ export default function SetReminderScreen() {
                         );
                       })}
                     </ScrollView>
-                    <View
-                      pointerEvents="none"
-                      style={styles.timeWheelSelection}
-                    />
+                    <View pointerEvents="none" style={styles.timeWheelSelection} />
                   </View>
                 </View>
 
@@ -878,161 +872,148 @@ export default function SetReminderScreen() {
             style={styles.medModalKeyboardContainer}
           >
             <View style={styles.medModalContainer}>
-            {/* Modal Header */}
-            <View style={styles.medModalHeader}>
-              <View>
-                <Text style={styles.medModalTitle}>Select Medicine</Text>
-                <Text style={styles.medModalSubtitle}>
-                  Choose which medication to schedule
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setIsMedModalVisible(false)}
-                style={styles.medModalCloseBtn}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                accessibilityRole="button"
-                accessibilityLabel="Close selection dialog"
-              >
-                <Ionicons name="close" size={22} color="#475569" />
-              </TouchableOpacity>
-            </View>
-
-            {/* In-Dialog Search (if medicines exist) */}
-            {medicines.length > 0 && (
-              <View style={styles.medModalSearchBox}>
-                <Ionicons name="search" size={18} color="#94A3B8" style={{ marginRight: 8 }} />
-                <TextInput
-                  style={styles.medModalSearchInput}
-                  value={modalSearch}
-                  onChangeText={setModalSearch}
-                  placeholder="Search medicines..."
-                  placeholderTextColor="#94A3B8"
-                  accessibilityLabel="Search medicines in dialog"
-                />
-                {modalSearch.length > 0 && (
-                  <TouchableOpacity onPress={() => setModalSearch("")}>
-                    <Ionicons name="close-circle" size={16} color="#94A3B8" />
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
-
-            {/* Medicines List or Empty State */}
-            {medicines.length === 0 ? (
-              <View style={styles.medModalEmptyBox}>
-                <View style={styles.medModalEmptyIconWrap}>
-                  <Ionicons name="medkit-outline" size={40} color="#94A3B8" />
+              {/* Modal Header */}
+              <View style={styles.medModalHeader}>
+                <View>
+                  <Text style={styles.medModalTitle}>Select Medicine</Text>
+                  <Text style={styles.medModalSubtitle}>Choose which medication to schedule</Text>
                 </View>
-                <Text style={styles.medModalEmptyTitle}>No Medicines Added</Text>
-                <Text style={styles.medModalEmptySub}>
-                  You must add a medicine to your cabinet before scheduling a reminder.
-                </Text>
                 <TouchableOpacity
-                  style={styles.medModalAddBtn}
-                  onPress={() => {
-                    setIsMedModalVisible(false);
-                    router.push("/medicines/create");
-                  }}
-                  activeOpacity={0.8}
+                  onPress={() => setIsMedModalVisible(false)}
+                  style={styles.medModalCloseBtn}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close selection dialog"
                 >
-                  <Ionicons name="add" size={18} color="#FFFFFF" />
-                  <Text style={styles.medModalAddBtnText}>Add Medicine</Text>
+                  <Ionicons name="close" size={22} color="#475569" />
                 </TouchableOpacity>
               </View>
-            ) : filteredMedicines.length === 0 ? (
-              <View style={styles.medModalNoResults}>
-                <Text style={styles.medModalNoResultsText}>
-                  No medicines match "{modalSearch}"
-                </Text>
-              </View>
-            ) : (
-              <ScrollView
-                style={styles.medModalList}
-                contentContainerStyle={{ paddingBottom: 24 }}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-              >
-                {filteredMedicines.map((med) => {
-                  const isSelected = selectedMed?.id === med.id;
-                  return (
-                    <TouchableOpacity
-                      key={med.id}
-                      style={[
-                        styles.medModalItem,
-                        isSelected && styles.medModalItemActive,
-                      ]}
-                      onPress={() => {
-                        setSelectedMed(med);
-                        setIsMedModalVisible(false);
-                        setModalSearch("");
 
-                        const existingSched = scheduleRepository.getByMedicineId(med.id);
-                        if (existingSched) {
-                          setRecurrence(existingSched.recurrence);
-                          setTimes(
-                            existingSched.times.map((t) => ({
-                              ...t,
-                              label: t.label || getTimeLabel(t.time),
-                            }))
-                          );
-                          if (existingSched.times.length > 0 && existingSched.times[0].amount) {
-                            setAmount(existingSched.times[0].amount);
-                          }
-                          setNotificationsEnabled(existingSched.notificationsEnabled);
-                        } else {
-                          const defaultDose =
-                            med.dosageForm === 'syrup'
-                              ? '5 ml'
-                              : med.dosageForm === 'eye_drop'
-                                ? '2 drops'
-                                : med.dosageForm === 'cream'
-                                  ? '1 application'
-                                  : med.dosageForm === 'injection'
-                                    ? '1 dose'
-                                    : med.dosageForm === 'capsule'
-                                      ? '1 capsule'
-                                      : '1 tablet';
-                          setAmount(defaultDose);
-                          setTimes((prev) =>
-                            prev.map((t) => ({
-                              ...t,
-                              amount: defaultDose,
-                            }))
-                          );
-                        }
-                      }}
-                      activeOpacity={0.7}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: isSelected }}
-                      accessibilityLabel={`${med.name}, ${med.strength}, ${med.dosageForm}`}
-                    >
-                      <MedicineIcon
-                        form={med.dosageForm}
-                        name={med.name}
-                        size={42}
-                      />
-                      <View style={styles.medModalItemInfo}>
-                        <Text style={styles.medModalItemName}>{med.name}</Text>
-                        <Text style={styles.medModalItemSub}>
-                          {med.strength} · {med.dosageForm}
-                          {med.category ? ` · ${med.category}` : ""}
-                        </Text>
-                      </View>
-                      {isSelected ? (
-                        <Ionicons
-                          name="checkmark-circle"
-                          size={22}
-                          color={Colors.primary}
-                        />
-                      ) : (
-                        <View style={styles.medModalRadioUnchecked} />
-                      )}
+              {/* In-Dialog Search (if medicines exist) */}
+              {medicines.length > 0 && (
+                <View style={styles.medModalSearchBox}>
+                  <Ionicons name="search" size={18} color="#94A3B8" style={{ marginRight: 8 }} />
+                  <TextInput
+                    style={styles.medModalSearchInput}
+                    value={modalSearch}
+                    onChangeText={setModalSearch}
+                    placeholder="Search medicines..."
+                    placeholderTextColor="#94A3B8"
+                    accessibilityLabel="Search medicines in dialog"
+                  />
+                  {modalSearch.length > 0 && (
+                    <TouchableOpacity onPress={() => setModalSearch('')}>
+                      <Ionicons name="close-circle" size={16} color="#94A3B8" />
                     </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            )}
+                  )}
+                </View>
+              )}
+
+              {/* Medicines List or Empty State */}
+              {medicines.length === 0 ? (
+                <View style={styles.medModalEmptyBox}>
+                  <View style={styles.medModalEmptyIconWrap}>
+                    <Ionicons name="medkit-outline" size={40} color="#94A3B8" />
+                  </View>
+                  <Text style={styles.medModalEmptyTitle}>No Medicines Added</Text>
+                  <Text style={styles.medModalEmptySub}>
+                    You must add a medicine to your cabinet before scheduling a reminder.
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.medModalAddBtn}
+                    onPress={() => {
+                      setIsMedModalVisible(false);
+                      router.push('/medicines/create');
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="add" size={18} color="#FFFFFF" />
+                    <Text style={styles.medModalAddBtnText}>Add Medicine</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : filteredMedicines.length === 0 ? (
+                <View style={styles.medModalNoResults}>
+                  <Text style={styles.medModalNoResultsText}>
+                    No medicines match "{modalSearch}"
+                  </Text>
+                </View>
+              ) : (
+                <ScrollView
+                  style={styles.medModalList}
+                  contentContainerStyle={{ paddingBottom: 24 }}
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+                >
+                  {filteredMedicines.map((med) => {
+                    const isSelected = selectedMed?.id === med.id;
+                    return (
+                      <TouchableOpacity
+                        key={med.id}
+                        style={[styles.medModalItem, isSelected && styles.medModalItemActive]}
+                        onPress={() => {
+                          setSelectedMed(med);
+                          setIsMedModalVisible(false);
+                          setModalSearch('');
+
+                          const existingSched = scheduleRepository.getByMedicineId(med.id);
+                          if (existingSched) {
+                            setRecurrence(existingSched.recurrence);
+                            setTimes(
+                              existingSched.times.map((t) => ({
+                                ...t,
+                                label: t.label || getTimeLabel(t.time),
+                              })),
+                            );
+                            if (existingSched.times.length > 0 && existingSched.times[0].amount) {
+                              setAmount(existingSched.times[0].amount);
+                            }
+                            setNotificationsEnabled(existingSched.notificationsEnabled);
+                          } else {
+                            const defaultDose =
+                              med.dosageForm === 'syrup'
+                                ? '5 ml'
+                                : med.dosageForm === 'eye_drop'
+                                  ? '2 drops'
+                                  : med.dosageForm === 'cream'
+                                    ? '1 application'
+                                    : med.dosageForm === 'injection'
+                                      ? '1 dose'
+                                      : med.dosageForm === 'capsule'
+                                        ? '1 capsule'
+                                        : '1 tablet';
+                            setAmount(defaultDose);
+                            setTimes((prev) =>
+                              prev.map((t) => ({
+                                ...t,
+                                amount: defaultDose,
+                              })),
+                            );
+                          }
+                        }}
+                        activeOpacity={0.7}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: isSelected }}
+                        accessibilityLabel={`${med.name}, ${med.strength}, ${med.dosageForm}`}
+                      >
+                        <MedicineIcon form={med.dosageForm} name={med.name} size={42} />
+                        <View style={styles.medModalItemInfo}>
+                          <Text style={styles.medModalItemName}>{med.name}</Text>
+                          <Text style={styles.medModalItemSub}>
+                            {med.strength} · {med.dosageForm}
+                            {med.category ? ` · ${med.category}` : ''}
+                          </Text>
+                        </View>
+                        {isSelected ? (
+                          <Ionicons name="checkmark-circle" size={22} color={Colors.primary} />
+                        ) : (
+                          <View style={styles.medModalRadioUnchecked} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              )}
             </View>
           </KeyboardAvoidingView>
         </View>

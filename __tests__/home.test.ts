@@ -107,7 +107,13 @@ describe('Home Screen Logic & Adherence Calculations', () => {
     const trimmed = name.trim();
     if (!trimmed) return 'AM';
     const parts = trimmed.split(' ').filter(Boolean);
-    return parts.map((p) => p[0]).join('').slice(0, 2).toUpperCase() || 'AM';
+    return (
+      parts
+        .map((p) => p[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase() || 'AM'
+    );
   }
 
   function formatDisplayDate(dateStr: string): string {
@@ -140,7 +146,7 @@ describe('Home Screen Logic & Adherence Calculations', () => {
 
   it('updates to 67% adherence when Next Up dose is marked as Taken', () => {
     const updatedDoses = sampleDoses.map((d) =>
-      d.id === '6' ? { ...d, status: 'taken' as const } : d
+      d.id === '6' ? { ...d, status: 'taken' as const } : d,
     );
     const summary = computeSummary(updatedDoses, '2026-04-22');
     expect(summary.total).toBe(6);

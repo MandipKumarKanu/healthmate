@@ -35,7 +35,7 @@ import ImageEnhancerModule from '../../modules/image-enhancer';
 interface ImageManipulatorModule {
   manipulate(
     source: string,
-    options?: { maxWidth?: number; maxHeight?: number }
+    options?: { maxWidth?: number; maxHeight?: number },
   ): ImageManipulatorContext;
 }
 
@@ -69,8 +69,7 @@ function resolveImageManipulator(): ImageManipulatorModule | null {
   if (imageManipulatorResolved) return imageManipulatorModule;
   imageManipulatorResolved = true;
   try {
-    imageManipulatorModule =
-      requireNativeModule<ImageManipulatorModule>('ExpoImageManipulator');
+    imageManipulatorModule = requireNativeModule<ImageManipulatorModule>('ExpoImageManipulator');
   } catch {
     // Native module unavailable (e.g. web build without the native emission):
     // fall back to the original image instead of breaking the scan flow.
@@ -84,7 +83,7 @@ async function renderAndSave(
   source: string,
   saveQuality: number,
   loadOptions: { maxWidth?: number; maxHeight?: number },
-  crop?: { originX: number; originY: number; width: number; height: number }
+  crop?: { originX: number; originY: number; width: number; height: number },
 ): Promise<PreparedImage> {
   // Decode-time downsample only when the load options are meaningful for this
   // pass; a crop's rectangle is expressed in the source file's pixel space, so
@@ -129,7 +128,7 @@ async function renderAndSave(
  */
 export async function prepareImageForOcr(
   imageUri: string,
-  options: PrepareOptions = {}
+  options: PrepareOptions = {},
 ): Promise<PreparedImage> {
   const imageManipulator = resolveImageManipulator();
   const maxDimension = options.maxDimension ?? DEFAULT_OCR_MAX_DIMENSION;
@@ -214,17 +213,12 @@ export async function enhanceImageForOcr(imageUri: string): Promise<PreparedImag
 export async function cropImageRegionForOcr(
   imageUri: string,
   region: { originX: number; originY: number; width: number; height: number },
-  options: PrepareOptions = {}
+  options: PrepareOptions = {},
 ): Promise<PreparedImage> {
   const imageManipulator = resolveImageManipulator();
   const quality = options.quality ?? 0.95;
 
-  if (
-    !imageManipulator ||
-    !imageUri ||
-    region.width <= 0 ||
-    region.height <= 0
-  ) {
+  if (!imageManipulator || !imageUri || region.width <= 0 || region.height <= 0) {
     return { uri: imageUri, processed: false, width: 0, height: 0 };
   }
 

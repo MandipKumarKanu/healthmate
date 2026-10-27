@@ -12,37 +12,34 @@ const state = { files: new Set(), dirs: new Set() };
 
 function joinUris(...uris) {
   return uris
-    .map((u) => (typeof u === "string" ? u : u.uri))
-    .filter((u) => u && typeof u === "string")
-    .map((u) => u.replace(/\/+$/, ""))
-    .join("/");
+    .map((u) => (typeof u === 'string' ? u : u.uri))
+    .filter((u) => u && typeof u === 'string')
+    .map((u) => u.replace(/\/+$/, ''))
+    .join('/');
 }
 
 function initMockState(initial = {}) {
   state.files = new Set(initial.files ?? []);
-  state.dirs = new Set(initial.dirs ?? [
-    "file:///mock-documents",
-    "file:///mock-cache",
-  ]);
+  state.dirs = new Set(initial.dirs ?? ['file:///mock-documents', 'file:///mock-cache']);
   return state;
 }
 
 function includeDirAncestors(dirUri) {
   // Ensure the parent chain registers as directories for list() to work.
   let current = dirUri;
-  while (current && current !== "file://") {
+  while (current && current !== 'file://') {
     state.dirs.add(current);
-    const next = current.substring(0, current.lastIndexOf("/"));
+    const next = current.substring(0, current.lastIndexOf('/'));
     if (!next || next === current) break;
     current = next;
   }
 }
 
 function listDir(dirUri) {
-  const prefix = dirUri.replace(/\/+$/, "") + "/";
+  const prefix = dirUri.replace(/\/+$/, '') + '/';
   const children = [];
   for (const uri of state.files) {
-    if (uri.startsWith(prefix) && !uri.slice(prefix.length).includes("/")) {
+    if (uri.startsWith(prefix) && !uri.slice(prefix.length).includes('/')) {
       children.push(uri);
     }
   }
@@ -59,17 +56,17 @@ class MockFile {
   }
 
   get name() {
-    return this.uri.substring(this.uri.lastIndexOf("/") + 1);
+    return this.uri.substring(this.uri.lastIndexOf('/') + 1);
   }
 
   get extension() {
     const name = this.name;
-    const dot = name.lastIndexOf(".");
-    return dot === -1 ? "" : name.slice(dot);
+    const dot = name.lastIndexOf('.');
+    return dot === -1 ? '' : name.slice(dot);
   }
 
   create() {
-    includeDirAncestors(this.uri.substring(0, this.uri.lastIndexOf("/")));
+    includeDirAncestors(this.uri.substring(0, this.uri.lastIndexOf('/')));
     state.files.add(this.uri);
   }
 
@@ -85,7 +82,7 @@ class MockFile {
     if (!this.exists) {
       throw new Error(`Source does not exist: ${this.uri}`);
     }
-    includeDirAncestors(dest.uri.substring(0, dest.uri.lastIndexOf("/")));
+    includeDirAncestors(dest.uri.substring(0, dest.uri.lastIndexOf('/')));
     state.files.add(dest.uri);
     return dest;
   }
@@ -100,13 +97,13 @@ class MockFile {
   }
 
   async text() {
-    return "";
+    return '';
   }
 }
 
 class MockDirectory {
   constructor(...uris) {
-    this.uri = joinUris(...uris).replace(/\/+$/, "");
+    this.uri = joinUris(...uris).replace(/\/+$/, '');
   }
 
   get exists() {
@@ -114,7 +111,7 @@ class MockDirectory {
   }
 
   get name() {
-    return this.uri.substring(this.uri.lastIndexOf("/") + 1);
+    return this.uri.substring(this.uri.lastIndexOf('/') + 1);
   }
 
   create(options = {}) {
@@ -127,7 +124,7 @@ class MockDirectory {
 
   delete() {
     state.dirs.delete(this.uri);
-    const prefix = this.uri + "/";
+    const prefix = this.uri + '/';
     for (const uri of [...state.files]) {
       if (uri.startsWith(prefix)) state.files.delete(uri);
     }
@@ -141,11 +138,11 @@ class MockDirectory {
 
 class MockPaths {
   static get document() {
-    return new MockDirectory("file:///mock-documents");
+    return new MockDirectory('file:///mock-documents');
   }
 
   static get cache() {
-    return new MockDirectory("file:///mock-cache");
+    return new MockDirectory('file:///mock-cache');
   }
 }
 

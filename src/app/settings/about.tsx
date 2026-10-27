@@ -34,8 +34,8 @@ export default function AboutScreen() {
             </View>
           </View>
           <Text style={styles.description}>
-            A mobile medication management and medicine-label education application
-            built with modern React Native, Expo Router, and on-device SQLite.
+            A mobile medication management and medicine-label education application built with
+            modern React Native, Expo Router, and on-device SQLite.
           </Text>
         </AppCard>
 

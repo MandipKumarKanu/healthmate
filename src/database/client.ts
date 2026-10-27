@@ -1,12 +1,9 @@
-import * as SQLite from "expo-sqlite";
-import { migrationManager } from "./migrationManager";
+import * as SQLite from 'expo-sqlite';
+import { migrationManager } from './migrationManager';
 
 export interface ISQLiteDatabase {
   execSync(sql: string): void;
-  runSync(
-    query: string,
-    params?: unknown[],
-  ): { changes: number; lastInsertRowId: number };
+  runSync(query: string, params?: unknown[]): { changes: number; lastInsertRowId: number };
   getFirstSync<T>(query: string, params?: unknown[]): T | null;
   getAllSync<T>(query: string, params?: unknown[]): T[];
 }
@@ -24,15 +21,18 @@ declare const __DEV__: boolean | undefined;
  */
 function guardIsEnabled(): boolean {
   try {
-    if (typeof __DEV__ !== "undefined" && __DEV__) return true;
+    if (typeof __DEV__ !== 'undefined' && __DEV__) return true;
   } catch {
     // Ignore runtime lookups; fall through to the NODE_ENV check.
   }
-  return process.env.NODE_ENV !== "production";
+  return process.env.NODE_ENV !== 'production';
 }
 
 class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
-  private schemaMigrations = new Map<number, { version: number; name: string; applied_at: string }>();
+  private schemaMigrations = new Map<
+    number,
+    { version: number; name: string; applied_at: string }
+  >();
   private profiles = new Map<string, Record<string, unknown>>();
   private preferences = new Map<string, { key: string; value: string }>();
   private medicines = new Map<string, Record<string, unknown>>();
@@ -46,8 +46,8 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
 
   execSync(sql: string): void {
     const clean = sql.trim().toUpperCase();
-    if (clean.includes("DROP TABLE")) {
-      if (clean.includes("SCHEMA_MIGRATIONS")) {
+    if (clean.includes('DROP TABLE')) {
+      if (clean.includes('SCHEMA_MIGRATIONS')) {
         this.schemaMigrations.clear();
       }
       this.profiles.clear();
@@ -66,10 +66,10 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
     // hand-managed by the handlers below.
     const sqlUpper = sql.trim().toUpperCase();
     const isKnownDdl =
-      sqlUpper.startsWith("PRAGMA") ||
-      sqlUpper.startsWith("CREATE TABLE") ||
-      sqlUpper.startsWith("CREATE INDEX") ||
-      sqlUpper.startsWith("ALTER TABLE");
+      sqlUpper.startsWith('PRAGMA') ||
+      sqlUpper.startsWith('CREATE TABLE') ||
+      sqlUpper.startsWith('CREATE INDEX') ||
+      sqlUpper.startsWith('ALTER TABLE');
     if (isKnownDdl) return;
     if (guardIsEnabled()) {
       throw new Error(
@@ -78,15 +78,12 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
     }
   }
 
-  runSync(
-    query: string,
-    params: unknown[] = [],
-  ): { changes: number; lastInsertRowId: number } {
+  runSync(query: string, params: unknown[] = []): { changes: number; lastInsertRowId: number } {
     const clean = query.trim().toUpperCase();
 
     if (
-      clean.startsWith("INSERT OR REPLACE INTO PROFILES") ||
-      clean.startsWith("INSERT INTO PROFILES")
+      clean.startsWith('INSERT OR REPLACE INTO PROFILES') ||
+      clean.startsWith('INSERT INTO PROFILES')
     ) {
       if (params.length >= 10) {
         const [
@@ -107,11 +104,9 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
           email: email ?? null,
           age: age !== undefined && age !== null ? Number(age) : null,
           gender: gender ?? null,
-          height:
-            height !== undefined && height !== null ? Number(height) : null,
-          weight:
-            weight !== undefined && weight !== null ? Number(weight) : null,
-          unit_system: (unitSystem as string) || "metric",
+          height: height !== undefined && height !== null ? Number(height) : null,
+          weight: weight !== undefined && weight !== null ? Number(weight) : null,
+          unit_system: (unitSystem as string) || 'metric',
           created_at: String(createdAt),
           onboarding_completed: Number(onboardingCompleted),
         });
@@ -125,7 +120,7 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
           gender: null,
           height: null,
           weight: null,
-          unit_system: "metric",
+          unit_system: 'metric',
           created_at: String(createdAt),
           onboarding_completed: Number(onboardingCompleted),
         });
@@ -133,7 +128,7 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return { changes: 1, lastInsertRowId: 1 };
     }
 
-    if (clean.startsWith("UPDATE PROFILES SET ONBOARDING_COMPLETED")) {
+    if (clean.startsWith('UPDATE PROFILES SET ONBOARDING_COMPLETED')) {
       const [completed] = params;
       for (const [id, prof] of this.profiles.entries()) {
         this.profiles.set(id, {
@@ -145,8 +140,8 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
     }
 
     if (
-      clean.startsWith("INSERT OR REPLACE INTO PREFERENCES") ||
-      clean.startsWith("INSERT INTO PREFERENCES")
+      clean.startsWith('INSERT OR REPLACE INTO PREFERENCES') ||
+      clean.startsWith('INSERT INTO PREFERENCES')
     ) {
       const [key, value] = params;
       this.preferences.set(String(key), {
@@ -156,7 +151,7 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return { changes: 1, lastInsertRowId: 1 };
     }
 
-    if (clean.startsWith("INSERT INTO SCHEMA_MIGRATIONS")) {
+    if (clean.startsWith('INSERT INTO SCHEMA_MIGRATIONS')) {
       const [version, name, applied_at] = params;
       this.schemaMigrations.set(Number(version), {
         version: Number(version),
@@ -167,8 +162,8 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
     }
 
     if (
-      clean.startsWith("INSERT OR REPLACE INTO MEDICINES") ||
-      clean.startsWith("INSERT INTO MEDICINES")
+      clean.startsWith('INSERT OR REPLACE INTO MEDICINES') ||
+      clean.startsWith('INSERT INTO MEDICINES')
     ) {
       const [
         id,
@@ -221,7 +216,7 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
     // name, strength, dosage_form, category, ingredient, manufacturer,
     // expiry_date, batch_number, package_details_text, information_source,
     // updated_at, current_inventory, refill_threshold, unit_dosage, id.
-    if (clean.startsWith("UPDATE MEDICINES SET") && params.length === 15) {
+    if (clean.startsWith('UPDATE MEDICINES SET') && params.length === 15) {
       const id = String(params[14]);
       const existing = this.medicines.get(id);
       if (!existing) return { changes: 0, lastInsertRowId: 0 };
@@ -247,13 +242,13 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return { changes: 1, lastInsertRowId: 1 };
     }
 
-    if (clean.startsWith("DELETE FROM MEDICINES WHERE ID")) {
+    if (clean.startsWith('DELETE FROM MEDICINES WHERE ID')) {
       const [id] = params;
       const existed = this.medicines.delete(String(id));
       return { changes: existed ? 1 : 0, lastInsertRowId: 0 };
     }
 
-    if (clean.startsWith("DELETE FROM SCHEDULES WHERE MEDICINE_ID")) {
+    if (clean.startsWith('DELETE FROM SCHEDULES WHERE MEDICINE_ID')) {
       const [medicineId] = params;
       let changes = 0;
       for (const [id, schedule] of this.schedules.entries()) {
@@ -266,8 +261,8 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
     }
 
     if (
-      clean.startsWith("INSERT OR REPLACE INTO SCHEDULE_HISTORY") ||
-      clean.startsWith("INSERT INTO SCHEDULE_HISTORY")
+      clean.startsWith('INSERT OR REPLACE INTO SCHEDULE_HISTORY') ||
+      clean.startsWith('INSERT INTO SCHEDULE_HISTORY')
     ) {
       const [
         id,
@@ -297,7 +292,7 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
     }
 
     // Order mirrors scheduleRepository.compactScheduleHistory: end_date, id.
-    if (clean.startsWith("UPDATE SCHEDULE_HISTORY SET END_DATE")) {
+    if (clean.startsWith('UPDATE SCHEDULE_HISTORY SET END_DATE')) {
       const [endDate, idParam] = params;
       const id = String(idParam);
       const existing = this.scheduleHistory.get(id);
@@ -309,13 +304,13 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return { changes: 1, lastInsertRowId: 1 };
     }
 
-    if (clean.startsWith("DELETE FROM SCHEDULE_HISTORY WHERE ID")) {
+    if (clean.startsWith('DELETE FROM SCHEDULE_HISTORY WHERE ID')) {
       const [id] = params;
       const existed = this.scheduleHistory.delete(String(id));
       return { changes: existed ? 1 : 0, lastInsertRowId: 0 };
     }
 
-    if (clean.startsWith("DELETE FROM ADHERENCE_LOGS WHERE MEDICINE_ID")) {
+    if (clean.startsWith('DELETE FROM ADHERENCE_LOGS WHERE MEDICINE_ID')) {
       const [medicineId] = params;
       let changes = 0;
       for (const [id, log] of this.adherenceLogs.entries()) {
@@ -328,8 +323,8 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
     }
 
     if (
-      clean.startsWith("INSERT OR REPLACE INTO SCHEDULES") ||
-      clean.startsWith("INSERT INTO SCHEDULES")
+      clean.startsWith('INSERT OR REPLACE INTO SCHEDULES') ||
+      clean.startsWith('INSERT INTO SCHEDULES')
     ) {
       const [
         id,
@@ -358,7 +353,7 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return { changes: 1, lastInsertRowId: 1 };
     }
 
-    if (clean.startsWith("UPDATE SCHEDULES SET ENABLED")) {
+    if (clean.startsWith('UPDATE SCHEDULES SET ENABLED')) {
       // Order mirrors scheduleRepository.toggleEnabled: enabled, updated_at, id.
       const [enabledFlag, updatedAt, idParam] = params;
       const id = String(idParam);
@@ -372,18 +367,17 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return { changes: 1, lastInsertRowId: 1 };
     }
 
-    if (clean.startsWith("DELETE FROM SCHEDULES WHERE ID")) {
+    if (clean.startsWith('DELETE FROM SCHEDULES WHERE ID')) {
       const [id] = params;
       const existed = this.schedules.delete(String(id));
       return { changes: existed ? 1 : 0, lastInsertRowId: 0 };
     }
 
     if (
-      clean.startsWith("INSERT OR REPLACE INTO ADHERENCE_LOGS") ||
-      clean.startsWith("INSERT INTO ADHERENCE_LOGS")
+      clean.startsWith('INSERT OR REPLACE INTO ADHERENCE_LOGS') ||
+      clean.startsWith('INSERT INTO ADHERENCE_LOGS')
     ) {
-      const [id, scheduleId, medicineId, doseDate, doseTime, status, loggedAt] =
-        params;
+      const [id, scheduleId, medicineId, doseDate, doseTime, status, loggedAt] = params;
       this.adherenceLogs.set(String(id), {
         id: String(id),
         schedule_id: String(scheduleId),
@@ -396,7 +390,7 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return { changes: 1, lastInsertRowId: 1 };
     }
 
-    if (clean.startsWith("DELETE FROM ADHERENCE_LOGS WHERE SCHEDULE_ID")) {
+    if (clean.startsWith('DELETE FROM ADHERENCE_LOGS WHERE SCHEDULE_ID')) {
       const [scheduleId] = params;
       let changes = 0;
       for (const [id, log] of this.adherenceLogs.entries()) {
@@ -409,18 +403,10 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
     }
 
     if (
-      clean.startsWith("INSERT OR REPLACE INTO REFILL_REMINDERS") ||
-      clean.startsWith("INSERT INTO REFILL_REMINDERS")
+      clean.startsWith('INSERT OR REPLACE INTO REFILL_REMINDERS') ||
+      clean.startsWith('INSERT INTO REFILL_REMINDERS')
     ) {
-      const [
-        id,
-        medicineId,
-        threshold,
-        currentStock,
-        status,
-        remindedAt,
-        createdAt,
-      ] = params;
+      const [id, medicineId, threshold, currentStock, status, remindedAt, createdAt] = params;
       this.refillReminders.set(String(id), {
         id: String(id),
         medicine_id: String(medicineId),
@@ -433,20 +419,20 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return { changes: 1, lastInsertRowId: 1 };
     }
 
-    if (clean.startsWith("UPDATE REFILL_REMINDERS SET STATUS")) {
+    if (clean.startsWith('UPDATE REFILL_REMINDERS SET STATUS')) {
       // Order mirrors refillService.markReminded: reminded_at, id
       const [remindedAt, id] = params;
       const row = this.refillReminders.get(String(id));
       if (!row) return { changes: 0, lastInsertRowId: 0 };
       this.refillReminders.set(String(id), {
         ...row,
-        status: "reminded",
+        status: 'reminded',
         reminded_at: remindedAt == null ? null : String(remindedAt),
       });
       return { changes: 1, lastInsertRowId: 1 };
     }
 
-    if (clean.startsWith("UPDATE REFILL_REMINDERS")) {
+    if (clean.startsWith('UPDATE REFILL_REMINDERS')) {
       // Order mirrors refillService: current_stock = ?, threshold = ? ... id = ?
       const [currentStock, threshold, id] = params;
       const row = this.refillReminders.get(String(id));
@@ -459,13 +445,13 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return { changes: 1, lastInsertRowId: 1 };
     }
 
-    if (clean.startsWith("DELETE FROM REFILL_REMINDERS WHERE ID")) {
+    if (clean.startsWith('DELETE FROM REFILL_REMINDERS WHERE ID')) {
       const [id] = params;
       const existed = this.refillReminders.delete(String(id));
       return { changes: existed ? 1 : 0, lastInsertRowId: 0 };
     }
 
-    if (clean.startsWith("DELETE FROM REFILL_REMINDERS WHERE MEDICINE_ID")) {
+    if (clean.startsWith('DELETE FROM REFILL_REMINDERS WHERE MEDICINE_ID')) {
       const [medicineId] = params;
       let changes = 0;
       for (const [id, row] of this.refillReminders.entries()) {
@@ -481,8 +467,8 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
     // medicine_name, detected_strength, dosage_form, manufacturer,
     // batch_number, expiry_date, raw_text, image_uri, scanned_at.
     if (
-      clean.startsWith("INSERT INTO SCAN_HISTORY") ||
-      clean.startsWith("INSERT OR REPLACE INTO SCAN_HISTORY")
+      clean.startsWith('INSERT INTO SCAN_HISTORY') ||
+      clean.startsWith('INSERT OR REPLACE INTO SCAN_HISTORY')
     ) {
       const [
         id,
@@ -511,22 +497,19 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return { changes: 1, lastInsertRowId: 1 };
     }
 
-    if (clean.startsWith("DELETE FROM SCAN_HISTORY WHERE ID")) {
+    if (clean.startsWith('DELETE FROM SCAN_HISTORY WHERE ID')) {
       const [id] = params;
       const existed = this.scanHistory.delete(String(id));
       return { changes: existed ? 1 : 0, lastInsertRowId: 0 };
     }
 
-    if (
-      clean === "DELETE FROM SCAN_HISTORY;" ||
-      clean === "DELETE FROM SCAN_HISTORY"
-    ) {
+    if (clean === 'DELETE FROM SCAN_HISTORY;' || clean === 'DELETE FROM SCAN_HISTORY') {
       const changes = this.scanHistory.size;
       this.scanHistory.clear();
       return { changes, lastInsertRowId: 0 };
     }
 
-    if (clean.startsWith("INSERT INTO AI_CONVERSATIONS")) {
+    if (clean.startsWith('INSERT INTO AI_CONVERSATIONS')) {
       const [id, title, createdAt] = params;
       this.aiConversations.set(String(id), {
         id: String(id),
@@ -536,7 +519,7 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return { changes: 1, lastInsertRowId: 1 };
     }
 
-    if (clean.startsWith("INSERT INTO AI_MESSAGES")) {
+    if (clean.startsWith('INSERT INTO AI_MESSAGES')) {
       const [id, conversationId, role, content, timestamp] = params;
       this.aiMessages.set(String(id), {
         id: String(id),
@@ -548,7 +531,7 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return { changes: 1, lastInsertRowId: 1 };
     }
 
-    if (clean.startsWith("DELETE FROM AI_MESSAGES WHERE CONVERSATION_ID")) {
+    if (clean.startsWith('DELETE FROM AI_MESSAGES WHERE CONVERSATION_ID')) {
       const [conversationId] = params;
       let changes = 0;
       for (const [id, msg] of this.aiMessages.entries()) {
@@ -560,31 +543,25 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return { changes, lastInsertRowId: 0 };
     }
 
-    if (clean.startsWith("DELETE FROM AI_CONVERSATIONS WHERE ID")) {
+    if (clean.startsWith('DELETE FROM AI_CONVERSATIONS WHERE ID')) {
       const [id] = params;
       const existed = this.aiConversations.delete(String(id));
       return { changes: existed ? 1 : 0, lastInsertRowId: 0 };
     }
 
-    if (
-      clean === "DELETE FROM AI_MESSAGES;" ||
-      clean === "DELETE FROM AI_MESSAGES"
-    ) {
+    if (clean === 'DELETE FROM AI_MESSAGES;' || clean === 'DELETE FROM AI_MESSAGES') {
       const changes = this.aiMessages.size;
       this.aiMessages.clear();
       return { changes, lastInsertRowId: 0 };
     }
 
-    if (
-      clean === "DELETE FROM AI_CONVERSATIONS;" ||
-      clean === "DELETE FROM AI_CONVERSATIONS"
-    ) {
+    if (clean === 'DELETE FROM AI_CONVERSATIONS;' || clean === 'DELETE FROM AI_CONVERSATIONS') {
       const changes = this.aiConversations.size;
       this.aiConversations.clear();
       return { changes, lastInsertRowId: 0 };
     }
 
-    if (clean.startsWith("DELETE FROM PREFERENCES WHERE KEY")) {
+    if (clean.startsWith('DELETE FROM PREFERENCES WHERE KEY')) {
       const match = clean.match(/KEY\s*=\s*'([^']+)'/i);
       const key = params.length > 0 ? String(params[0]) : match ? match[1] : null;
       if (key) {
@@ -594,10 +571,7 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return { changes: 0, lastInsertRowId: 0 };
     }
 
-    if (
-      clean === "DELETE FROM PREFERENCES;" ||
-      clean === "DELETE FROM PREFERENCES"
-    ) {
+    if (clean === 'DELETE FROM PREFERENCES;' || clean === 'DELETE FROM PREFERENCES') {
       const changes = this.preferences.size;
       this.preferences.clear();
       return { changes, lastInsertRowId: 0 };
@@ -619,18 +593,18 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
   getAllSync<T>(query: string, params: unknown[] = []): T[] {
     const clean = query.trim().toUpperCase();
 
-    if (clean.includes("FROM SCHEMA_MIGRATIONS")) {
+    if (clean.includes('FROM SCHEMA_MIGRATIONS')) {
       return Array.from(this.schemaMigrations.values()).sort(
         (a, b) => a.version - b.version,
       ) as unknown as T[];
     }
 
-    if (clean.includes("FROM PROFILES")) {
+    if (clean.includes('FROM PROFILES')) {
       return Array.from(this.profiles.values()) as unknown as T[];
     }
 
-    if (clean.includes("FROM PREFERENCES")) {
-      if (clean.includes("WHERE KEY =")) {
+    if (clean.includes('FROM PREFERENCES')) {
+      if (clean.includes('WHERE KEY =')) {
         const [key] = params;
         const item = this.preferences.get(String(key));
         return item ? ([item] as unknown as T[]) : [];
@@ -638,8 +612,8 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return Array.from(this.preferences.values()) as unknown as T[];
     }
 
-    if (clean.includes("FROM MEDICINES")) {
-      if (clean.includes("WHERE ID =")) {
+    if (clean.includes('FROM MEDICINES')) {
+      if (clean.includes('WHERE ID =')) {
         const [id] = params;
         const item = this.medicines.get(String(id));
         return item ? ([item] as unknown as T[]) : [];
@@ -649,19 +623,19 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       ) as unknown as T[];
     }
 
-    if (clean.includes("FROM SCHEDULES")) {
-      if (clean.includes("WHERE ID =")) {
+    if (clean.includes('FROM SCHEDULES')) {
+      if (clean.includes('WHERE ID =')) {
         const [id] = params;
         const item = this.schedules.get(String(id));
         return item ? ([item] as unknown as T[]) : [];
       }
-      if (clean.includes("WHERE MEDICINE_ID =")) {
+      if (clean.includes('WHERE MEDICINE_ID =')) {
         const [medId] = params;
         return Array.from(this.schedules.values()).filter(
           (s) => s.medicine_id === String(medId),
         ) as unknown as T[];
       }
-      if (clean.includes("WHERE ENABLED = 1")) {
+      if (clean.includes('WHERE ENABLED = 1')) {
         return Array.from(this.schedules.values()).filter(
           (s) => Number(s.enabled) === 1,
         ) as unknown as T[];
@@ -669,8 +643,8 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return Array.from(this.schedules.values()) as unknown as T[];
     }
 
-    if (clean.includes("FROM SCHEDULE_HISTORY")) {
-      if (clean.includes("WHERE SCHEDULE_ID =")) {
+    if (clean.includes('FROM SCHEDULE_HISTORY')) {
+      if (clean.includes('WHERE SCHEDULE_ID =')) {
         const [schedId] = params;
         return Array.from(this.scheduleHistory.values()).filter(
           (s) => s.schedule_id === String(schedId),
@@ -679,17 +653,17 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return Array.from(this.scheduleHistory.values()) as unknown as T[];
     }
 
-    if (clean.includes("FROM ADHERENCE_LOGS")) {
-      if (clean.includes("WHERE DOSE_DATE =")) {
+    if (clean.includes('FROM ADHERENCE_LOGS')) {
+      if (clean.includes('WHERE DOSE_DATE =')) {
         const [doseDate] = params;
         let rows = Array.from(this.adherenceLogs.values()).filter(
           (l) => l.dose_date === String(doseDate),
         ) as unknown as Record<string, unknown>[];
-        if (clean.includes("AND DOSE_TIME =")) {
+        if (clean.includes('AND DOSE_TIME =')) {
           const doseTime = String(params[1]);
           rows = rows.filter((l) => l.dose_time === doseTime);
         }
-        if (clean.includes("AND SCHEDULE_ID =")) {
+        if (clean.includes('AND SCHEDULE_ID =')) {
           const scheduleId = String(params[2]);
           rows = rows.filter((l) => l.schedule_id === scheduleId);
         }
@@ -698,13 +672,13 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return Array.from(this.adherenceLogs.values()) as unknown as T[];
     }
 
-    if (clean.includes("FROM REFILL_REMINDERS")) {
-      if (clean.includes("WHERE ID =")) {
+    if (clean.includes('FROM REFILL_REMINDERS')) {
+      if (clean.includes('WHERE ID =')) {
         const [id] = params;
         const item = this.refillReminders.get(String(id));
         return item ? ([item] as unknown as T[]) : [];
       }
-      if (clean.includes("WHERE MEDICINE_ID =")) {
+      if (clean.includes('WHERE MEDICINE_ID =')) {
         const [medicineId] = params;
         return Array.from(this.refillReminders.values()).filter(
           (r) => r.medicine_id === String(medicineId),
@@ -713,8 +687,8 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return Array.from(this.refillReminders.values()) as unknown as T[];
     }
 
-    if (clean.includes("FROM SCAN_HISTORY")) {
-      if (clean.includes("WHERE ID =")) {
+    if (clean.includes('FROM SCAN_HISTORY')) {
+      if (clean.includes('WHERE ID =')) {
         const [id] = params;
         const item = this.scanHistory.get(String(id));
         return item ? ([item] as unknown as T[]) : [];
@@ -724,8 +698,8 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       ) as unknown as T[];
     }
 
-    if (clean.includes("FROM AI_CONVERSATIONS")) {
-      if (clean.includes("WHERE ID =")) {
+    if (clean.includes('FROM AI_CONVERSATIONS')) {
+      if (clean.includes('WHERE ID =')) {
         const [id] = params;
         const item = this.aiConversations.get(String(id));
         return item ? ([item] as unknown as T[]) : [];
@@ -735,14 +709,12 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       ) as unknown as T[];
     }
 
-    if (clean.includes("FROM AI_MESSAGES")) {
-      if (clean.includes("WHERE CONVERSATION_ID =")) {
+    if (clean.includes('FROM AI_MESSAGES')) {
+      if (clean.includes('WHERE CONVERSATION_ID =')) {
         const [convId] = params;
         return Array.from(this.aiMessages.values())
           .filter((m) => m.conversation_id === String(convId))
-          .sort((a, b) =>
-            String(a.timestamp).localeCompare(String(b.timestamp)),
-          ) as unknown as T[];
+          .sort((a, b) => String(a.timestamp).localeCompare(String(b.timestamp))) as unknown as T[];
       }
       return Array.from(this.aiMessages.values()).sort((a, b) =>
         String(a.timestamp).localeCompare(String(b.timestamp)),
@@ -765,8 +737,8 @@ let dbInstance: ISQLiteDatabase | null = null;
 export function getDatabase(): ISQLiteDatabase {
   if (!dbInstance) {
     try {
-      const realDb = SQLite.openDatabaseSync("healthmate.db");
-      realDb.execSync("PRAGMA foreign_keys = ON;");
+      const realDb = SQLite.openDatabaseSync('healthmate.db');
+      realDb.execSync('PRAGMA foreign_keys = ON;');
       dbInstance = realDb as unknown as ISQLiteDatabase;
     } catch {
       // In Expo Go or client runtimes without native ExpoSQLite, fall back smoothly

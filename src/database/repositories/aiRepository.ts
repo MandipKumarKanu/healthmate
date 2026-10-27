@@ -19,7 +19,7 @@ export const aiRepository = {
   getConversations(): AIConversation[] {
     const db = getDatabase();
     const rows = db.getAllSync<ConversationRow>(
-      'SELECT * FROM ai_conversations ORDER BY created_at DESC;'
+      'SELECT * FROM ai_conversations ORDER BY created_at DESC;',
     );
     return rows.map((r) => ({
       id: r.id,
@@ -31,10 +31,9 @@ export const aiRepository = {
 
   getConversationById(id: string): AIConversation | null {
     const db = getDatabase();
-    const row = db.getFirstSync<ConversationRow>(
-      'SELECT * FROM ai_conversations WHERE id = ?;',
-      [id]
-    );
+    const row = db.getFirstSync<ConversationRow>('SELECT * FROM ai_conversations WHERE id = ?;', [
+      id,
+    ]);
     if (!row) return null;
     return {
       id: row.id,
@@ -47,7 +46,7 @@ export const aiRepository = {
   getLatestConversation(): AIConversation | null {
     const db = getDatabase();
     const row = db.getFirstSync<ConversationRow>(
-      'SELECT * FROM ai_conversations ORDER BY created_at DESC;'
+      'SELECT * FROM ai_conversations ORDER BY created_at DESC;',
     );
     if (!row) return null;
     return {
@@ -63,10 +62,11 @@ export const aiRepository = {
     const id = `conv_${Date.now()}`;
     const now = new Date().toISOString();
 
-    db.runSync(
-      'INSERT INTO ai_conversations (id, title, created_at) VALUES (?, ?, ?);',
-      [id, title, now]
-    );
+    db.runSync('INSERT INTO ai_conversations (id, title, created_at) VALUES (?, ?, ?);', [
+      id,
+      title,
+      now,
+    ]);
 
     return {
       id,
@@ -78,7 +78,12 @@ export const aiRepository = {
 
   addMessage(
     conversationId: string,
-    message: { id?: string; role: 'user' | 'assistant' | 'system'; content: string; timestamp?: string }
+    message: {
+      id?: string;
+      role: 'user' | 'assistant' | 'system';
+      content: string;
+      timestamp?: string;
+    },
   ): AIMessage {
     const db = getDatabase();
     const id = message.id || `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -86,7 +91,7 @@ export const aiRepository = {
 
     db.runSync(
       'INSERT INTO ai_messages (id, conversation_id, role, content, timestamp) VALUES (?, ?, ?, ?, ?);',
-      [id, conversationId, message.role, message.content, timestamp]
+      [id, conversationId, message.role, message.content, timestamp],
     );
 
     return {
@@ -101,7 +106,7 @@ export const aiRepository = {
     const db = getDatabase();
     const rows = db.getAllSync<MessageRow>(
       'SELECT * FROM ai_messages WHERE conversation_id = ? ORDER BY timestamp ASC;',
-      [conversationId]
+      [conversationId],
     );
     return rows.map((r) => ({
       id: r.id,
