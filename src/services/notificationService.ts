@@ -561,20 +561,29 @@ export const notificationService = {
       }
 
       const identifiers: string[] = [];
-      for (const trigger of triggers) {
-        const identifier = await Notifications.scheduleNotificationAsync({
-          content: {
-            title: `Time to take ${medicineName}`,
-            body: `${doseLabel ? `${doseLabel} · ` : ""}Scheduled dose: ${amount}`,
-            data: { scheduleId, time, medicineName },
-            sound: "default",
-            ...(Platform.OS === "android"
-              ? { channelId: "medication-reminders" }
-              : {}),
-          },
-          trigger,
-        });
-        identifiers.push(identifier);
+      // Bounded/future schedules can contain 24-60 individual date triggers.
+      // Scheduling each one sequentially made the Save Reminder spinner appear
+      // stuck, so dispatch a small batch in parallel without flooding Android.
+      const batchSize = 8;
+      for (let index = 0; index < triggers.length; index += batchSize) {
+        const batch = triggers.slice(index, index + batchSize);
+        const batchIdentifiers = await Promise.all(
+          batch.map((trigger) =>
+            Notifications.scheduleNotificationAsync({
+              content: {
+                title: `Time to take ${medicineName}`,
+                body: `${doseLabel ? `${doseLabel} · ` : ""}Scheduled dose: ${amount}`,
+                data: { scheduleId, time, medicineName },
+                sound: "default",
+                ...(Platform.OS === "android"
+                  ? { channelId: "medication-reminders" }
+                  : {}),
+              },
+              trigger,
+            }),
+          ),
+        );
+        identifiers.push(...batchIdentifiers);
       }
 
       // Schedule the reboot-proof native alarm chain on Android: each dose's

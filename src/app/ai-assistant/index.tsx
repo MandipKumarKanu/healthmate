@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ScrollView,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -77,6 +78,15 @@ export default function AIAssistantScreen() {
       void checkConnectivityAndKey();
     }, [checkConnectivityAndKey]),
   );
+
+  // Keep the newest message visible when Android resizes the available window
+  // for the keyboard. The composer is outside the message ScrollView by design.
+  useEffect(() => {
+    const subscription = Keyboard.addListener('keyboardDidShow', () => {
+      requestAnimationFrame(() => scrollViewRef.current?.scrollToEnd({ animated: true }));
+    });
+    return () => subscription.remove();
+  }, []);
 
   /** Offline fallback: fixed terminology guide, unchanged behavior. */
   const generateOfflineReply = useCallback((text: string): string => {
@@ -272,7 +282,9 @@ export default function AIAssistantScreen() {
       </View>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
+        // Android uses window resize in app.json. A second "height" adjustment
+        // here pushes the composer behind the keyboard on several OEM keyboards.
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         style={styles.keyboardContainer}
       >
@@ -355,6 +367,7 @@ export default function AIAssistantScreen() {
             value={inputText}
             onChangeText={setInputText}
             returnKeyType="send"
+            blurOnSubmit={false}
             onSubmitEditing={() => sendMessage(inputText)}
           />
           <TouchableOpacity

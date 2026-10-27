@@ -70,7 +70,7 @@ export function AppButton({
     else if (variant === 'text') list.push(styles.textVariantText);
     else if (variant === 'destructive') list.push(styles.destructiveText);
 
-    if (disabled) list.push(styles.disabledText);
+    if (disabled && !loading) list.push(styles.disabledText);
     if (textStyle) list.push(textStyle);
 
     return list;
@@ -84,10 +84,13 @@ export function AppButton({
       activeOpacity={0.75}
     >
       {loading ? (
-        <ActivityIndicator
-          size="small"
-          color={variant === 'primary' ? Colors.textInverse : Colors.primary}
-        />
+        <>
+          <ActivityIndicator
+            size="small"
+            color={variant === 'primary' ? Colors.textInverse : Colors.primary}
+          />
+          <Text style={[getTextStyles(), styles.loadingLabel]}>{title}</Text>
+        </>
       ) : (
         <>
           {icon ? <>{icon}</> : null}
@@ -138,6 +141,9 @@ const styles = StyleSheet.create({
   },
   disabled: {
     opacity: 0.5,
+  },
+  loadingLabel: {
+    marginLeft: 8,
   },
   baseText: {
     fontWeight: '600',
