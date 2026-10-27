@@ -200,6 +200,9 @@ export default function AIAssistantScreen() {
       <ConnectGeminiModal
         visible={keyModalVisible}
         onClose={() => setKeyModalVisible(false)}
+        onKeySaved={() => {
+          setHasApiKey(true);
+        }}
         onSuccess={() => {
           setHasApiKey(true);
         }}
