@@ -412,6 +412,7 @@ export const aiAssistantService = {
     ].join('\n');
 
     const modelsToTry = GEMINI_MODELS_TO_TRY;
+    let lastPackagingParseError: unknown = null;
 
     for (const model of modelsToTry) {
       try {
@@ -451,6 +452,17 @@ export const aiAssistantService = {
               signal: controller.signal,
             }
           );
+        } catch (error) {
+          if ((error as { name?: string })?.name === 'AbortError') {
+            throw Object.assign(
+              new Error('Gemini packaging interpretation timed out.'),
+              { code: 'TIMEOUT' },
+            );
+          }
+          throw Object.assign(
+            new Error('Could not reach Gemini to interpret this medicine label.'),
+            { code: 'NETWORK' },
+          );
         } finally {
           clearTimeout(timer);
         }
@@ -462,12 +474,20 @@ export const aiAssistantService = {
           if (mapped.code === 'BAD_KEY') {
             await this._clearRejectedApiKey();
           }
-          break;
+          throw Object.assign(new Error(mapped.message), {
+            code: mapped.code,
+            status: response.status,
+          });
         }
 
         const data = await response.json();
         const answerText = this.extractAnswerText(data);
-        if (!answerText) break;
+        if (!answerText) {
+          throw Object.assign(
+            new Error('Gemini returned an empty packaging interpretation.'),
+            { code: 'EMPTY_ANSWER' },
+          );
+        }
 
         const cleanJson = answerText
           .replace(/```json/gi, '')
@@ -506,8 +526,17 @@ export const aiAssistantService = {
           candidates: baseExtraction.candidates,
         };
       } catch (err) {
+        if ((err as { code?: string })?.code) throw err;
         console.warn(`Gemini packaging parse on model ${model} failed:`, err);
+        lastPackagingParseError = err;
       }
+    }
+
+    if (lastPackagingParseError) {
+      throw Object.assign(
+        new Error('Gemini could not return a reliable structured interpretation. Review the OCR fields manually.'),
+        { code: 'AI_PARSE' },
+      );
     }
 
     return baseExtraction;
