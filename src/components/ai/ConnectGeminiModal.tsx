@@ -22,6 +22,7 @@ interface ConnectGeminiModalProps {
   visible: boolean;
   onClose: () => void;
   onSuccess?: (key: string, action?: 'scan' | 'done') => void;
+  onKeySaved?: (key: string) => void;
   onDisconnected?: () => void;
 }
 
@@ -29,6 +30,7 @@ export function ConnectGeminiModal({
   visible,
   onClose,
   onSuccess,
+  onKeySaved,
   onDisconnected,
 }: ConnectGeminiModalProps) {
   const [keyDraft, setKeyDraft] = useState('');
@@ -119,6 +121,7 @@ export function ConnectGeminiModal({
       // Valid! Save securely
       await aiAssistantService.saveApiKey(trimmed);
       setCurrentKey(trimmed);
+      onKeySaved?.(trimmed);
       setIsVerifying(false);
       setShowCelebration(true);
     } catch (err: any) {
