@@ -29,6 +29,7 @@ const { aiAssistantService } = require('../src/services/aiAssistantService') as 
     deleteApiKey(): Promise<void>;
     verifyApiKey(key: string): Promise<{ valid: boolean; error?: string }>;
     askGemini(question: string, history?: { role: string; content: string }[]): Promise<{ text: string; model: string; usedNetwork: boolean }>;
+    parseMedicinePackagingWithAI(rawOcrText: string): Promise<unknown>;
   };
 };
 
@@ -162,6 +163,19 @@ describe('aiAssistantService (Gemini)', () => {
     expect(result.model).toBe('gemini-3.8-flash');
     expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(String(mockFetch.mock.calls[1][0])).toContain('/models/gemini-3.8-flash:generateContent');
+  });
+
+  it('surfaces Gemini quota errors from packaging interpretation instead of silently hiding them', async () => {
+    await aiAssistantService.saveApiKey('sk-packaging-throttled');
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      json: () => Promise.resolve({ error: { message: 'resource_exhausted' } }),
+    });
+
+    await expect(
+      aiAssistantService.parseMedicinePackagingWithAI('Paracetamol 500 mg tablet'),
+    ).rejects.toMatchObject({ code: 'RATE_LIMIT' });
   });
 
   it('explains API-key restrictions when Google refuses a key during verification', async () => {
