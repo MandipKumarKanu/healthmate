@@ -644,7 +644,7 @@ export default function SetReminderScreen() {
             </View>
           ) : null}
           <AppButton
-            title="Save Medication Schedule"
+            title={isSaving ? 'Saving schedule…' : 'Save Medication Schedule'}
             onPress={handleSave}
             variant="primary"
             size="lg"
@@ -701,6 +701,8 @@ export default function SetReminderScreen() {
                       showsVerticalScrollIndicator={false}
                       nestedScrollEnabled
                       snapToOffsets={HOUR_WHEEL_SNAP_OFFSETS}
+                      snapToStart={false}
+                      snapToEnd={false}
                       decelerationRate="fast"
                       snapToAlignment="start"
                       onScrollEndDrag={(event) =>
@@ -746,6 +748,8 @@ export default function SetReminderScreen() {
                       showsVerticalScrollIndicator={false}
                       nestedScrollEnabled
                       snapToOffsets={MINUTE_WHEEL_SNAP_OFFSETS}
+                      snapToStart={false}
+                      snapToEnd={false}
                       decelerationRate="fast"
                       snapToAlignment="start"
                       onScrollEndDrag={(event) =>
