@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   StyleSheet,
   View,
   Text,
+  ActivityIndicator,
   TouchableOpacity,
   TextInput,
   ScrollView,
@@ -35,6 +36,20 @@ import {
   getTimeLabel,
 } from '../../utils/reminderValidation';
 
+const TIME_WHEEL_ITEM_HEIGHT = 48;
+const TIME_WHEEL_VIEW_HEIGHT = 144;
+const TIME_WHEEL_PADDING = TIME_WHEEL_VIEW_HEIGHT / 2;
+const TIME_WHEEL_FIRST_SNAP_OFFSET =
+  TIME_WHEEL_PADDING + TIME_WHEEL_ITEM_HEIGHT / 2 - TIME_WHEEL_VIEW_HEIGHT / 2;
+const HOUR_WHEEL_SNAP_OFFSETS = Array.from(
+  { length: 12 },
+  (_, index) => TIME_WHEEL_FIRST_SNAP_OFFSET + index * TIME_WHEEL_ITEM_HEIGHT,
+);
+const MINUTE_WHEEL_SNAP_OFFSETS = Array.from(
+  { length: 60 },
+  (_, index) => TIME_WHEEL_FIRST_SNAP_OFFSET + index * TIME_WHEEL_ITEM_HEIGHT,
+);
+
 export default function SetReminderScreen() {
   const router = useRouter();
   const { medicineId, date } = useLocalSearchParams<{ medicineId?: string; date?: string }>();
@@ -54,10 +69,29 @@ export default function SetReminderScreen() {
   const [amountError, setAmountError] = useState<string | null>(null);
   const [editingTimes, setEditingTimes] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveProgress, setSaveProgress] = useState('');
 
-  // Time picker state for modal display (iOS, Web, or fallback)
+  // Time picker state and snap wheels for quick, precise minute selection.
   const [pickerTarget, setPickerTarget] = useState<{ id: string | 'new'; date: Date } | null>(null);
   const [tempPickerDate, setTempPickerDate] = useState<Date>(new Date());
+  const hourWheelRef = useRef<ScrollView | null>(null);
+  const minuteWheelRef = useRef<ScrollView | null>(null);
+
+  useEffect(() => {
+    if (!pickerTarget) return;
+    const hourIndex = (pickerTarget.date.getHours() % 12 || 12) - 1;
+    const minuteIndex = pickerTarget.date.getMinutes();
+    requestAnimationFrame(() => {
+      hourWheelRef.current?.scrollTo({
+        y: TIME_WHEEL_FIRST_SNAP_OFFSET + hourIndex * TIME_WHEEL_ITEM_HEIGHT,
+        animated: false,
+      });
+      minuteWheelRef.current?.scrollTo({
+        y: TIME_WHEEL_FIRST_SNAP_OFFSET + minuteIndex * TIME_WHEEL_ITEM_HEIGHT,
+        animated: false,
+      });
+    });
+  }, [pickerTarget]);
 
   const loadMedicines = useCallback(() => {
     try {
@@ -178,11 +212,25 @@ export default function SetReminderScreen() {
     setPickerTarget(null);
   };
 
-  const adjustPickerTime = (unit: 'hour' | 'minute', delta: number) => {
+  const handleTimeWheelScroll = (unit: 'hour' | 'minute', offsetY: number) => {
+    const count = unit === 'hour' ? 12 : 60;
+    const index = Math.max(
+      0,
+      Math.min(
+        count - 1,
+        Math.round((offsetY - TIME_WHEEL_FIRST_SNAP_OFFSET) / TIME_WHEEL_ITEM_HEIGHT),
+      ),
+    );
+
     setTempPickerDate((current) => {
       const next = new Date(current);
-      if (unit === 'hour') next.setHours(next.getHours() + delta);
-      else next.setMinutes(next.getMinutes() + delta);
+      if (unit === 'hour') {
+        const hour12 = index + 1;
+        const isPM = current.getHours() >= 12;
+        next.setHours((hour12 % 12) + (isPM ? 12 : 0));
+      } else {
+        next.setMinutes(index);
+      }
       return next;
     });
   };
@@ -259,6 +307,7 @@ export default function SetReminderScreen() {
     }
 
     setIsSaving(true);
+    setSaveProgress(notificationsEnabled ? 'Checking notification and alarm access…' : 'Saving reminder schedule…');
     try {
       let canNotify = notificationsEnabled;
       if (notificationsEnabled) {
@@ -275,6 +324,7 @@ export default function SetReminderScreen() {
       // This keeps the in-memory reminder list in sync with the saved SQLite row.
       const refreshDate =
         date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : selectedDate;
+      setSaveProgress(canNotify ? 'Saving schedule and preparing alarms…' : 'Saving reminder schedule…');
       const existingSchedule = scheduleRepository.getByMedicineId(selectedMed.id);
       const scheduleId = existingSchedule?.id ?? `sched_${selectedMed.id}`;
       const now = new Date().toISOString();
@@ -323,6 +373,7 @@ export default function SetReminderScreen() {
       );
     } finally {
       setIsSaving(false);
+      setSaveProgress('');
     }
   };
 
@@ -513,7 +564,14 @@ export default function SetReminderScreen() {
               </TouchableOpacity>
 
               <Text style={styles.presetsLabel}>Quick Add Presets</Text>
-              <View style={styles.presetRow}>
+              <ScrollView
+                horizontal
+                style={styles.presetScroller}
+                contentContainerStyle={styles.presetRow}
+                showsHorizontalScrollIndicator={false}
+                nestedScrollEnabled
+                keyboardShouldPersistTaps="handled"
+              >
                 {['08:00', '14:00', '18:00', '22:00'].map((preset) => {
                   const isAdded = times.some((t) => t.time === preset);
                   return (
@@ -531,7 +589,7 @@ export default function SetReminderScreen() {
                     </TouchableOpacity>
                   );
                 })}
-              </View>
+              </ScrollView>
             </>
           )}
         </AppCard>
@@ -579,6 +637,12 @@ export default function SetReminderScreen() {
 
         {/* Save Button */}
         <View style={styles.saveContainer}>
+          {isSaving ? (
+            <View style={styles.saveProgressRow}>
+              <ActivityIndicator size="small" color={Colors.primary} />
+              <Text style={styles.saveProgressText}>{saveProgress}</Text>
+            </View>
+          ) : null}
           <AppButton
             title="Save Medication Schedule"
             onPress={handleSave}
@@ -629,49 +693,90 @@ export default function SetReminderScreen() {
 
               <View style={styles.timePickerControls}>
                 <View style={styles.timePickerColumn}>
-                  <TouchableOpacity
-                    style={styles.timeStepButton}
-                    onPress={() => adjustPickerTime('hour', 1)}
-                    accessibilityRole="button"
-                    accessibilityLabel="Increase hour"
-                  >
-                    <Ionicons name="chevron-up" size={20} color={Colors.primary} />
-                  </TouchableOpacity>
-                  <Text style={styles.timePickerValue}>
-                    {String(tempPickerDate.getHours() % 12 || 12).padStart(2, '0')}
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.timeStepButton}
-                    onPress={() => adjustPickerTime('hour', -1)}
-                    accessibilityRole="button"
-                    accessibilityLabel="Decrease hour"
-                  >
-                    <Ionicons name="chevron-down" size={20} color={Colors.primary} />
-                  </TouchableOpacity>
+                  <View style={styles.timeWheelViewport}>
+                    <ScrollView
+                      ref={hourWheelRef}
+                      style={styles.timeWheelScroll}
+                      contentContainerStyle={styles.timeWheelContent}
+                      showsVerticalScrollIndicator={false}
+                      nestedScrollEnabled
+                      snapToOffsets={HOUR_WHEEL_SNAP_OFFSETS}
+                      decelerationRate="fast"
+                      snapToAlignment="start"
+                      onScrollEndDrag={(event) =>
+                        handleTimeWheelScroll('hour', event.nativeEvent.contentOffset.y)
+                      }
+                      onMomentumScrollEnd={(event) =>
+                        handleTimeWheelScroll('hour', event.nativeEvent.contentOffset.y)
+                      }
+                      accessibilityLabel="Scroll to select reminder hour"
+                    >
+                      {Array.from({ length: 12 }, (_, index) => index + 1).map((hour) => {
+                        const selectedHour = tempPickerDate.getHours() % 12 || 12;
+                        const selected = hour === selectedHour;
+                        return (
+                          <View key={hour} style={styles.timeWheelItem}>
+                            <Text
+                              style={[
+                                styles.timeWheelItemText,
+                                selected && styles.timeWheelItemTextSelected,
+                              ]}
+                            >
+                              {String(hour).padStart(2, '0')}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </ScrollView>
+                    <View
+                      pointerEvents="none"
+                      style={styles.timeWheelSelection}
+                    />
+                  </View>
                 </View>
 
                 <Text style={styles.timePickerColon}>:</Text>
 
                 <View style={styles.timePickerColumn}>
-                  <TouchableOpacity
-                    style={styles.timeStepButton}
-                    onPress={() => adjustPickerTime('minute', 1)}
-                    accessibilityRole="button"
-                    accessibilityLabel="Increase minute"
-                  >
-                    <Ionicons name="chevron-up" size={20} color={Colors.primary} />
-                  </TouchableOpacity>
-                  <Text style={styles.timePickerValue}>
-                    {String(tempPickerDate.getMinutes()).padStart(2, '0')}
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.timeStepButton}
-                    onPress={() => adjustPickerTime('minute', -1)}
-                    accessibilityRole="button"
-                    accessibilityLabel="Decrease minute"
-                  >
-                    <Ionicons name="chevron-down" size={20} color={Colors.primary} />
-                  </TouchableOpacity>
+                  <View style={styles.timeWheelViewport}>
+                    <ScrollView
+                      ref={minuteWheelRef}
+                      style={styles.timeWheelScroll}
+                      contentContainerStyle={styles.timeWheelContent}
+                      showsVerticalScrollIndicator={false}
+                      nestedScrollEnabled
+                      snapToOffsets={MINUTE_WHEEL_SNAP_OFFSETS}
+                      decelerationRate="fast"
+                      snapToAlignment="start"
+                      onScrollEndDrag={(event) =>
+                        handleTimeWheelScroll('minute', event.nativeEvent.contentOffset.y)
+                      }
+                      onMomentumScrollEnd={(event) =>
+                        handleTimeWheelScroll('minute', event.nativeEvent.contentOffset.y)
+                      }
+                      accessibilityLabel="Scroll to select reminder minute"
+                    >
+                      {Array.from({ length: 60 }, (_, minute) => minute).map((minute) => {
+                        const selected = minute === tempPickerDate.getMinutes();
+                        return (
+                          <View key={minute} style={styles.timeWheelItem}>
+                            <Text
+                              style={[
+                                styles.timeWheelItemText,
+                                selected && styles.timeWheelItemTextSelected,
+                              ]}
+                            >
+                              {String(minute).padStart(2, '0')}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </ScrollView>
+                    <View
+                      pointerEvents="none"
+                      style={styles.timeWheelSelection}
+                    />
+                  </View>
                 </View>
 
                 <View style={styles.timePickerPeriod}>
@@ -1112,15 +1217,23 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontWeight: '600',
   },
+  presetScroller: {
+    flexGrow: 0,
+    marginHorizontal: -2,
+  },
   presetRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
+    flexWrap: 'nowrap',
     gap: 8,
+    paddingHorizontal: 2,
+    paddingBottom: 2,
   },
   presetChip: {
+    flexShrink: 0,
     backgroundColor: Colors.primaryLight,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     borderRadius: Radius.pill,
   },
   presetChipDisabled: {
@@ -1173,6 +1286,18 @@ const styles = StyleSheet.create({
   saveContainer: {
     marginTop: Spacing.sm,
     marginBottom: Spacing.xl,
+  },
+  saveProgressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  saveProgressText: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontWeight: '500',
   },
   modalBackdrop: {
     flex: 1,
@@ -1240,24 +1365,51 @@ const styles = StyleSheet.create({
   },
   timePickerColumn: {
     alignItems: 'center',
-    gap: Spacing.sm,
+    justifyContent: 'center',
   },
-  timeStepButton: {
-    width: 48,
-    height: 34,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.primaryLight,
+  timeWheelViewport: {
+    width: 62,
+    height: TIME_WHEEL_VIEW_HEIGHT,
+    borderRadius: Radius.lg,
+    backgroundColor: '#F8FAFC',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  timeWheelScroll: {
+    flex: 1,
+  },
+  timeWheelContent: {
+    paddingVertical: TIME_WHEEL_PADDING,
+  },
+  timeWheelItem: {
+    height: TIME_WHEEL_ITEM_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  timePickerValue: {
-    minWidth: 54,
-    fontSize: 34,
-    lineHeight: 42,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-    textAlign: 'center',
+  timeWheelItemText: {
+    fontSize: 19,
+    lineHeight: 26,
+    fontWeight: '500',
+    color: Colors.textTertiary,
     fontVariant: ['tabular-nums'],
+  },
+  timeWheelItemTextSelected: {
+    fontSize: 27,
+    lineHeight: 34,
+    fontWeight: '800',
+    color: Colors.primary,
+  },
+  timeWheelSelection: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: TIME_WHEEL_ITEM_HEIGHT,
+    height: TIME_WHEEL_ITEM_HEIGHT,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#BFDBFE',
+    backgroundColor: 'rgba(59, 130, 246, 0.05)',
   },
   timePickerColon: {
     fontSize: 30,
