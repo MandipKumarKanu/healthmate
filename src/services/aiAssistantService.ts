@@ -96,7 +96,7 @@ export interface GeminiAnswer {
 
 export const aiAssistantService = {
   /** Reads the stored key once and caches it for the session. */
-  _cachedKey: null as string | null | undefined,
+  _cachedKey: undefined as string | null | undefined,
 
   async getApiKey(): Promise<string | null> {
     if (this._cachedKey !== undefined) return this._cachedKey ?? null;

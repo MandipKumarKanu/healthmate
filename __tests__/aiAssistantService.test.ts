@@ -33,6 +33,10 @@ const { aiAssistantService } = require('../src/services/aiAssistantService') as 
   };
 };
 
+// Capture the module's real initial state before each test resets the cache.
+// This catches the cold-start bug where null made getApiKey skip SecureStore.
+const initialCachedKeyAtModuleLoad = aiAssistantService._cachedKey;
+
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const secureStoreMock = require('./__mocks__/expo-secure-store') as {
   __clearStore(): void;
@@ -58,6 +62,10 @@ function geminiBodyWithText(text: string) {
 }
 
 describe('aiAssistantService (Gemini)', () => {
+  it('starts with an uninitialized key cache so a cold launch reads SecureStore', () => {
+    expect(initialCachedKeyAtModuleLoad).toBeUndefined();
+  });
+
   beforeEach(() => {
     mockFetch.mockReset();
     secureStoreMock.__clearStore();
