@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
   StyleSheet,
   View,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ScrollView,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   Image,
   Modal,
@@ -29,6 +30,41 @@ const GENDER_OPTIONS: { label: string; value: GenderOption }[] = [
 
 export default function OnboardingProfileScreen() {
   const router = useRouter();
+  const profileScrollRef = useRef<ScrollView | null>(null);
+  const focusedInputTagRef = useRef<number | null>(null);
+
+  const scrollFocusedInput = useCallback((target: number) => {
+    focusedInputTagRef.current = target;
+    requestAnimationFrame(() => {
+      const responder = profileScrollRef.current as unknown as {
+        scrollResponderScrollNativeHandleToKeyboard?: (
+          nodeHandle: number,
+          additionalOffset?: number,
+          preventNegativeScrollOffset?: boolean,
+        ) => void;
+      } | null;
+      responder?.scrollResponderScrollNativeHandleToKeyboard?.(target, 120, true);
+    });
+  }, []);
+
+  useEffect(() => {
+    const subscription = Keyboard.addListener("keyboardDidShow", () => {
+      const target = focusedInputTagRef.current;
+      if (target == null) return;
+      requestAnimationFrame(() => {
+        const responder = profileScrollRef.current as unknown as {
+          scrollResponderScrollNativeHandleToKeyboard?: (
+            nodeHandle: number,
+            additionalOffset?: number,
+            preventNegativeScrollOffset?: boolean,
+          ) => void;
+        } | null;
+        responder?.scrollResponderScrollNativeHandleToKeyboard?.(target, 120, true);
+      });
+    });
+    return () => subscription.remove();
+  }, []);
+
   const {
     updateProfile,
     profile,
@@ -228,9 +264,12 @@ export default function OnboardingProfileScreen() {
     <AppScreen scrollable={false} contentContainerStyle={styles.container}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === "ios" ? "padding" : Platform.OS === "android" ? "height" : undefined}
+        // Android already resizes this window. Avoid applying a second height
+        // reduction on top of adjustResize while still allowing the form to scroll.
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <ScrollView
+          ref={profileScrollRef}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -300,6 +339,7 @@ export default function OnboardingProfileScreen() {
                   }}
                   autoCapitalize="words"
                   autoCorrect={false}
+                  onFocus={(event) => scrollFocusedInput(event.nativeEvent.target)}
                   accessibilityLabel="Full name"
                 />
               </View>
@@ -340,6 +380,7 @@ export default function OnboardingProfileScreen() {
                     }}
                     keyboardType="number-pad"
                     maxLength={3}
+                    onFocus={(event) => scrollFocusedInput(event.nativeEvent.target)}
                     accessibilityLabel="Age"
                   />
                 </View>
@@ -413,6 +454,7 @@ export default function OnboardingProfileScreen() {
                     }
                   }}
                   keyboardType="numeric"
+                  onFocus={(event) => scrollFocusedInput(event.nativeEvent.target)}
                   accessibilityLabel="Height"
                 />
                 <TouchableOpacity
@@ -501,6 +543,7 @@ export default function OnboardingProfileScreen() {
                     }
                   }}
                   keyboardType="numeric"
+                  onFocus={(event) => scrollFocusedInput(event.nativeEvent.target)}
                   accessibilityLabel="Weight"
                 />
                 <TouchableOpacity
