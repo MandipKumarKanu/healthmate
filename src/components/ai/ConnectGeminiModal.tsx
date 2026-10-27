@@ -33,24 +33,45 @@ export function ConnectGeminiModal({
 }: ConnectGeminiModalProps) {
   const [keyDraft, setKeyDraft] = useState('');
   const [isSecure, setIsSecure] = useState(true);
+  const [isLoadingKey, setIsLoadingKey] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentKey, setCurrentKey] = useState<string | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // Load existing key when modal opens
+  // Load the persisted key whenever the modal opens, and ignore stale reads
+  // if it closes before SecureStore responds.
   useEffect(() => {
+    let active = true;
     if (visible) {
-      aiAssistantService.getApiKey().then((k) => {
-        setCurrentKey(k);
-        setKeyDraft(k || '');
-      });
+      setIsLoadingKey(true);
       setError(null);
       setIsVerifying(false);
       setShowCelebration(false);
       setCopiedLink(false);
+
+      aiAssistantService
+        .getApiKey()
+        .then((key) => {
+          if (!active) return;
+          setCurrentKey(key);
+          setKeyDraft(key || '');
+        })
+        .catch(() => {
+          if (!active) return;
+          setCurrentKey(null);
+          setKeyDraft('');
+          setError('Could not read the saved Gemini key from secure storage. Please try again.');
+        })
+        .finally(() => {
+          if (active) setIsLoadingKey(false);
+        });
     }
+
+    return () => {
+      active = false;
+    };
   }, [visible]);
 
   const handleOpenAiStudio = async () => {
@@ -109,13 +130,17 @@ export function ConnectGeminiModal({
   };
 
   const handleDisconnect = async () => {
-    await aiAssistantService.deleteApiKey();
-    setCurrentKey(null);
-    setKeyDraft('');
-    setError(null);
-    setShowCelebration(false);
-    onDisconnected?.();
-    onClose();
+    try {
+      await aiAssistantService.deleteApiKey();
+      setCurrentKey(null);
+      setKeyDraft('');
+      setError(null);
+      setShowCelebration(false);
+      onDisconnected?.();
+      onClose();
+    } catch (err: any) {
+      setError(err?.message || 'Could not remove the saved key. Please try again.');
+    }
   };
 
   const handleFinish = (action: 'scan' | 'done') => {
@@ -150,7 +175,7 @@ export function ConnectGeminiModal({
                 </View>
                 <View>
                   <Text style={styles.title}>Personal AI Setup</Text>
-                  <Text style={styles.subtitle}>Google Gemini 2.0 Flash Lite</Text>
+                  <Text style={styles.subtitle}>Google Gemini 3.5 Flash-Lite</Text>
                 </View>
               </View>
               <TouchableOpacity
@@ -190,7 +215,7 @@ export function ConnectGeminiModal({
                   <View style={styles.connectedPillRow}>
                     <View style={styles.connectedDot} />
                     <Text style={styles.connectedPillText}>
-                      Connected to Gemini Flash Lite
+                      Connected to Gemini 3.5 Flash-Lite
                     </Text>
                   </View>
 
@@ -379,10 +404,15 @@ export function ConnectGeminiModal({
                           styles.verifyButtonDisabled,
                       ]}
                       onPress={handleVerifyAndSave}
-                      disabled={!keyDraft.trim() || isVerifying}
+                      disabled={!keyDraft.trim() || isVerifying || isLoadingKey}
                       activeOpacity={0.8}
                     >
-                      {isVerifying ? (
+                      {isLoadingKey ? (
+                        <>
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                          <Text style={styles.verifyButtonText}>Loading saved key...</Text>
+                        </>
+                      ) : isVerifying ? (
                         <>
                           <ActivityIndicator size="small" color="#FFFFFF" />
                           <Text style={styles.verifyButtonText}>
