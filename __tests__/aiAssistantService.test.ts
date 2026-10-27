@@ -35,6 +35,7 @@ const { aiAssistantService } = require('../src/services/aiAssistantService') as 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const secureStoreMock = require('./__mocks__/expo-secure-store') as {
   __clearStore(): void;
+  getItemAsync: { mockRejectedValueOnce(value: unknown): unknown };
   setItemAsync: { mockRejectedValueOnce(value: unknown): unknown };
 };
 
@@ -78,6 +79,17 @@ describe('aiAssistantService (Gemini)', () => {
     aiAssistantService._cachedKey = undefined;
 
     await expect(aiAssistantService.getApiKey()).resolves.toBe('sk-persisted-key');
+  });
+
+  it('reports secure storage read failure without caching it as a missing key', async () => {
+    secureStoreMock.getItemAsync.mockRejectedValueOnce(new Error('storage unavailable'));
+
+    await expect(aiAssistantService.getApiKey())
+      .rejects.toMatchObject({ code: 'SECURE_STORE_READ' });
+
+    // The failed read must not be cached; a later read can succeed.
+    await aiAssistantService.saveApiKey('sk-retry-key');
+    await expect(aiAssistantService.getApiKey()).resolves.toBe('sk-retry-key');
   });
 
   it('rejects a key save when secure storage fails instead of reporting success', async () => {
