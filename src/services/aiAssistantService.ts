@@ -23,9 +23,8 @@ const DEFAULT_MODEL = 'gemini-flash-lite-latest';
 const FALLBACK_MODELS = [
   'gemini-flash-latest',
   'gemini-2.5-flash',
-  'gemini-2.0-flash',
-  'gemini-1.5-flash',
-  'gemini-2.0-flash-lite',
+  'gemini-3.5-flash-lite',
+  'gemini-3.8-flash',
 ];
 export const GEMINI_MODELS_TO_TRY = [DEFAULT_MODEL, ...FALLBACK_MODELS];
 const MAX_HISTORY_TURNS = 12; // keep requests bounded; persistence holds more
@@ -328,7 +327,7 @@ export const aiAssistantService = {
           signal: controller.signal,
         });
 
-        if (response.status === 404) {
+        if (response.status === 404 || response.status === 503 || response.status === 502 || response.status === 500) {
           lastModelError = await readGeminiErrorMessage(response);
           continue;
         }
@@ -415,7 +414,7 @@ export const aiAssistantService = {
         }
 
         const detail = await readGeminiErrorMessage(response);
-        if (response.status === 404) continue;
+        if (response.status === 404 || response.status === 503 || response.status === 502 || response.status === 500) continue;
 
         const mapped = classifyGeminiError(response.status, detail);
         if (
@@ -563,7 +562,7 @@ export const aiAssistantService = {
 
         if (!response.ok) {
           const detail = await readGeminiErrorMessage(response);
-          if (response.status === 404) {
+          if (response.status === 404 || response.status === 503 || response.status === 502 || response.status === 500) {
             lastModelError = detail;
             continue;
           }
@@ -738,7 +737,7 @@ export const aiAssistantService = {
 
         if (!response.ok) {
           const detail = await readGeminiErrorMessage(response);
-          if (response.status === 404) continue;
+          if (response.status === 404 || response.status === 503 || response.status === 502 || response.status === 500) continue;
           if (response.status === 429) {
             throw Object.assign(new Error('Gemini quota reached.'), { code: 'RATE_LIMIT' });
           }
