@@ -35,7 +35,7 @@ async function readGeminiErrorMessage(response: Response): Promise<string> {
 }
 
 function isInvalidGeminiApiKeyMessage(message: string): boolean {
-  return /api[_\\s-]?key.{0,60}(invalid|not valid|reported as leaked|blocked|disabled)|(?:invalid|not valid|reported as leaked|blocked|disabled).{0,60}api[_\\s-]?key|API_KEY_INVALID/i.test(
+  return /api[_\s-]?key.{0,60}(invalid|not valid|reported as leaked|blocked|disabled)|(?:invalid|not valid|reported as leaked|blocked|disabled).{0,60}api[_\s-]?key|API_KEY_INVALID/i.test(
     message,
   );
 }
@@ -415,39 +415,42 @@ export const aiAssistantService = {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 12000);
 
-        const response = await fetch(
-          `${API_BASE}/models/${model}:generateContent`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-goog-api-key': apiKey,
-            },
-            body: JSON.stringify({
-              systemInstruction: {
-                parts: [{ text: systemPrompt }],
+        let response: Response;
+        try {
+          response = await fetch(
+            `${API_BASE}/models/${model}:generateContent`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': apiKey,
               },
-              contents: [
-                {
-                  role: 'user',
-                  parts: [
-                    {
-                      text: `Raw OCR text from medication packaging:\n\n${rawOcrText}`,
-                    },
-                  ],
+              body: JSON.stringify({
+                systemInstruction: {
+                  parts: [{ text: systemPrompt }],
                 },
-              ],
-              generationConfig: {
-                temperature: 0.1,
-                responseMimeType: 'application/json',
-                maxOutputTokens: 512,
-              },
-            }),
-            signal: controller.signal,
-          }
-        );
-
-        clearTimeout(timer);
+                contents: [
+                  {
+                    role: 'user',
+                    parts: [
+                      {
+                        text: `Raw OCR text from medication packaging:\n\n${rawOcrText}`,
+                      },
+                    ],
+                  },
+                ],
+                generationConfig: {
+                  temperature: 0.1,
+                  responseMimeType: 'application/json',
+                  maxOutputTokens: 512,
+                },
+              }),
+              signal: controller.signal,
+            }
+          );
+        } finally {
+          clearTimeout(timer);
+        }
 
         if (!response.ok) {
           const detail = await readGeminiErrorMessage(response);
