@@ -49,20 +49,21 @@ export default function ScanScreen() {
 
   const checkPrerequisites = useCallback(async () => {
     setIsCheckingPrerequisites(true);
-    try {
-      const [online, key] = await Promise.all([
-        networkService.checkInternet(),
-        aiAssistantService.getApiKey(),
-      ]);
-      setIsOnline(online);
-      setHasApiKey(Boolean(key));
-    } catch (error) {
-      console.warn('Could not check scan prerequisites:', error);
-      setIsOnline(false);
-      setHasApiKey(false);
-    } finally {
-      setIsCheckingPrerequisites(false);
-    }
+    const [online, key] = await Promise.all([
+      networkService.checkInternet().catch((error) => {
+        console.warn('Could not check internet connectivity:', error);
+        return false;
+      }),
+      aiAssistantService.getApiKey().catch((error) => {
+        // Keep storage failures separate from internet failures. The Connect AI
+        // modal will show the secure-store error if the user opens it.
+        console.warn('Could not read Gemini key during scan setup:', error);
+        return null;
+      }),
+    ]);
+    setIsOnline(online);
+    setHasApiKey(Boolean(key));
+    setIsCheckingPrerequisites(false);
   }, []);
 
   useFocusEffect(
