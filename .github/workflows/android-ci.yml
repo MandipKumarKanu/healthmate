@@ -114,8 +114,6 @@ jobs:
           ./gradlew assembleRelease \
             -PversionCode=${{ steps.build_number.outputs.build_num }} \
             -PreactNativeArchitectures=arm64-v8a \
-            -Pexpo.useLegacyPackaging=true \
-            -Pandroid.enableShrinkResourcesInReleaseBuilds=true \
             --no-daemon
           APK_FILE=$(find app/build/outputs/apk/release -type f -name "*.apk" | head -n 1)
           cp "$APK_FILE" "../healthmate-v${{ steps.build_number.outputs.version }}-arm64-v8a.apk"
@@ -126,8 +124,6 @@ jobs:
           ./gradlew assembleRelease \
             -PversionCode=${{ steps.build_number.outputs.build_num }} \
             -PreactNativeArchitectures=armeabi-v7a \
-            -Pexpo.useLegacyPackaging=true \
-            -Pandroid.enableShrinkResourcesInReleaseBuilds=true \
             --no-daemon
           APK_FILE=$(find app/build/outputs/apk/release -type f -name "*.apk" | head -n 1)
           cp "$APK_FILE" "../healthmate-v${{ steps.build_number.outputs.version }}-armeabi-v7a.apk"

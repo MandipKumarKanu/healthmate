@@ -217,8 +217,13 @@ git push origin v1.3.1
 
 ### 3. Output & Distribution
 
-- **GitHub Releases**: Standalone installable APKs (`healthmate-v1.3.1-arm64-v8a.apk` and `healthmate-v1.3.1-armeabi-v7a.apk`) are automatically attached to the published GitHub Release with generated release notes.
-- **Workflow Artifacts**: The APKs are also preserved as downloadable workflow artifacts (`healthmate-apk-arm64-v8a` and `healthmate-apk-armeabi-v7a`) in the Actions run summary page for 30 days.
+- **GitHub Releases**: Standalone installable APKs are automatically attached to the published GitHub Release with generated release notes:
+  - `healthmate-v<version>-universal.apk` (**Recommended**: Works on all Android phones, tablets, and emulators).
+  - `healthmate-v<version>-arm64-v8a.apk` (Optimized for modern 64-bit phones).
+  - `healthmate-v<version>-armeabi-v7a.apk` (For legacy 32-bit phones).
+- **Workflow Artifacts**: The APKs are also preserved as downloadable workflow artifacts (`healthmate-apk-universal`, `healthmate-apk-arm64-v8a`, and `healthmate-apk-armeabi-v7a`) in the Actions run summary page for 30 days.
+
+> **💡 Installation Tip:** If Android displays *"App not installed as package appears to be invalid"*, completely uninstall any previous or development build of HealthMate from your device first to clear existing signing certificate conflicts, or install the `-universal.apk` build.
 
 ---
 
