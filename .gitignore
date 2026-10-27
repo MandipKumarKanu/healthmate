@@ -40,6 +40,10 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# working notes
+plan.md
+phase.md
+
 example
 
 # generated native folders

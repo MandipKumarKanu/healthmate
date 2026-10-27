@@ -74,7 +74,7 @@ describe("Reminder store live refresh", () => {
       testDate,
     );
 
-    expect(result).toBe(true);
+    expect(result.saved).toBe(true);
     expect(getDosesSpy).toHaveBeenCalledWith(testDate);
     expect(useReminderStore.getState().doses).toEqual([savedDose]);
     expect(useReminderStore.getState().daySummary).toEqual(summary(testDate, 1));

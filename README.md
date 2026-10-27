@@ -41,8 +41,7 @@ The application faithfully reproduces the iOS-style reference design, offering a
    - Automated OCR parsing extracting Medicine Name, Strength, Dosage Form, Manufacturer, Batch, and Expiry Date
    - Human-in-the-loop review allowing corrections before adding to cabinet or saving to history
 
-6. **AI Assistant (`/ai-assistant`)**:
-   - Live answers via Gemini `gemini-3.5-flash-lite`, with stable-model fallback.
+6. **AI Assistant (`/ai-assistant`)**:    - Live answers via Gemini `gemini-flash-lite-latest`, with `latest`-alias fallback.
    - The in-app "Connect AI" flow verifies the key and confirms SecureStore persistence before showing a connected state. Rejected keys are disconnected and the user is prompted to reconnect.
    - The key stays in Expo SecureStore on-device and is sent to Google when a Gemini feature is used. Google rejects unrestricted standard keys; use a new auth key or a standard key with explicit API restrictions.
    - Suggested prompts for mg vs. mL, active ingredients, batch/lot numbers, and medicine storage

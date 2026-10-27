@@ -9,6 +9,7 @@ import {
   ScrollView,
 } from "react-native";
 import { AppAlert as Alert } from "../../services/appAlert";
+import { saveScanImage } from "../../services/scanImageStorage";
 import { useRouter, useFocusEffect } from "expo-router";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
@@ -93,6 +94,7 @@ export default function ScanScreen() {
 
   // Editable fields for review
   const [medName, setMedName] = useState("");
+  const [medComposition, setMedComposition] = useState("");
   const [medStrength, setMedStrength] = useState("");
   const [medForm, setMedForm] = useState<DosageForm>("tablet");
   const [medExpiry, setMedExpiry] = useState("");
@@ -158,6 +160,7 @@ export default function ScanScreen() {
       setUsedFallbackEngine(isDemo);
       setExtractedData(extracted);
       setMedName(extracted.medicineName || "");
+      setMedComposition(extracted.genericName || "");
       setMedStrength(extracted.detectedStrength || "");
       setMedForm(extracted.dosageForm || "tablet");
       setMedExpiry(extracted.expiryDate || "");
@@ -297,6 +300,7 @@ export default function ScanScreen() {
     setExpandedDebugPass(null);
     setCopiedDebugPass(null);
     setMedName("");
+    setMedComposition("");
     setMedStrength("");
     setMedForm("tablet");
     setMedExpiry("");
@@ -324,12 +328,15 @@ export default function ScanScreen() {
     }
   };
 
-  const handleSaveToHistory = () => {
+  const handleSaveToHistory = async () => {
     if (!medName.trim()) {
       Alert.alert("Notice", "Please provide a medicine name.");
       return;
     }
 
+    // Copy the capture out of volatile cache into stable storage
+    // before persisting the reference (undefined keeps the row, just image-less).
+    const stableImageUri = await saveScanImage(capturedImage || undefined);
     scanHistoryRepository.add({
       medicineName: medName,
       detectedStrength: medStrength || undefined,
@@ -338,7 +345,7 @@ export default function ScanScreen() {
       batchNumber: medBatch || undefined,
       expiryDate: medExpiry || undefined,
       rawText: extractedData?.rawText,
-      imageUri: capturedImage || undefined,
+      imageUri: stableImageUri,
     });
 
     Alert.alert("Saved to Scan History", "Scan record has been saved.", [
@@ -347,13 +354,14 @@ export default function ScanScreen() {
     ]);
   };
 
-  const handleAddToCabinet = () => {
+  const handleAddToCabinet = async () => {
     if (!medName.trim()) {
       Alert.alert("Notice", "Please provide a medicine name.");
       return;
     }
 
-    // Save to scan history
+    // Save to scan history (stable image storage)
+    const stableImageUri = await saveScanImage(capturedImage || undefined);
     scanHistoryRepository.add({
       medicineName: medName,
       detectedStrength: medStrength || undefined,
@@ -362,7 +370,7 @@ export default function ScanScreen() {
       batchNumber: medBatch || undefined,
       expiryDate: medExpiry || undefined,
       rawText: extractedData?.rawText,
-      imageUri: capturedImage || undefined,
+      imageUri: stableImageUri,
     });
 
     // Add to medicine cabinet
@@ -372,7 +380,7 @@ export default function ScanScreen() {
       strength: medStrength.trim() || "Standard dose",
       dosageForm: medForm,
       category: "Prescription",
-      ingredient: extractedData?.genericName || undefined,
+      ingredient: medComposition.trim() || extractedData?.genericName || undefined,
       packageDetails: {
         manufacturer: medMfg || undefined,
         expiryDate: medExpiry || undefined,
@@ -939,6 +947,7 @@ export default function ScanScreen() {
                         onPress={() => {
                           setMedName(cand.name);
                           if (cand.genericName) {
+                            setMedComposition(cand.genericName);
                             setExtractedData((prev) =>
                               prev ? { ...prev, genericName: cand.genericName } : null
                             );
@@ -961,6 +970,16 @@ export default function ScanScreen() {
                   </View>
                 </View>
               )}
+
+              <View style={styles.divider} />
+
+              <Text style={styles.fieldLabel}>Active Salt / Composition</Text>
+              <TextInput
+                style={styles.fieldInput}
+                value={medComposition}
+                onChangeText={setMedComposition}
+                placeholder="Active ingredient / chemical salt"
+              />
 
               <View style={styles.divider} />
 

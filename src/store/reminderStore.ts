@@ -11,6 +11,25 @@ import { medicineRepository } from "../database/repositories/medicineRepository"
 import { notificationService } from "../services/notificationService";
 import { getTodayDateString } from "../database/seed";
 
+/**
+ * Named, user-facing reasons a schedule could not arm its alarms.
+ * `notification_permission`: OS notification permission is denied.
+ * `exact_alarm`: Android exact-alarm ("Alarms & reminders") access is denied.
+ * `internal`: permission state looks fine, but scheduling still failed
+ *   (runtime, storage or network failure inside the scheduling path).
+ */
+export type ScheduleAlarmFailure =
+  | "notification_permission"
+  | "exact_alarm"
+  | "internal";
+
+export interface ScheduleSaveResult {
+  /** The schedule row (and the visible date refresh) persisted successfully. */
+  saved: boolean;
+  /** Present only when at least one dose alarm could not be scheduled. */
+  alarmFailure?: ScheduleAlarmFailure;
+}
+
 interface ReminderState {
   doses: ScheduledDose[];
   daySummary: DayAdherenceSummary | null;
@@ -20,7 +39,10 @@ interface ReminderState {
     status: DoseStatus,
     targetDate: string,
   ) => void;
-  saveSchedule: (schedule: ReminderSchedule, refreshDate?: string) => Promise<boolean>;
+  saveSchedule: (
+    schedule: ReminderSchedule,
+    refreshDate?: string,
+  ) => Promise<ScheduleSaveResult>;
   deleteSchedule: (scheduleId: string, refreshDate?: string) => Promise<void>;
   toggleScheduleEnabled: (
     scheduleId: string,
@@ -60,7 +82,7 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
 
     if (!schedule.enabled || !schedule.notificationsEnabled) {
       refreshVisibleDate();
-      return true;
+      return { saved: true };
     }
 
     const medicine = medicineRepository.getById(schedule.medicineId);
@@ -92,11 +114,21 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
       await notificationService.cancelForSchedule(schedule.id);
       scheduleRepository.save({ ...schedule, notificationsEnabled: false });
       refreshVisibleDate();
-      return false;
+
+      // Classify WHY scheduling failed so screens can show a named
+      // reason (permission loss vs exact-alarm denial vs internal error).
+      const diagnosis = await notificationService.diagnoseAlarmAccess();
+      const alarmFailure: ScheduleAlarmFailure =
+        !diagnosis.notificationPermission
+          ? "notification_permission"
+          : !diagnosis.exactAlarm
+            ? "exact_alarm"
+            : "internal";
+      return { saved: true, alarmFailure };
     }
 
     refreshVisibleDate();
-    return scheduledIds.length === schedule.times.length;
+    return { saved: true };
   },
 
   deleteSchedule: async (scheduleId, refreshDate = getTodayDateString()) => {

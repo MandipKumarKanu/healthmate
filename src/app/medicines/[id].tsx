@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { StyleSheet, View, Text, TouchableOpacity } from "react-native";
+import React, { useState, useEffect } from "react";
+import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
 import { AppAlert as Alert } from "../../services/appAlert";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -15,8 +15,12 @@ import { MedicalDisclaimer } from "../../components/ui/MedicalDisclaimer";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { medicineRepository } from "../../database/repositories/medicineRepository";
 import { scheduleRepository } from "../../database/repositories/scheduleRepository";
+import { profileRepository } from "../../database/repositories/profileRepository";
 import { isLowStock } from "../../services/refillService";
 import { useMedicineStore } from "../../store/medicineStore";
+import { aiAssistantService, MedicineEducationalInfo } from "../../services/aiAssistantService";
+import { networkService } from "../../services/networkService";
+import { ConnectGeminiModal } from "../../components/ai/ConnectGeminiModal";
 
 export default function MedicineDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -25,12 +29,83 @@ export default function MedicineDetailsScreen() {
 
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [eduInfo, setEduInfo] = useState<MedicineEducationalInfo | null>(null);
+  const [isLoadingEdu, setIsLoadingEdu] = useState(false);
+  const [showConnectModal, setShowConnectModal] = useState(false);
 
   const storeMedicine = useMedicineStore((s) =>
     s.medicines.find((m) => m.id === id),
   );
   const medicine = storeMedicine || medicineRepository.getById(id || "");
   const schedule = id ? scheduleRepository.getByMedicineId(id) : null;
+
+  useEffect(() => {
+    if (!medicine?.id) return;
+    const cached = profileRepository.getPreference(`edu_info_${medicine.id}`);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached) as MedicineEducationalInfo;
+        setEduInfo(parsed);
+      } catch {
+        setEduInfo(null);
+      }
+    } else {
+      setEduInfo(null);
+    }
+  }, [medicine?.id]);
+
+  const handleFetchEducationalInfo = async (forceRefresh = false) => {
+    if (!medicine) return;
+    let key: string | null = null;
+    try {
+      key = await aiAssistantService.getApiKey();
+    } catch {
+      key = null;
+    }
+    if (!key) {
+      setShowConnectModal(true);
+      return;
+    }
+    const isOnline = await networkService.checkInternet().catch(() => false);
+    if (!isOnline) {
+      Alert.alert(
+        "Internet Connection Required",
+        "Please connect to the internet to fetch educational information with Gemini AI."
+      );
+      return;
+    }
+
+    setIsLoadingEdu(true);
+    try {
+      const info = await aiAssistantService.fetchMedicineEducationalInfo(
+        medicine.name,
+        medicine.ingredient,
+        medicine.dosageForm,
+      );
+      profileRepository.updatePreference(`edu_info_${medicine.id}`, JSON.stringify(info));
+      setEduInfo(info);
+    } catch (err: any) {
+      console.warn("Failed to generate educational info:", err);
+      const isBadKey = err?.code === "BAD_KEY" || err?.message?.includes("rejected");
+      if (isBadKey) {
+        Alert.alert(
+          "Gemini key issue",
+          "Your Gemini API key was rejected or invalid. Please reconnect a valid key.",
+          [
+            { text: "Reconnect AI", onPress: () => setShowConnectModal(true) },
+            { text: "Cancel", style: "cancel" },
+          ]
+        );
+      } else {
+        Alert.alert(
+          "Could not generate AI guide",
+          err?.message || "Please check your network connection and try again."
+        );
+      }
+    } finally {
+      setIsLoadingEdu(false);
+    }
+  };
 
   if (!medicine) {
     return (
@@ -205,6 +280,18 @@ export default function MedicineDetailsScreen() {
 
           <View style={styles.rowDivider} />
 
+          {medicine.ingredient ? (
+            <>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Active composition (Salt)</Text>
+                <Text style={[styles.infoValue, styles.compositionHighlight]}>
+                  {medicine.ingredient}
+                </Text>
+              </View>
+              <View style={styles.rowDivider} />
+            </>
+          ) : null}
+
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Strength</Text>
             <Text style={styles.infoValue}>{medicine.strength}</Text>
@@ -278,155 +365,342 @@ export default function MedicineDetailsScreen() {
         </AppCard>
 
         {/* Section: General educational information */}
-        <SectionHeader title="General educational information" />
+        <SectionHeader
+          title="General educational information"
+          actionText={eduInfo ? "Refresh" : undefined}
+          onActionPress={eduInfo ? () => handleFetchEducationalInfo(true) : undefined}
+        />
         <AppCard style={styles.educationCard}>
-          <Text style={styles.eduQuestion}>What is it used for?</Text>
-          <Text style={styles.eduBody}>
-            No reviewed patient leaflet is linked to this record. This screen
-            does not establish why you take this medicine or whether it is
-            appropriate for you. Check the leaflet for your exact product or ask
-            a pharmacist.
-          </Text>
-
-          {/* Action pills: Explain simply / Why prescribed? */}
-          <View style={styles.pillActionRow}>
-            <TouchableOpacity
-              style={styles.explainButton}
-              onPress={() =>
-                router.push({
-                  pathname: "/ai-assistant",
-                  params: { query: `Explain ${medicine.name} simply` },
-                })
-              }
-              activeOpacity={0.7}
-            >
-              <Text style={styles.explainButtonText}>Explain simply</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.whyButton}
-              onPress={() =>
-                router.push({
-                  pathname: "/ai-assistant",
-                  params: { query: `Why is ${medicine.name} prescribed?` },
-                })
-              }
-              activeOpacity={0.7}
-            >
-              <Text style={styles.whyButtonText}>Why prescribed?</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Expandable Educational Accordion Items */}
-          <View style={styles.accordionContainer}>
-            {/* How does it work? */}
-            <TouchableOpacity
-              style={styles.accordionRow}
-              onPress={() => toggleExpand("how")}
-            >
-              <Text style={styles.accordionTitle}>How does it work?</Text>
-              <Ionicons
-                name={
-                  expandedSection === "how" ? "chevron-up" : "chevron-forward"
-                }
-                size={16}
-                color={Colors.textTertiary}
-              />
-            </TouchableOpacity>
-            {expandedSection === "how" ? (
-              <Text style={styles.accordionBody}>
-                No medicine-specific mechanism information has been verified for
-                this record. Check the official patient leaflet for your exact
-                product or ask a pharmacist.
-              </Text>
-            ) : null}
-
-            <View style={styles.rowDivider} />
-
-            {/* Common uses */}
-            <TouchableOpacity
-              style={styles.accordionRow}
-              onPress={() => toggleExpand("uses")}
-            >
-              <Text style={styles.accordionTitle}>Common uses</Text>
-              <Ionicons
-                name={
-                  expandedSection === "uses" ? "chevron-up" : "chevron-forward"
-                }
-                size={16}
-                color={Colors.textTertiary}
-              />
-            </TouchableOpacity>
-            {expandedSection === "uses" ? (
-              <Text style={styles.accordionBody}>
-                Uses depend on the active ingredient, formulation, and your
-                clinical circumstances. This record does not contain a reviewed
-                list of approved uses.
-              </Text>
-            ) : null}
-
-            <View style={styles.rowDivider} />
-
-            {/* Important safety information */}
-            <TouchableOpacity
-              style={styles.accordionRow}
-              onPress={() => toggleExpand("safety")}
-            >
-              <View style={styles.safetyRow}>
-                <Ionicons
-                  name="shield-outline"
-                  size={16}
-                  color={Colors.primary}
-                  style={{ marginRight: 6 }}
-                />
-                <Text style={styles.accordionTitle}>
-                  Important safety information
+          {eduInfo ? (
+            <View style={styles.aiBadgeBanner}>
+              <View style={styles.aiBadgeLeft}>
+                <MaterialCommunityIcons name="molecule" size={16} color={Colors.primary} />
+                <Text style={styles.aiBadgeText} numberOfLines={1}>
+                  AI Guide · {eduInfo.activeSaltUsed || medicine.ingredient || medicine.name}
                 </Text>
               </View>
-              <Ionicons
-                name={
-                  expandedSection === "safety"
-                    ? "chevron-up"
-                    : "chevron-forward"
-                }
-                size={16}
-                color={Colors.textTertiary}
-              />
-            </TouchableOpacity>
-            {expandedSection === "safety" ? (
-              <Text style={styles.accordionBody}>
-                Storage and precautions vary by product. Follow the instructions
-                on the original package and patient leaflet, and ask a
-                pharmacist if they are unclear.
-              </Text>
-            ) : null}
+              <TouchableOpacity
+                onPress={() => handleFetchEducationalInfo(true)}
+                disabled={isLoadingEdu}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                {isLoadingEdu ? (
+                  <ActivityIndicator size="small" color={Colors.primary} />
+                ) : (
+                  <Feather name="refresh-cw" size={13} color={Colors.textSecondary} />
+                )}
+              </TouchableOpacity>
+            </View>
+          ) : null}
 
-            <View style={styles.rowDivider} />
-
-            {/* Common side effects */}
-            <TouchableOpacity
-              style={styles.accordionRow}
-              onPress={() => toggleExpand("effects")}
-            >
-              <Text style={styles.accordionTitle}>Common side effects</Text>
-              <Ionicons
-                name={
-                  expandedSection === "effects"
-                    ? "chevron-up"
-                    : "chevron-forward"
-                }
-                size={16}
-                color={Colors.textTertiary}
-              />
-            </TouchableOpacity>
-            {expandedSection === "effects" ? (
-              <Text style={styles.accordionBody}>
-                No reviewed product-specific side-effect list is linked to this
-                record. Check the patient leaflet for your exact product or ask
-                a pharmacist about concerns.
+          {isLoadingEdu ? (
+            <View style={styles.loadingEduContainer}>
+              <ActivityIndicator size="large" color={Colors.primary} />
+              <Text style={styles.loadingEduTitle}>Analyzing Active Composition…</Text>
+              <Text style={styles.loadingEduSub}>
+                Gemini AI is examining {medicine.ingredient || medicine.name} to compile educational insights.
               </Text>
-            ) : null}
-          </View>
+            </View>
+          ) : eduInfo ? (
+            <>
+              <Text style={styles.eduQuestion}>What is it used for?</Text>
+              <Text style={styles.eduBody}>{eduInfo.summary}</Text>
+
+              {/* Action pills: Explain simply / Why prescribed? */}
+              <View style={styles.pillActionRow}>
+                <TouchableOpacity
+                  style={styles.explainButton}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/ai-assistant",
+                      params: {
+                        query: `Explain ${medicine.name}${medicine.ingredient ? ` (${medicine.ingredient})` : ""} simply`,
+                      },
+                    })
+                  }
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.explainButtonText}>Explain simply</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.whyButton}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/ai-assistant",
+                      params: {
+                        query: `Why is ${medicine.name}${medicine.ingredient ? ` (${medicine.ingredient})` : ""} prescribed?`,
+                      },
+                    })
+                  }
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.whyButtonText}>Why prescribed?</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Expandable Educational Accordion Items */}
+              <View style={styles.accordionContainer}>
+                {/* How does it work? */}
+                <TouchableOpacity
+                  style={styles.accordionRow}
+                  onPress={() => toggleExpand("how")}
+                >
+                  <Text style={styles.accordionTitle}>How does it work?</Text>
+                  <Ionicons
+                    name={expandedSection === "how" ? "chevron-up" : "chevron-forward"}
+                    size={16}
+                    color={Colors.textTertiary}
+                  />
+                </TouchableOpacity>
+                {expandedSection === "how" ? (
+                  <Text style={styles.accordionBody}>{eduInfo.mechanism}</Text>
+                ) : null}
+
+                <View style={styles.rowDivider} />
+
+                {/* Common uses */}
+                <TouchableOpacity
+                  style={styles.accordionRow}
+                  onPress={() => toggleExpand("uses")}
+                >
+                  <Text style={styles.accordionTitle}>Common uses</Text>
+                  <Ionicons
+                    name={expandedSection === "uses" ? "chevron-up" : "chevron-forward"}
+                    size={16}
+                    color={Colors.textTertiary}
+                  />
+                </TouchableOpacity>
+                {expandedSection === "uses" ? (
+                  <View style={styles.bulletList}>
+                    {eduInfo.commonUses.map((item, idx) => (
+                      <View key={idx} style={styles.bulletItem}>
+                        <View style={styles.bulletDot} />
+                        <Text style={styles.bulletText}>{item}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+
+                <View style={styles.rowDivider} />
+
+                {/* Important safety information */}
+                <TouchableOpacity
+                  style={styles.accordionRow}
+                  onPress={() => toggleExpand("safety")}
+                >
+                  <View style={styles.safetyRow}>
+                    <Ionicons
+                      name="shield-outline"
+                      size={16}
+                      color={Colors.primary}
+                      style={{ marginRight: 6 }}
+                    />
+                    <Text style={styles.accordionTitle}>Important safety information</Text>
+                  </View>
+                  <Ionicons
+                    name={expandedSection === "safety" ? "chevron-up" : "chevron-forward"}
+                    size={16}
+                    color={Colors.textTertiary}
+                  />
+                </TouchableOpacity>
+                {expandedSection === "safety" ? (
+                  <View style={styles.bulletList}>
+                    {eduInfo.safetyAlerts.map((item, idx) => (
+                      <View key={idx} style={styles.bulletItem}>
+                        <Ionicons
+                          name="alert-circle-outline"
+                          size={14}
+                          color={Colors.warningDark}
+                          style={{ marginTop: 2, marginRight: 6 }}
+                        />
+                        <Text style={styles.bulletText}>{item}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+
+                <View style={styles.rowDivider} />
+
+                {/* Common side effects */}
+                <TouchableOpacity
+                  style={styles.accordionRow}
+                  onPress={() => toggleExpand("effects")}
+                >
+                  <Text style={styles.accordionTitle}>Common side effects</Text>
+                  <Ionicons
+                    name={expandedSection === "effects" ? "chevron-up" : "chevron-forward"}
+                    size={16}
+                    color={Colors.textTertiary}
+                  />
+                </TouchableOpacity>
+                {expandedSection === "effects" ? (
+                  <View style={styles.bulletList}>
+                    {eduInfo.sideEffects.map((item, idx) => (
+                      <View key={idx} style={styles.bulletItem}>
+                        <View style={styles.bulletDot} />
+                        <Text style={styles.bulletText}>{item}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+              </View>
+            </>
+          ) : (
+            <>
+              {/* Not generated yet: Prompt card + fallback */}
+              <View style={styles.generateEduBox}>
+                <View style={styles.generateEduHeader}>
+                  <View style={styles.generateEduIconWrap}>
+                    <Ionicons name="sparkles" size={18} color={Colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.generateEduTitle}>Get AI Educational Insights</Text>
+                    <Text style={styles.generateEduSubtitle}>
+                      {medicine.ingredient
+                        ? `Analyze active composition "${medicine.ingredient}" with Gemini AI for mechanism of action, typical uses, and safety.`
+                        : `Analyze ${medicine.name} with Gemini AI for active composition, mechanism, and patient education.`}
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  style={styles.generateEduButton}
+                  onPress={() => handleFetchEducationalInfo()}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="sparkles" size={15} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={styles.generateEduButtonText}>Generate with Gemini AI</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.eduQuestion}>What is it used for?</Text>
+              <Text style={styles.eduBody}>
+                No reviewed patient leaflet is linked to this record. Tap "Generate with Gemini AI" above or check the official package leaflet.
+              </Text>
+
+              {/* Action pills: Explain simply / Why prescribed? */}
+              <View style={styles.pillActionRow}>
+                <TouchableOpacity
+                  style={styles.explainButton}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/ai-assistant",
+                      params: {
+                        query: `Explain ${medicine.name}${medicine.ingredient ? ` (${medicine.ingredient})` : ""} simply`,
+                      },
+                    })
+                  }
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.explainButtonText}>Explain simply</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.whyButton}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/ai-assistant",
+                      params: {
+                        query: `Why is ${medicine.name}${medicine.ingredient ? ` (${medicine.ingredient})` : ""} prescribed?`,
+                      },
+                    })
+                  }
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.whyButtonText}>Why prescribed?</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Expandable Educational Accordion Items */}
+              <View style={styles.accordionContainer}>
+                {/* How does it work? */}
+                <TouchableOpacity
+                  style={styles.accordionRow}
+                  onPress={() => toggleExpand("how")}
+                >
+                  <Text style={styles.accordionTitle}>How does it work?</Text>
+                  <Ionicons
+                    name={expandedSection === "how" ? "chevron-up" : "chevron-forward"}
+                    size={16}
+                    color={Colors.textTertiary}
+                  />
+                </TouchableOpacity>
+                {expandedSection === "how" ? (
+                  <Text style={styles.accordionBody}>
+                    No medicine-specific mechanism information has been verified for this record. Tap "Generate with Gemini AI" above or check the official leaflet.
+                  </Text>
+                ) : null}
+
+                <View style={styles.rowDivider} />
+
+                {/* Common uses */}
+                <TouchableOpacity
+                  style={styles.accordionRow}
+                  onPress={() => toggleExpand("uses")}
+                >
+                  <Text style={styles.accordionTitle}>Common uses</Text>
+                  <Ionicons
+                    name={expandedSection === "uses" ? "chevron-up" : "chevron-forward"}
+                    size={16}
+                    color={Colors.textTertiary}
+                  />
+                </TouchableOpacity>
+                {expandedSection === "uses" ? (
+                  <Text style={styles.accordionBody}>
+                    Uses depend on the active ingredient and formulation. Tap "Generate with Gemini AI" to get active salt insights.
+                  </Text>
+                ) : null}
+
+                <View style={styles.rowDivider} />
+
+                {/* Important safety information */}
+                <TouchableOpacity
+                  style={styles.accordionRow}
+                  onPress={() => toggleExpand("safety")}
+                >
+                  <View style={styles.safetyRow}>
+                    <Ionicons
+                      name="shield-outline"
+                      size={16}
+                      color={Colors.primary}
+                      style={{ marginRight: 6 }}
+                    />
+                    <Text style={styles.accordionTitle}>Important safety information</Text>
+                  </View>
+                  <Ionicons
+                    name={expandedSection === "safety" ? "chevron-up" : "chevron-forward"}
+                    size={16}
+                    color={Colors.textTertiary}
+                  />
+                </TouchableOpacity>
+                {expandedSection === "safety" ? (
+                  <Text style={styles.accordionBody}>
+                    Storage and precautions vary by product. Follow instructions on original packaging.
+                  </Text>
+                ) : null}
+
+                <View style={styles.rowDivider} />
+
+                {/* Common side effects */}
+                <TouchableOpacity
+                  style={styles.accordionRow}
+                  onPress={() => toggleExpand("effects")}
+                >
+                  <Text style={styles.accordionTitle}>Common side effects</Text>
+                  <Ionicons
+                    name={expandedSection === "effects" ? "chevron-up" : "chevron-forward"}
+                    size={16}
+                    color={Colors.textTertiary}
+                  />
+                </TouchableOpacity>
+                {expandedSection === "effects" ? (
+                  <Text style={styles.accordionBody}>
+                    No reviewed side-effect list linked to this record. Check the package insert or consult a pharmacist.
+                  </Text>
+                ) : null}
+              </View>
+            </>
+          )}
         </AppCard>
 
         {/* Section: Your schedule */}
@@ -516,6 +790,15 @@ export default function MedicineDetailsScreen() {
         destructive
         onConfirm={confirmDelete}
         onCancel={() => setShowDeleteModal(false)}
+      />
+
+      <ConnectGeminiModal
+        visible={showConnectModal}
+        onClose={() => setShowConnectModal(false)}
+        onKeySaved={() => {
+          setShowConnectModal(false);
+          handleFetchEducationalInfo();
+        }}
       />
     </AppScreen>
   );
@@ -795,5 +1078,122 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     color: Colors.textSecondary,
+  },
+  compositionHighlight: {
+    color: Colors.primary,
+    fontWeight: "700",
+  },
+  aiBadgeBanner: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#F0F4FF",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: Radius.md,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: "#D9E4FF",
+  },
+  aiBadgeLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flex: 1,
+    marginRight: 8,
+  },
+  aiBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: Colors.primary,
+    flexShrink: 1,
+  },
+  loadingEduContainer: {
+    alignItems: "center",
+    paddingVertical: 24,
+    gap: 8,
+  },
+  loadingEduTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: Colors.textPrimary,
+    marginTop: 6,
+  },
+  loadingEduSub: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    maxWidth: 280,
+    lineHeight: 18,
+  },
+  generateEduBox: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: Radius.lg,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  generateEduHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginBottom: 12,
+  },
+  generateEduIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#EEF2FF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2,
+  },
+  generateEduTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: Colors.textPrimary,
+    marginBottom: 3,
+  },
+  generateEduSubtitle: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 17,
+  },
+  generateEduButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.primary,
+    paddingVertical: 10,
+    borderRadius: Radius.pill,
+  },
+  generateEduButtonText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  bulletList: {
+    paddingBottom: 10,
+    gap: 8,
+  },
+  bulletItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    paddingRight: 8,
+  },
+  bulletDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.primary,
+    marginTop: 6,
+    marginRight: 8,
+  },
+  bulletText: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+    flex: 1,
   },
 });

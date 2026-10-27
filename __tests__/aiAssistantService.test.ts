@@ -24,13 +24,27 @@ const mockFetch = jest.fn() as unknown as FetchSpy;
 const { aiAssistantService } = require('../src/services/aiAssistantService') as {
   aiAssistantService: {
     _cachedKey: string | null | undefined;
+    _cachedModel: string | null | undefined;
     getApiKey(): Promise<string | null>;
     saveApiKey(key: string): Promise<void>;
     deleteApiKey(): Promise<void>;
     verifyApiKey(key: string): Promise<{ valid: boolean; error?: string }>;
     askGemini(question: string, history?: { role: string; content: string }[]): Promise<{ text: string; model: string; usedNetwork: boolean }>;
-    parseMedicinePackagingWithAI(rawOcrText: string): Promise<unknown>;
+    parseMedicinePackagingWithAI(rawOcrText: string): Promise<{
+      medicineName: string;
+      genericName?: string;
+      dosageForm: string;
+      detectedStrength?: string;
+      manufacturer?: string;
+      batchNumber?: string;
+      expiryDate?: string;
+    }>;
   };
+};
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { ocrService } = require('../src/services/ocrService') as {
+  ocrService: { extractMedicineData(text: string): { detectedStrength?: string } };
 };
 
 // Capture the module's real initial state before each test resets the cache.
@@ -70,6 +84,8 @@ describe('aiAssistantService (Gemini)', () => {
     mockFetch.mockReset();
     secureStoreMock.__clearStore();
     aiAssistantService._cachedKey = undefined;
+    // Model cache: reset so each test starts without a preference.
+    aiAssistantService._cachedModel = undefined;
   });
 
   it('refuses to answer without a key (offline-first behavior unchanged)', async () => {
@@ -118,7 +134,7 @@ describe('aiAssistantService (Gemini)', () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const [url, init] = mockFetch.mock.calls[0];
-    expect(String(url)).toContain('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent');
+    expect(String(url)).toContain('https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent');
     const headers = (init as { headers: Record<string, string> }).headers;
     expect(headers['x-goog-api-key']).toBe('sk-live-key');
 
@@ -168,9 +184,9 @@ describe('aiAssistantService (Gemini)', () => {
 
     const result = await aiAssistantService.askGemini('What is a label?');
 
-    expect(result.model).toBe('gemini-3.8-flash');
+    expect(result.model).toBe('gemini-flash-latest');
     expect(mockFetch).toHaveBeenCalledTimes(2);
-    expect(String(mockFetch.mock.calls[1][0])).toContain('/models/gemini-3.8-flash:generateContent');
+    expect(String(mockFetch.mock.calls[1][0])).toContain('/models/gemini-flash-latest:generateContent');
   });
 
   it('surfaces Gemini quota errors from packaging interpretation instead of silently hiding them', async () => {
@@ -223,5 +239,64 @@ describe('aiAssistantService (Gemini)', () => {
 
     await expect(aiAssistantService.askGemini('hello'))
       .rejects.toMatchObject({ code: 'EMPTY_ANSWER' });
+  });
+
+  it('prefers the last working model so the next message skips the try-chain', async () => {
+    await aiAssistantService.saveApiKey('sk-cached-model');
+
+    // First message: default model 404s, the fallback answers → cache it.
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      json: () => Promise.resolve({ error: { message: 'model not found' } }),
+    });
+    mockFetch.mockResolvedValueOnce(okResponse(geminiBodyWithText('first')));
+    const first = await aiAssistantService.askGemini('hello');
+    expect(first.model).toBe('gemini-flash-latest');
+
+    // Second message: one straight request to the cached model, no chain.
+    mockFetch.mockResolvedValueOnce(okResponse(geminiBodyWithText('second')));
+    const second = await aiAssistantService.askGemini('hello again');
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+    expect(second.model).toBe('gemini-flash-latest');
+    expect(String(mockFetch.mock.calls[2][0])).toContain(
+      '/models/gemini-flash-latest:generateContent',
+    );
+  });
+
+  it('applies the null-rule: null/omitted Gemini fields stay absent instead of inheriting dictionary guesses', async () => {
+    await aiAssistantService.saveApiKey('sk-null-rule');
+    const rawText = 'Paracetamol 500 mg tablet Dolo 650 manufacturer unknown';
+
+    // The local dictionary extraction DOES guess a strength from this text…
+    const base = ocrService.extractMedicineData(rawText);
+    expect(base.detectedStrength).toBeDefined();
+
+    // …but Gemini reviewed the label and reported no strength, no batch, and
+    // no expiry — those must stay absent rather than inherit the guesses.
+    mockFetch.mockResolvedValueOnce(
+      okResponse(
+        geminiBodyWithText(
+          JSON.stringify({
+            medicineName: 'Dolo 650',
+            genericName: 'Paracetamol',
+            dosageForm: 'tablet',
+            manufacturer: null,
+            detectedStrength: null,
+            expiryDate: '  ',
+          }),
+        ),
+      ),
+    );
+
+    const result = await aiAssistantService.parseMedicinePackagingWithAI(rawText);
+
+    expect(result.medicineName).toBe('Dolo 650');
+    expect(result.dosageForm).toBe('tablet');
+    // Null, omitted and whitespace-only values are all "not present".
+    expect(result.detectedStrength).toBeUndefined();
+    expect(result.manufacturer).toBeUndefined();
+    expect(result.batchNumber).toBeUndefined();
+    expect(result.expiryDate).toBeUndefined();
   });
 });

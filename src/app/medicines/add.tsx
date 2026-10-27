@@ -25,6 +25,7 @@ export default function AddMedicineScreen() {
   const params = useLocalSearchParams<{
     editId?: string;
     name?: string;
+    ingredient?: string;
     strength?: string;
     form?: string;
     expiry?: string;
@@ -36,6 +37,7 @@ export default function AddMedicineScreen() {
   const { addMedicine, updateMedicine } = useMedicineStore();
 
   const [name, setName] = useState(params.name || "");
+  const [ingredient, setIngredient] = useState(params.ingredient || "");
   const [strength, setStrength] = useState(params.strength || "");
   const [dosageForm, setDosageForm] = useState<DosageForm>(
     (params.form as DosageForm) || "tablet",
@@ -53,6 +55,7 @@ export default function AddMedicineScreen() {
       const existing = medicineRepository.getById(params.editId);
       if (existing) {
         setName(existing.name);
+        setIngredient(existing.ingredient || "");
         setStrength(existing.strength);
         setDosageForm(existing.dosageForm);
         setCategory(existing.category || "Generic");
@@ -96,6 +99,7 @@ export default function AddMedicineScreen() {
     if (isEditing && params.editId) {
       updateMedicine(params.editId, {
         name: trimmedName,
+        ingredient: ingredient.trim() || undefined,
         strength: strength.trim() || "Standard dose",
         dosageForm,
         category,
@@ -116,6 +120,7 @@ export default function AddMedicineScreen() {
       const newMed = addMedicine({
         id: `med_${Date.now()}`,
         name: trimmedName,
+        ingredient: ingredient.trim() || undefined,
         strength: strength.trim() || "Standard dose",
         dosageForm,
         category,
@@ -162,6 +167,17 @@ export default function AddMedicineScreen() {
             placeholderTextColor={Colors.textTertiary}
             value={name}
             onChangeText={setName}
+          />
+
+          <View style={styles.divider} />
+
+          <Text style={styles.inputLabel}>Active Salt / Composition</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="e.g. Paracetamol, Amoxicillin & Clavulanate"
+            placeholderTextColor={Colors.textTertiary}
+            value={ingredient}
+            onChangeText={setIngredient}
           />
 
           <View style={styles.divider} />

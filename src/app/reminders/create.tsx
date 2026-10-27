@@ -331,7 +331,7 @@ export default function SetReminderScreen() {
       const scheduleId = existingSchedule?.id ?? `sched_${selectedMed.id}`;
       const now = new Date().toISOString();
 
-      const alarmsScheduled = await saveSchedule(
+      const saveResult = await saveSchedule(
         {
           id: scheduleId,
           medicineId: selectedMed.id,
@@ -351,10 +351,28 @@ export default function SetReminderScreen() {
         refreshDate,
       );
 
-      if (!alarmsScheduled) {
+      if (!saveResult.saved) {
+        Alert.alert(
+          'Could not save schedule',
+          'HealthMate could not finish saving this schedule to your device database. Please try again; if it keeps failing, check that enough free storage is available.',
+        );
+        return;
+      }
+
+      // Each alarm-arming failure has a named, distinct reason so
+      // the user knows exactly which setting to fix (no more generic copy).
+      if (saveResult.alarmFailure) {
+        const failureMessages: Record<string, string> = {
+          notification_permission:
+            'Your schedule is saved, but notification permission is currently denied. Allow HealthMate to send notifications in Android Settings → Apps → HealthMate → Notifications, then edit and re-save this schedule to arm reminders.',
+          exact_alarm:
+            'Your schedule is saved, but exact alarm access was not granted. Allow “Alarms & reminders” in Android Settings → Apps → HealthMate → Alarms & reminders, then edit and re-save this schedule.',
+          internal:
+            'Your schedule is saved, but at least one alarm could not be scheduled (internal or network error). Try re-saving this schedule; if it keeps failing, check your connection and device storage.',
+        };
         Alert.alert(
           'Schedule saved without alarms',
-          'Your medication schedule was saved, but at least one alarm could not be scheduled. Allow notifications and “Alarms & reminders” access in Android Settings, then edit and save this schedule again.',
+          failureMessages[saveResult.alarmFailure],
           [{ text: 'OK', onPress: () => router.back() }],
         );
         return;

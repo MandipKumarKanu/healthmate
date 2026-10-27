@@ -12,7 +12,14 @@ export default function RootLayout() {
   useEffect(() => {
     initApp();
     notificationService.init().then(() => {
-      notificationService.reconcileScheduledReminders();
+      // Run the reconcile pass off the foreground open path — it
+      // walks every schedule and every OS notification, so it is deferred to
+      // the next tick instead of competing with the initial render/commit.
+      // (InteractionManager was removed from react-native core in 0.88;
+      // setTimeout is the sanctioned deferral now.)
+      setTimeout(() => {
+        notificationService.reconcileScheduledReminders();
+      }, 0);
     });
 
     // Recover alarms on launch, reboot, or when permissions return from system settings.

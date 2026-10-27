@@ -532,6 +532,23 @@ export default function ProfileScreen() {
               color={Colors.textTertiary}
             />
           </TouchableOpacity>
+
+          <View style={styles.rowDivider} />
+
+          <TouchableOpacity
+            style={styles.settingRow}
+            onPress={() => router.push('/settings/backup')}
+          >
+            <View style={styles.settingIconContainer}>
+              <Ionicons name="save-outline" size={18} color={Colors.primary} />
+            </View>
+            <Text style={styles.settingLabel}>Backup & Restore</Text>
+            <Ionicons
+              name="chevron-forward"
+              size={16}
+              color={Colors.textTertiary}
+            />
+          </TouchableOpacity>
         </AppCard>
 
         {/* Section: Alarm Reliability & Battery */}

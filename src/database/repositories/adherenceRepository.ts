@@ -7,6 +7,7 @@ import {
 import {
   parseDateParts,
   isScheduleDueOnDate,
+  getTodayDateString,
 } from "../../utils/scheduleRecurrence";
 import {
   ScheduledDose,
@@ -75,7 +76,102 @@ export function calculateDayAdherenceSummary(
   };
 }
 
+/** How many past days the missed-dose sweep covers (matches the insights weekly window). */
+export const MISSED_SWEEP_LOOKBACK_DAYS = 7;
+
+/**
+ * True when a dose scheduled for `date`/`time` should already have been taken
+ * (or flagged missed) as of `now` — including today's doses whose time passed.
+ */
+function isDoseOverdue(
+  date: string,
+  time: string,
+  today: string,
+  nowMinutes: number,
+): boolean {
+  if (date < today) return true;
+  if (date > today) return false;
+  const [hours, minutes] = time.split(":").map(Number);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return false;
+  return hours * 60 + minutes <= nowMinutes;
+}
+
+
 export const adherenceRepository = {
+  /**
+   * Auto-miss sweep: writes overdue doses into `adherence_logs` so
+   * adherence insights no longer depend on which dates the user happened to
+   * open. Covers enabled, non-sample schedules over the last
+   * `MISSED_SWEEP_LOOKBACK_DAYS` days plus today.
+   *
+   * Conservative by design:
+   * - never overwrites an existing log row (user intent — taken / skipped /
+   *   explicit missed rows — always wins),
+   * - skips sample/seed schedules so demo data is not polluted,
+   * - uses the same log id convention as `logDoseStatus` for stable identity.
+   *
+   * Returns the persisted log ids (empty when everything was already covered).
+   */
+  persistMissedDoses(
+    now: Date = new Date(),
+    lookbackDays: number = MISSED_SWEEP_LOOKBACK_DAYS,
+  ): string[] {
+    const today = getTodayDateString(now);
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+    const dates: string[] = [];
+    for (let offset = lookbackDays; offset >= 0; offset--) {
+      const d = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() - offset,
+      );
+      dates.push(getTodayDateString(d));
+    }
+
+    const db = getDatabase();
+    const persisted: string[] = [];
+
+    for (const schedule of scheduleRepository.getAll()) {
+      if (!schedule.enabled || schedule.times.length === 0) continue;
+      const medicine = medicineRepository.getById(schedule.medicineId);
+      if (!medicine || medicine.isSample) continue;
+
+      for (const date of dates) {
+        if (!isScheduleDueOnDate(schedule, date)) continue;
+        for (const timeEntry of schedule.times) {
+          if (!isDoseOverdue(date, timeEntry.time, today, nowMinutes)) {
+            continue;
+          }
+          const existing = db.getFirstSync<{ status: string }>(
+            "SELECT status FROM adherence_logs WHERE dose_date = ? AND dose_time = ? AND schedule_id = ?;",
+            [date, timeEntry.time, schedule.id],
+          );
+          if (existing) continue;
+
+          const logId = `log_${schedule.id}_${date}_${timeEntry.time.replace(":", "")}`;
+          db.runSync(
+            `INSERT OR REPLACE INTO adherence_logs (
+              id, schedule_id, medicine_id, dose_date, dose_time, status, logged_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?);`,
+            [
+              logId,
+              schedule.id,
+              medicine.id,
+              date,
+              timeEntry.time,
+              "missed",
+              now.toISOString(),
+            ],
+          );
+          persisted.push(logId);
+        }
+      }
+    }
+
+    return persisted;
+  },
+
   getDosesForDate(date: string): ScheduledDose[] {
     if (!parseDateParts(date)) return [];
     const db = getDatabase();

@@ -4,6 +4,7 @@ import {
   getTodayDateString,
   getPreviousDayString,
   isScheduleDueOnDate,
+  parseDateParts,
 } from "../../utils/scheduleRecurrence";
 
 interface ScheduleRow {
@@ -51,6 +52,26 @@ function mapRowToSchedule(row: ScheduleRow): ReminderSchedule {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+/**
+ * How many history versions to retain per schedule before the oldest
+ * rows are dropped. Dose identity for dropped versions is still recoverable
+ * from adherence_logs (doses are re-created from log rows not covered by
+ * current schedules), so dropping only affects display amount for very old
+ * doses.
+ */
+export const MAX_HISTORY_ROWS_PER_SCHEDULE = 10;
+
+function addDayUtc(dateStr: string, days: number): string {
+  const parts = parseDateParts(dateStr);
+  if (!parts) return dateStr;
+  const d = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2] + days));
+  return [
+    d.getUTCFullYear(),
+    String(d.getUTCMonth() + 1).padStart(2, "0"),
+    String(d.getUTCDate()).padStart(2, "0"),
+  ].join("-");
 }
 
 function mapHistoryRowToSchedule(row: ScheduleHistoryRow): ReminderSchedule {
@@ -221,6 +242,9 @@ export const scheduleRepository = {
         schedule.updatedAt,
       ],
     );
+
+    // Keep the version history bounded after every archive.
+    this.compactScheduleHistory(schedule.id);
   },
 
   delete(id: string): boolean {
@@ -253,6 +277,7 @@ export const scheduleRepository = {
 
     // CRITICAL: Preserve historical adherence_logs for past records
     const result = db.runSync("DELETE FROM schedules WHERE id = ?;", [id]);
+    this.compactScheduleHistory(id);
     return result.changes > 0;
   },
 
@@ -262,5 +287,81 @@ export const scheduleRepository = {
       "UPDATE schedules SET enabled = ?, updated_at = ? WHERE id = ?;",
       [enabled ? 1 : 0, new Date().toISOString(), id],
     );
+  },
+
+  /**
+   * Compacts the schedule-history for one schedule:
+   *
+   * 1. Merge pass: consecutive versions with identical recurrence, times and
+   *    medicine that form a contiguous/overlapping date range are folded into
+   *    a single segment (older rows survive, one merged row per segment).
+   * 2. Cap pass: if more than MAX_HISTORY_ROWS_PER_SCHEDULE versions remain,
+   *    the OLDEST versions are dropped — their dates fall back to adherence
+   *    log-based dose recovery, which preserves dose identity.
+   *
+   * Called after every save()/delete() that archives a history row. Rows are
+   * read once and sorted in JS so behavior is identical on SQLite and the
+   * in-memory demonstration adapter.
+   */
+  compactScheduleHistory(scheduleId: string): void {
+    const db = getDatabase();
+    const rows = db
+      .getAllSync<ScheduleHistoryRow>(
+        "SELECT * FROM schedule_history WHERE schedule_id = ? ORDER BY start_date ASC;",
+        [scheduleId],
+      )
+      .slice()
+      .sort(
+        (a, b) =>
+          a.start_date.localeCompare(b.start_date) ||
+          a.created_at.localeCompare(b.created_at),
+      );
+
+    // Merge pass: fold contiguous/overlapping identical versions together.
+    const merged: ScheduleHistoryRow[] = [];
+    for (const row of rows) {
+      const prev = merged[merged.length - 1];
+      if (
+        prev &&
+        prev.medicine_id === row.medicine_id &&
+        prev.recurrence === row.recurrence &&
+        prev.times_json === row.times_json &&
+        row.start_date <= addDayUtc(prev.end_date, 1)
+      ) {
+        // Extend the surviving segment to the later end; delete the merged row.
+        const newEnd =
+          row.end_date > prev.end_date ? row.end_date : prev.end_date;
+        if (newEnd !== prev.end_date) {
+          db.runSync(
+            "UPDATE schedule_history SET end_date = ? WHERE id = ?;",
+            [newEnd, prev.id],
+          );
+          prev.end_date = newEnd;
+        }
+        db.runSync("DELETE FROM schedule_history WHERE id = ?;", [row.id]);
+      } else {
+        merged.push({ ...row });
+      }
+    }
+
+    // Cap pass: keep the newest MAX_HISTORY_ROWS_PER_SCHEDULE versions.
+    // "Newest" is by updated_at of the version (falls back to created_at).
+    if (merged.length > MAX_HISTORY_ROWS_PER_SCHEDULE) {
+      const byNewest = merged
+        .slice()
+        .sort((a, b) =>
+          (b.updated_at || b.created_at).localeCompare(
+            a.updated_at || a.created_at,
+          ),
+        );
+      const toDrop = new Set(
+        byNewest
+          .slice(MAX_HISTORY_ROWS_PER_SCHEDULE)
+          .map((row) => row.id),
+      );
+      for (const id of toDrop) {
+        db.runSync("DELETE FROM schedule_history WHERE id = ?;", [id]);
+      }
+    }
   },
 };

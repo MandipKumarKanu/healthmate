@@ -1,9 +1,14 @@
 import { create } from "zustand";
 import { UserProfile, UserPreferences, OnboardingDraft, SnoozeIntervalMinutes } from "../types";
 import { profileRepository } from "../database/repositories/profileRepository";
+import { adherenceRepository } from "../database/repositories/adherenceRepository";
 import { seedInitialDataIfNeeded, getTodayDateString } from "../database/seed";
 import { resetDatabase } from "../database/client";
 import { notificationService } from "../services/notificationService";
+import {
+  cleanupOrphanScanImages,
+  deleteAllScanImages,
+} from "../services/scanImageStorage";
 import { useMedicineStore } from "./medicineStore";
 import { useReminderStore } from "./reminderStore";
 
@@ -62,6 +67,21 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   initApp: () => {
     seedInitialDataIfNeeded(false);
+    // Persist any doses that became overdue since the last open so
+    // adherence insights do not depend on which dates were visited. Part of the
+    // same write-batch as seeding; failures must never block app startup.
+    try {
+      adherenceRepository.persistMissedDoses();
+    } catch (error) {
+      console.warn("Missed-dose sweep failed:", error);
+    }
+    // Reclaim scan images no longer referenced by any scan row.
+    // Fire-and-forget; a failure must never block app startup.
+    try {
+      cleanupOrphanScanImages();
+    } catch (error) {
+      console.warn("Scan-image cleanup failed:", error);
+    }
     const profile = profileRepository.getProfile();
     const preferences = profileRepository.getPreferences();
     const savedDraft = profileRepository.getOnboardingDraft();
@@ -173,6 +193,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Explicitly cancel all pending OS notifications and native alarms before clearing data
     await notificationService.cancelAll();
     resetDatabase();
+    deleteAllScanImages();
     get().clearOnboardingDraft();
     seedInitialDataIfNeeded(true);
     const profile = profileRepository.getProfile();
@@ -189,6 +210,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Explicitly cancel all pending OS notifications and native alarms before clearing data
     await notificationService.cancelAll();
     resetDatabase();
+    deleteAllScanImages();
     get().clearOnboardingDraft();
     const selectedDate = getTodayDateString();
     set({

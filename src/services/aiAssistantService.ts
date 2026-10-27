@@ -13,11 +13,15 @@ import { ocrService, ExtractedMedicineData } from './ocrService';
  */
 
 const KEY_STORE_NAME = 'gemini_api_key';
+// SecureStore slot for the last Gemini model that answered
+// successfully, so later messages start there instead of replaying the chain.
+const MODEL_STORE_NAME = 'gemini_cached_model';
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
-// Use a stable model ID. A "latest" alias may move between model versions.
-const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
-const FALLBACK_MODELS = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-2.5-flash-lite'];
-const GEMINI_MODELS_TO_TRY = [DEFAULT_MODEL, ...FALLBACK_MODELS];
+// Use "latest" aliases so requests follow Google's current stable channel
+// without chasing hard-coded version numbers.
+const DEFAULT_MODEL = 'gemini-flash-lite-latest';
+const FALLBACK_MODELS = 'gemini-flash-latest';
+const GEMINI_MODELS_TO_TRY = [DEFAULT_MODEL, FALLBACK_MODELS];
 const MAX_HISTORY_TURNS = 12; // keep requests bounded; persistence holds more
 
 const KEY_REJECTION_HELP =
@@ -83,6 +87,23 @@ export const MEDICATION_GUARDRAIL_SYSTEM_PROMPT = [
   '- Never present yourself as a clinician, and never say "I recommend medicine X".',
 ].join('\n');
 
+/**
+ * Null-rule for Gemini packaging fields. When the model omits a
+ * key, returns null, or returns an empty/whitespace string, it has reviewed
+ * the label and chose not to report that field — treat it as "not present"
+ * instead of merging local dictionary/regex guesses (lot numbers, strengths
+ * inferred from noise) back into the result.
+ */
+function geminiOptionalField(
+  parsed: Record<string, unknown>,
+  key: string,
+): string | undefined {
+  const value = parsed[key];
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
 export interface GeminiTurn {
   role: 'user' | 'assistant';
   text: string;
@@ -94,9 +115,54 @@ export interface GeminiAnswer {
   usedNetwork: boolean;
 }
 
+export interface MedicineEducationalInfo {
+  summary: string;
+  mechanism: string;
+  commonUses: string[];
+  safetyAlerts: string[];
+  sideEffects: string[];
+  activeSaltUsed?: string;
+  generatedAt: string;
+}
+
 export const aiAssistantService = {
   /** Reads the stored key once and caches it for the session. */
   _cachedKey: undefined as string | null | undefined,
+
+  /** Last model that answered successfully (memoized per session). */
+  _cachedModel: undefined as string | null | undefined,
+
+  /**
+   * Returns the persisted last-working model, or null when none is
+   * known yet. A storage failure reads as "no cache" and is NOT memoized, so
+   * a later read can still succeed.
+   */
+  async getWorkingModel(): Promise<string | null> {
+    if (this._cachedModel !== undefined) return this._cachedModel ?? null;
+    try {
+      const stored = await SecureStore.getItemAsync(MODEL_STORE_NAME);
+      this._cachedModel = stored ?? null;
+      return this._cachedModel;
+    } catch {
+      this._cachedModel = undefined;
+      return null;
+    }
+  },
+
+  /**
+   * Remembers a model that just answered. Best effort: the
+   * in-memory memo still skips the try-chain for the rest of the session even
+   * if the persistent write fails.
+   */
+  async setWorkingModel(model: string): Promise<void> {
+    if (!model || this._cachedModel === model) return;
+    this._cachedModel = model;
+    try {
+      await SecureStore.setItemAsync(MODEL_STORE_NAME, model);
+    } catch {
+      // Keep the in-memory value; a later success will retry the write.
+    }
+  },
 
   async getApiKey(): Promise<string | null> {
     if (this._cachedKey !== undefined) return this._cachedKey ?? null;
@@ -220,10 +286,13 @@ export const aiAssistantService = {
       });
     }
 
-    const requestedModel = options.model ?? DEFAULT_MODEL;
+    // Start from the last model that answered successfully so the
+    // common case is one request instead of replaying the whole try-chain.
+    const preferredModel =
+      options.model ?? (await this.getWorkingModel()) ?? DEFAULT_MODEL;
     const modelsToTry = [
-      requestedModel,
-      ...FALLBACK_MODELS.filter((model) => model !== requestedModel),
+      preferredModel,
+      ...GEMINI_MODELS_TO_TRY.filter((model) => model !== preferredModel),
     ];
     const contents = this.buildContents(history, prompt);
     const body = {
@@ -282,6 +351,9 @@ export const aiAssistantService = {
           });
         }
 
+        // Remember the model that just answered so the next
+        // message starts directly on it.
+        await this.setWorkingModel(model);
         return { text: answerText, model, usedNetwork: true };
       } catch (error) {
         if ((error as { name?: string }).name === 'AbortError') {
@@ -338,7 +410,11 @@ export const aiAssistantService = {
           },
         );
 
-        if (response.ok) return { valid: true };
+        if (response.ok) {
+          // The key was verified through this model — prefer it next.
+          await this.setWorkingModel(model);
+          return { valid: true };
+        }
 
         const detail = await readGeminiErrorMessage(response);
         if (response.status === 404) continue;
@@ -411,7 +487,15 @@ export const aiAssistantService = {
       '- Return ONLY valid JSON, with NO markdown backticks or commentary.',
     ].join('\n');
 
-    const modelsToTry = GEMINI_MODELS_TO_TRY;
+    // Prefer the last model that answered successfully so scans do
+    // not replay the full try-chain either.
+    const preferredParseModel = await this.getWorkingModel();
+    const modelsToTry = preferredParseModel
+      ? [
+          preferredParseModel,
+          ...GEMINI_MODELS_TO_TRY.filter((m) => m !== preferredParseModel),
+        ]
+      : GEMINI_MODELS_TO_TRY;
     let lastPackagingParseError: unknown = null;
     let lastModelError = '';
 
@@ -439,7 +523,15 @@ export const aiAssistantService = {
                     role: 'user',
                     parts: [
                       {
-                        text: `Raw OCR text from medication packaging:\n\n${rawOcrText}`,
+                        text: [
+                          `Raw OCR text from medication packaging:\n\n${rawOcrText}`,
+                          baseExtraction.genericName
+                            ? `\nInitial salt/composition hint from local dictionary: ${baseExtraction.genericName}`
+                            : '',
+                          baseExtraction.medicineName && baseExtraction.medicineName !== 'Unknown medicine'
+                            ? `Initial brand hint from local dictionary: ${baseExtraction.medicineName}`
+                            : '',
+                        ].filter(Boolean).join('\n'),
                       },
                     ],
                   },
@@ -497,30 +589,33 @@ export const aiAssistantService = {
           .replace(/```json/gi, '')
           .replace(/```/g, '')
           .trim();
-        const parsed = JSON.parse(cleanJson);
+        const parsedGemini: Record<string, unknown> = JSON.parse(cleanJson);
+        // The model produced parseable JSON — remember it.
+        await this.setWorkingModel(model);
+        const parsed = parsedGemini;
 
+        // Names and dosage form keep the local fallback: the UI requires both,
+        // and the dictionary matches them directly against label text. All
+        // other fields follow the packaging null-rule — an omitted/null Gemini
+        // value stays absent rather than inheriting dictionary noise.
+        const geminiName = geminiOptionalField(parsed, 'medicineName');
+        const geminiGeneric = geminiOptionalField(parsed, 'genericName');
         const resolvedMedName =
-          parsed.medicineName?.trim() ||
-          parsed.genericName?.trim() ||
-          baseExtraction.medicineName;
+          geminiName || geminiGeneric || baseExtraction.medicineName;
         const resolvedGenName =
-          parsed.genericName?.trim() ||
-          parsed.medicineName?.trim() ||
-          baseExtraction.genericName;
+          geminiGeneric || baseExtraction.genericName;
 
         return {
           medicineName: resolvedMedName,
           genericName: resolvedGenName,
-          detectedStrength:
-            parsed.detectedStrength?.trim() || baseExtraction.detectedStrength,
+          detectedStrength: geminiOptionalField(parsed, 'detectedStrength'),
           dosageForm:
-            normalizeDosageForm(parsed.dosageForm) ||
+            normalizeDosageForm(geminiOptionalField(parsed, 'dosageForm')) ||
             baseExtraction.dosageForm ||
             'tablet',
-          manufacturer:
-            parsed.manufacturer?.trim() || baseExtraction.manufacturer,
-          batchNumber: parsed.batchNumber?.trim() || baseExtraction.batchNumber,
-          expiryDate: parsed.expiryDate?.trim() || baseExtraction.expiryDate,
+          manufacturer: geminiOptionalField(parsed, 'manufacturer'),
+          batchNumber: geminiOptionalField(parsed, 'batchNumber'),
+          expiryDate: geminiOptionalField(parsed, 'expiryDate'),
           rawText: rawOcrText,
           // Gemini output helps extract fields, but its confidence is not
           // calibrated. Preserve the dictionary OCR score instead of inventing
@@ -550,6 +645,150 @@ export const aiAssistantService = {
       ),
       { code: 'MODEL_UNAVAILABLE' },
     );
+  },
+
+  /**
+   * Generates structured, patient-friendly educational information about a medicine
+   * based on its active chemical salt / composition and name using Gemini AI.
+   */
+  async fetchMedicineEducationalInfo(
+    medicineName: string,
+    activeIngredient?: string,
+    dosageForm?: string
+  ): Promise<MedicineEducationalInfo> {
+    const apiKey = await this.getApiKey();
+    if (!apiKey) {
+      throw Object.assign(new Error('Personal AI is not connected.'), { code: 'NO_KEY' });
+    }
+
+    const systemPrompt = [
+      'You are a trusted medical education specialist for HealthMate.',
+      'Generate clear, accurate, patient-friendly educational information about a medicine based on its active chemical salt/composition and medicine name.',
+      'Focus primarily on the active chemical composition/salt to provide accurate pharmacological facts.',
+      'Explain mechanism of action and uses in accessible language that patients can easily understand.',
+      'Do NOT provide personal prescription instructions or dosage recommendations (e.g. do not say "take 2 pills").',
+      '',
+      'JSON Schema:',
+      '{',
+      '  "summary": "Clear, concise 2-3 sentence overview explaining what this medicine and its active salt are commonly used for.",',
+      '  "mechanism": "How this active ingredient/salt works in the body, explained simply and clearly.",',
+      '  "commonUses": ["Primary medical use 1", "Primary medical use 2", "Primary medical use 3"],',
+      '  "safetyAlerts": ["Important precaution or interaction (e.g. food, alcohol, organ cautions)", "Who should exercise extra caution before taking"],',
+      '  "sideEffects": ["Common mild side effect 1", "Common mild side effect 2", "Important symptom to report to a doctor"]',
+      '}',
+      '',
+      'Rules:',
+      '- Return ONLY valid JSON, with NO markdown backticks or commentary.',
+      '- Keep bullet points concise and easy to read.',
+    ].join('\n');
+
+    const preferredModel = (await this.getWorkingModel()) ?? DEFAULT_MODEL;
+    const modelsToTry = [
+      preferredModel,
+      ...GEMINI_MODELS_TO_TRY.filter((m) => m !== preferredModel),
+    ];
+
+    const saltText = activeIngredient && activeIngredient.trim()
+      ? activeIngredient.trim()
+      : 'Infer from medicine name';
+    const userPrompt = `Medicine Name: ${medicineName}\nActive Salt / Composition: ${saltText}\nDosage Form: ${dosageForm || 'tablet'}`;
+
+    let lastError: unknown = null;
+
+    for (const model of modelsToTry) {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 14000);
+
+        let response: Response;
+        try {
+          response = await fetch(
+            `${API_BASE}/models/${model}:generateContent`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': apiKey,
+              },
+              body: JSON.stringify({
+                systemInstruction: {
+                  parts: [{ text: systemPrompt }],
+                },
+                contents: [
+                  {
+                    role: 'user',
+                    parts: [{ text: userPrompt }],
+                  },
+                ],
+                generationConfig: {
+                  temperature: 0.2,
+                  responseMimeType: 'application/json',
+                  maxOutputTokens: 768,
+                },
+              }),
+              signal: controller.signal,
+            }
+          );
+        } catch (error) {
+          if ((error as { name?: string })?.name === 'AbortError') {
+            throw Object.assign(new Error('AI request timed out.'), { code: 'TIMEOUT' });
+          }
+          throw Object.assign(new Error('Network error reaching Gemini.'), { code: 'NETWORK' });
+        } finally {
+          clearTimeout(timer);
+        }
+
+        if (!response.ok) {
+          const detail = await readGeminiErrorMessage(response);
+          if (response.status === 404) continue;
+          if (response.status === 429) {
+            throw Object.assign(new Error('Gemini quota reached.'), { code: 'RATE_LIMIT' });
+          }
+          if (response.status === 400 || response.status === 401 || response.status === 403) {
+            await this._clearRejectedApiKey();
+            throw Object.assign(new Error(KEY_REJECTION_HELP), { code: 'BAD_KEY' });
+          }
+          throw new Error(`Gemini returned status ${response.status}: ${detail}`);
+        }
+
+        const data = await response.json();
+        const answerText = this.extractAnswerText(data);
+        if (!answerText) {
+          throw Object.assign(new Error('Empty response from AI.'), { code: 'EMPTY_ANSWER' });
+        }
+
+        const cleanJson = answerText
+          .replace(/```json/gi, '')
+          .replace(/```/g, '')
+          .trim();
+        const parsed = JSON.parse(cleanJson);
+
+        await this.setWorkingModel(model);
+
+        return {
+          summary: typeof parsed.summary === 'string' ? parsed.summary.trim() : `Educational summary for ${medicineName}.`,
+          mechanism: typeof parsed.mechanism === 'string' ? parsed.mechanism.trim() : 'Mechanism details not available.',
+          commonUses: Array.isArray(parsed.commonUses) && parsed.commonUses.length > 0
+            ? parsed.commonUses.map(String)
+            : ['General health management as prescribed by your doctor.'],
+          safetyAlerts: Array.isArray(parsed.safetyAlerts) && parsed.safetyAlerts.length > 0
+            ? parsed.safetyAlerts.map(String)
+            : ['Check the patient leaflet on the original package and consult a pharmacist.'],
+          sideEffects: Array.isArray(parsed.sideEffects) && parsed.sideEffects.length > 0
+            ? parsed.sideEffects.map(String)
+            : ['Refer to the official package insert for potential side effects.'],
+          activeSaltUsed: activeIngredient || medicineName,
+          generatedAt: new Date().toISOString(),
+        };
+      } catch (err) {
+        lastError = err;
+        if ((err as { code?: string })?.code) {
+          throw err;
+        }
+      }
+    }
+
+    throw lastError || new Error('Could not fetch educational information from Gemini.');
   },
 };
 

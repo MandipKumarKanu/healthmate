@@ -1,5 +1,4 @@
 import * as SQLite from "expo-sqlite";
-import { CREATE_TABLES_SQL } from "./schema";
 import { migrationManager } from "./migrationManager";
 
 export interface ISQLiteDatabase {
@@ -10,6 +9,26 @@ export interface ISQLiteDatabase {
   ): { changes: number; lastInsertRowId: number };
   getFirstSync<T>(query: string, params?: unknown[]): T | null;
   getAllSync<T>(query: string, params?: unknown[]): T[];
+}
+
+declare const __DEV__: boolean | undefined;
+
+/**
+ * When true (dev builds, Expo Go, and Jest runs) the in-memory demonstration
+ * database refuses to swallow unknown SQL: any statement that reaches the
+ * end of a handler chain without matching a known write/read pattern throws
+ * `Unsupported statement` instead of silently returning `changes: 0` / `[]`.
+ * While the real SQLite path exists on
+ * every device, Expo Go / CI run this in-memory DB, so a new repository
+ * query that forgets a handler shows up as a loud test failure.
+ */
+function guardIsEnabled(): boolean {
+  try {
+    if (typeof __DEV__ !== "undefined" && __DEV__) return true;
+  } catch {
+    // Ignore runtime lookups; fall through to the NODE_ENV check.
+  }
+  return process.env.NODE_ENV !== "production";
 }
 
 class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
@@ -26,8 +45,9 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
   private aiMessages = new Map<string, Record<string, unknown>>();
 
   execSync(sql: string): void {
-    if (sql.includes("DROP TABLE")) {
-      if (sql.includes("schema_migrations")) {
+    const clean = sql.trim().toUpperCase();
+    if (clean.includes("DROP TABLE")) {
+      if (clean.includes("SCHEMA_MIGRATIONS")) {
         this.schemaMigrations.clear();
       }
       this.profiles.clear();
@@ -37,8 +57,24 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       this.scheduleHistory.clear();
       this.adherenceLogs.clear();
       this.refillReminders.clear();
+      this.scanHistory.clear();
       this.aiConversations.clear();
       this.aiMessages.clear();
+      return;
+    }
+    // Schema DDL (migrations, PRAGMAs) is absorbed: the in-memory layout is
+    // hand-managed by the handlers below.
+    const sqlUpper = sql.trim().toUpperCase();
+    const isKnownDdl =
+      sqlUpper.startsWith("PRAGMA") ||
+      sqlUpper.startsWith("CREATE TABLE") ||
+      sqlUpper.startsWith("CREATE INDEX") ||
+      sqlUpper.startsWith("ALTER TABLE");
+    if (isKnownDdl) return;
+    if (guardIsEnabled()) {
+      throw new Error(
+        `[InMemoryDemonstrationDatabase] Unsupported execSync statement: ${sql.trim().slice(0, 160)}`,
+      );
     }
   }
 
@@ -108,7 +144,10 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return { changes: 1, lastInsertRowId: 1 };
     }
 
-    if (clean.startsWith("INSERT OR REPLACE INTO PREFERENCES")) {
+    if (
+      clean.startsWith("INSERT OR REPLACE INTO PREFERENCES") ||
+      clean.startsWith("INSERT INTO PREFERENCES")
+    ) {
       const [key, value] = params;
       this.preferences.set(String(key), {
         key: String(key),
@@ -226,7 +265,10 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return { changes, lastInsertRowId: 0 };
     }
 
-    if (clean.startsWith("INSERT OR REPLACE INTO SCHEDULE_HISTORY")) {
+    if (
+      clean.startsWith("INSERT OR REPLACE INTO SCHEDULE_HISTORY") ||
+      clean.startsWith("INSERT INTO SCHEDULE_HISTORY")
+    ) {
       const [
         id,
         scheduleId,
@@ -254,6 +296,25 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return { changes: 1, lastInsertRowId: 1 };
     }
 
+    // Order mirrors scheduleRepository.compactScheduleHistory: end_date, id.
+    if (clean.startsWith("UPDATE SCHEDULE_HISTORY SET END_DATE")) {
+      const [endDate, idParam] = params;
+      const id = String(idParam);
+      const existing = this.scheduleHistory.get(id);
+      if (!existing) return { changes: 0, lastInsertRowId: 0 };
+      this.scheduleHistory.set(id, {
+        ...existing,
+        end_date: String(endDate),
+      });
+      return { changes: 1, lastInsertRowId: 1 };
+    }
+
+    if (clean.startsWith("DELETE FROM SCHEDULE_HISTORY WHERE ID")) {
+      const [id] = params;
+      const existed = this.scheduleHistory.delete(String(id));
+      return { changes: existed ? 1 : 0, lastInsertRowId: 0 };
+    }
+
     if (clean.startsWith("DELETE FROM ADHERENCE_LOGS WHERE MEDICINE_ID")) {
       const [medicineId] = params;
       let changes = 0;
@@ -266,7 +327,10 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return { changes, lastInsertRowId: 0 };
     }
 
-    if (clean.startsWith("INSERT OR REPLACE INTO SCHEDULES")) {
+    if (
+      clean.startsWith("INSERT OR REPLACE INTO SCHEDULES") ||
+      clean.startsWith("INSERT INTO SCHEDULES")
+    ) {
       const [
         id,
         medicineId,
@@ -294,13 +358,30 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return { changes: 1, lastInsertRowId: 1 };
     }
 
+    if (clean.startsWith("UPDATE SCHEDULES SET ENABLED")) {
+      // Order mirrors scheduleRepository.toggleEnabled: enabled, updated_at, id.
+      const [enabledFlag, updatedAt, idParam] = params;
+      const id = String(idParam);
+      const existing = this.schedules.get(id);
+      if (!existing) return { changes: 0, lastInsertRowId: 0 };
+      this.schedules.set(id, {
+        ...existing,
+        enabled: Number(enabledFlag),
+        updated_at: String(updatedAt),
+      });
+      return { changes: 1, lastInsertRowId: 1 };
+    }
+
     if (clean.startsWith("DELETE FROM SCHEDULES WHERE ID")) {
       const [id] = params;
       const existed = this.schedules.delete(String(id));
       return { changes: existed ? 1 : 0, lastInsertRowId: 0 };
     }
 
-    if (clean.startsWith("INSERT OR REPLACE INTO ADHERENCE_LOGS")) {
+    if (
+      clean.startsWith("INSERT OR REPLACE INTO ADHERENCE_LOGS") ||
+      clean.startsWith("INSERT INTO ADHERENCE_LOGS")
+    ) {
       const [id, scheduleId, medicineId, doseDate, doseTime, status, loggedAt] =
         params;
       this.adherenceLogs.set(String(id), {
@@ -327,7 +408,10 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return { changes, lastInsertRowId: 0 };
     }
 
-    if (clean.startsWith("INSERT OR REPLACE INTO REFILL_REMINDERS")) {
+    if (
+      clean.startsWith("INSERT OR REPLACE INTO REFILL_REMINDERS") ||
+      clean.startsWith("INSERT INTO REFILL_REMINDERS")
+    ) {
       const [
         id,
         medicineId,
@@ -393,27 +477,35 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return { changes, lastInsertRowId: 0 };
     }
 
-    if (clean.startsWith("INSERT OR REPLACE INTO SCAN_HISTORY")) {
+    // Column order mirrors scanHistoryRepository.add() exactly: id,
+    // medicine_name, detected_strength, dosage_form, manufacturer,
+    // batch_number, expiry_date, raw_text, image_uri, scanned_at.
+    if (
+      clean.startsWith("INSERT INTO SCAN_HISTORY") ||
+      clean.startsWith("INSERT OR REPLACE INTO SCAN_HISTORY")
+    ) {
       const [
         id,
+        medicineName,
+        detectedStrength,
+        dosageForm,
+        manufacturer,
+        batchNumber,
+        expiryDate,
+        rawText,
         imageUri,
-        rawOcrText,
-        extractedMedicineName,
-        extractedStrength,
-        extractedDosageForm,
-        extractedBatch,
-        extractedExpiry,
         scannedAt,
       ] = params;
       this.scanHistory.set(String(id), {
         id: String(id),
-        image_uri: String(imageUri),
-        raw_ocr_text: String(rawOcrText),
-        extracted_medicine_name: extractedMedicineName ?? null,
-        extracted_strength: extractedStrength ?? null,
-        extracted_dosage_form: extractedDosageForm ?? null,
-        extracted_batch: extractedBatch ?? null,
-        extracted_expiry: extractedExpiry ?? null,
+        medicine_name: String(medicineName),
+        detected_strength: detectedStrength ?? null,
+        dosage_form: dosageForm ?? null,
+        manufacturer: manufacturer ?? null,
+        batch_number: batchNumber ?? null,
+        expiry_date: expiryDate ?? null,
+        raw_text: rawText ?? null,
+        image_uri: imageUri ?? null,
         scanned_at: String(scannedAt),
       });
       return { changes: 1, lastInsertRowId: 1 };
@@ -423,6 +515,15 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       const [id] = params;
       const existed = this.scanHistory.delete(String(id));
       return { changes: existed ? 1 : 0, lastInsertRowId: 0 };
+    }
+
+    if (
+      clean === "DELETE FROM SCAN_HISTORY;" ||
+      clean === "DELETE FROM SCAN_HISTORY"
+    ) {
+      const changes = this.scanHistory.size;
+      this.scanHistory.clear();
+      return { changes, lastInsertRowId: 0 };
     }
 
     if (clean.startsWith("INSERT INTO AI_CONVERSATIONS")) {
@@ -502,6 +603,11 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return { changes, lastInsertRowId: 0 };
     }
 
+    if (guardIsEnabled()) {
+      throw new Error(
+        `[InMemoryDemonstrationDatabase] Unsupported runSync statement: ${query.trim().slice(0, 160)}`,
+      );
+    }
     return { changes: 0, lastInsertRowId: 0 };
   }
 
@@ -643,9 +749,16 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       ) as unknown as T[];
     }
 
+    if (guardIsEnabled()) {
+      throw new Error(
+        `[InMemoryDemonstrationDatabase] Unsupported getAllSync statement: ${query.trim().slice(0, 160)}`,
+      );
+    }
     return [];
   }
 }
+
+export { InMemoryDemonstrationDatabase };
 
 let dbInstance: ISQLiteDatabase | null = null;
 
