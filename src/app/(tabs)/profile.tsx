@@ -631,16 +631,18 @@ export default function ProfileScreen() {
       <Modal visible={isEditingProfile} transparent animationType="fade" statusBarTranslucent>
         <View style={styles.modalOverlay}>
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
-            style={{ width: '100%', maxWidth: 420 }}
+            // Android already resizes this modal window. Avoid applying "height" which double-shrinks the card.
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={{ width: '100%', maxWidth: 420, maxHeight: '100%', flexShrink: 1 }}
           >
             <View style={styles.profileModalCard}>
               <Text style={styles.modalTitle}>Edit Profile</Text>
 
               <ScrollView
-                style={{ maxHeight: 380 }}
+                style={{ maxHeight: 380, flexShrink: 1 }}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
+                keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
               >
                 {/* Full Name */}
                 <View style={styles.modalFieldGroup}>
@@ -981,8 +983,8 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     padding: Spacing.xl,
     width: '100%',
-    maxWidth: 420,
-    maxHeight: '90%',
+    maxHeight: '100%',
+    flexShrink: 1,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.18,

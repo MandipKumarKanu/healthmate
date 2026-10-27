@@ -9,6 +9,8 @@ import {
   ScrollView,
   Modal,
   Pressable,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { AppAlert as Alert } from "../../services/appAlert";
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -853,7 +855,11 @@ export default function SetReminderScreen() {
         onRequestClose={() => setIsMedModalVisible(false)}
       >
         <View style={styles.medModalOverlay}>
-          <View style={styles.medModalContainer}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.medModalKeyboardContainer}
+          >
+            <View style={styles.medModalContainer}>
             {/* Modal Header */}
             <View style={styles.medModalHeader}>
               <View>
@@ -926,6 +932,8 @@ export default function SetReminderScreen() {
                 style={styles.medModalList}
                 contentContainerStyle={{ paddingBottom: 24 }}
                 showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
               >
                 {filteredMedicines.map((med) => {
                   const isSelected = selectedMed?.id === med.id;
@@ -1007,7 +1015,8 @@ export default function SetReminderScreen() {
                 })}
               </ScrollView>
             )}
-          </View>
+            </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </AppScreen>
@@ -1016,7 +1025,7 @@ export default function SetReminderScreen() {
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: 60,
+    paddingBottom: 160,
   },
   body: {
     paddingHorizontal: Spacing.screenPaddingHorizontal,
@@ -1523,10 +1532,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: Spacing.lg,
   },
-  medModalContainer: {
+  medModalKeyboardContainer: {
     width: '100%',
     maxWidth: 420,
-    maxHeight: '85%',
+    maxHeight: '100%',
+    flexShrink: 1,
+  },
+  medModalContainer: {
+    width: '100%',
+    maxHeight: '100%',
+    flexShrink: 1,
     backgroundColor: Colors.cardBackground,
     borderRadius: Radius.card,
     borderWidth: 1,

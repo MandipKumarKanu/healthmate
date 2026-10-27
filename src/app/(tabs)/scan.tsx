@@ -1035,7 +1035,7 @@ export default function ScanScreen() {
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: 110,
+    paddingBottom: 160,
   },
   body: {
     paddingHorizontal: Spacing.screenPaddingHorizontal,

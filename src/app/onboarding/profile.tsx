@@ -273,6 +273,7 @@ export default function OnboardingProfileScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         >
           {/* Top Bar: Back Button */}
           <View style={styles.topNavRow}>

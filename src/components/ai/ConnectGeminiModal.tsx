@@ -197,6 +197,7 @@ export function ConnectGeminiModal({
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.scrollContent}
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
             >
               {showCelebration ? (
                 /* Celebration View (MCQ Choice 4) */

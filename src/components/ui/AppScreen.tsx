@@ -39,8 +39,10 @@ export function AppScreen({
       {scrollable ? (
         <KeyboardAvoidingView
           style={styles.keyboardAvoiding}
-          behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
-          keyboardVerticalOffset={0}
+          // Android already resizes this window (softwareKeyboardLayoutMode: "resize").
+          // Applying "height" here as well double-shrinks the screen.
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
         >
           <ScrollView
             style={styles.scroll}
@@ -48,7 +50,7 @@ export function AppScreen({
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-            automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+            automaticallyAdjustKeyboardInsets={false}
           >
             {children}
           </ScrollView>

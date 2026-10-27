@@ -300,7 +300,7 @@ export default function AddMedicineScreen() {
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: 60,
+    paddingBottom: 160,
   },
   body: {
     paddingHorizontal: Spacing.screenPaddingHorizontal,

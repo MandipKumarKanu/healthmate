@@ -296,6 +296,7 @@ export default function AIAssistantScreen() {
             scrollViewRef.current?.scrollToEnd({ animated: true })
           }
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         >
           {messages.length === 0 ? (
             // Landing state matching section 7.I
