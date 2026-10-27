@@ -5,13 +5,13 @@ import {
   Text,
   TouchableOpacity,
   Switch,
-  Alert,
   TextInput,
   Modal,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { AppAlert as Alert } from "../../services/appAlert";
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
@@ -622,10 +622,10 @@ export default function ProfileScreen() {
       </View>
 
       {/* Edit Profile Modal */}
-      <Modal visible={isEditingProfile} transparent animationType="fade">
+      <Modal visible={isEditingProfile} transparent animationType="fade" statusBarTranslucent>
         <View style={styles.modalOverlay}>
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
             style={{ width: '100%', maxWidth: 420 }}
           >
             <View style={styles.profileModalCard}>
@@ -953,10 +953,10 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    backgroundColor: 'rgba(0, 0, 0, 0.60)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: Spacing.xl,
+    padding: Spacing.lg,
   },
   nameModalCard: {
     backgroundColor: '#FFFFFF',
@@ -966,11 +966,19 @@ const styles = StyleSheet.create({
     maxWidth: 320,
   },
   profileModalCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.cardBackground,
     borderRadius: Radius.card,
-    padding: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: Spacing.xl,
     width: '100%',
-    maxWidth: 360,
+    maxWidth: 420,
+    maxHeight: '90%',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 12,
   },
   modalTitle: {
     fontSize: 18,

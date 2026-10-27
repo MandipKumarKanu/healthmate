@@ -138,7 +138,7 @@ export function ConnectGeminiModal({
     >
       <View style={styles.backdrop}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
           style={styles.keyboardContainer}
         >
           <View style={styles.card}>

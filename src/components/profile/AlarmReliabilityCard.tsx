@@ -349,7 +349,7 @@ export function AlarmReliabilityCard() {
       </AppCard>
 
       {/* OEM Assistant Guide Modal */}
-      <Modal visible={isGuideModalVisible} transparent animationType="slide">
+      <Modal visible={isGuideModalVisible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setIsGuideModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             {/* Modal Header */}
@@ -672,17 +672,27 @@ const styles = StyleSheet.create({
   // Modal styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: Colors.overlay,
-    justifyContent: "flex-end",
+    backgroundColor: 'rgba(0, 0, 0, 0.60)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.lg,
   },
   modalCard: {
+    width: '100%',
+    maxWidth: 420,
+    maxHeight: '85%',
     backgroundColor: Colors.cardBackground,
-    borderTopLeftRadius: Radius.xxl,
-    borderTopRightRadius: Radius.xxl,
+    borderRadius: Radius.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
     paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.xl,
-    paddingBottom: Spacing.xxl,
-    maxHeight: "85%",
+    paddingBottom: Spacing.xl,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 12,
   },
   modalHeader: {
     flexDirection: "row",

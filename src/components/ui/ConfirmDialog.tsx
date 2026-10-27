@@ -1,8 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, Text, Modal, TouchableOpacity } from 'react-native';
-import { Colors } from '../../theme/colors';
-import { Radius, Spacing, Typography } from '../../theme/tokens';
-import { AppButton } from './AppButton';
+import { AppDialog, type AppDialogButton } from './AppDialog';
 
 interface ConfirmDialogProps {
   visible: boolean;
@@ -25,77 +22,23 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onCancel}
-    >
-      <View style={styles.overlay}>
-        <View style={styles.dialog}>
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.message}>{message}</Text>
+  const buttons: AppDialogButton[] = [
+    { text: cancelText, style: 'cancel', onPress: onCancel },
+    {
+      text: confirmText,
+      style: destructive ? 'destructive' : 'default',
+      onPress: onConfirm,
+    },
+  ];
 
-          <View style={styles.buttonRow}>
-            <View style={styles.buttonFlex}>
-              <AppButton
-                title={cancelText}
-                onPress={onCancel}
-                variant="outline"
-                size="md"
-              />
-            </View>
-            <View style={styles.buttonFlex}>
-              <AppButton
-                title={confirmText}
-                onPress={onConfirm}
-                variant={destructive ? 'destructive' : 'primary'}
-                size="md"
-              />
-            </View>
-          </View>
-        </View>
-      </View>
-    </Modal>
+  return (
+    <AppDialog
+      visible={visible}
+      title={title}
+      message={message}
+      iconName={destructive ? 'warning-outline' : 'shield-checkmark-outline'}
+      buttons={buttons}
+      onRequestClose={onCancel}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.xl,
-  },
-  dialog: {
-    backgroundColor: Colors.cardBackground,
-    borderRadius: Radius.card,
-    padding: Spacing.xl,
-    width: '100%',
-    maxWidth: 340,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  title: {
-    ...Typography.heading2,
-    fontSize: 18,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-    marginBottom: Spacing.xs,
-  },
-  message: {
-    ...Typography.bodyMedium,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.lg,
-    lineHeight: 20,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-  },
-  buttonFlex: {
-    flex: 1,
-  },
-});

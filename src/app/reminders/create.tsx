@@ -6,16 +6,12 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
-  Alert,
-  Platform,
   Modal,
+  Pressable,
 } from 'react-native';
+import { AppAlert as Alert } from "../../services/appAlert";
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons, Feather } from '@expo/vector-icons';
-import DateTimePicker, {
-  DateTimePickerAndroid,
-  DateTimePickerEvent,
-} from '@react-native-community/datetimepicker';
 import { Colors } from '../../theme/colors';
 import { Radius, Spacing, Typography } from '../../theme/tokens';
 import { AppScreen } from '../../components/ui/AppScreen';
@@ -161,26 +157,6 @@ export default function SetReminderScreen() {
       0
     );
 
-    if (Platform.OS === 'android') {
-      try {
-        DateTimePickerAndroid.open({
-          value: dateObj,
-          mode: 'time',
-          is24Hour: false,
-          onChange: (event: DateTimePickerEvent, selectedDate?: Date) => {
-            if (event.type === 'set' && selectedDate) {
-              const hours = String(selectedDate.getHours()).padStart(2, '0');
-              const minutes = String(selectedDate.getMinutes()).padStart(2, '0');
-              handleTimeSelected(targetId, `${hours}:${minutes}`);
-            }
-          },
-        });
-        return;
-      } catch (err) {
-        console.warn('Native Android time picker unavailable, falling back to modal', err);
-      }
-    }
-
     setTempPickerDate(dateObj);
     setPickerTarget({ id: targetId, date: dateObj });
   };
@@ -197,6 +173,25 @@ export default function SetReminderScreen() {
 
   const closePickerModal = () => {
     setPickerTarget(null);
+  };
+
+  const adjustPickerTime = (unit: 'hour' | 'minute', delta: number) => {
+    setTempPickerDate((current) => {
+      const next = new Date(current);
+      if (unit === 'hour') next.setHours(next.getHours() + delta);
+      else next.setMinutes(next.getMinutes() + delta);
+      return next;
+    });
+  };
+
+  const setPickerPeriod = (period: 'AM' | 'PM') => {
+    setTempPickerDate((current) => {
+      const next = new Date(current);
+      const hour = next.getHours();
+      if (period === 'AM' && hour >= 12) next.setHours(hour - 12);
+      if (period === 'PM' && hour < 12) next.setHours(hour + 12);
+      return next;
+    });
   };
 
   const addPresetTime = (presetTime: string) => {
@@ -570,62 +565,157 @@ export default function SetReminderScreen() {
         </View>
       </View>
 
-      {/* Time Picker Modal for iOS / Web */}
+      {/* HealthMate-styled time picker. Avoids the platform-native Android dialog. */}
       {pickerTarget && (
         <Modal
           transparent
           animationType="fade"
-          visible={pickerTarget !== null}
+          visible
+          statusBarTranslucent
           onRequestClose={closePickerModal}
         >
-          <TouchableOpacity
-            style={styles.modalBackdrop}
-            activeOpacity={1}
-            onPress={closePickerModal}
-          >
-            <View
-              style={styles.modalContent}
-              onStartShouldSetResponder={() => true}
-            >
-              <View style={styles.modalHeader}>
+          <View style={styles.modalBackdrop}>
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={closePickerModal}
+              accessibilityRole="button"
+              accessibilityLabel="Close time picker"
+            />
+            <View style={styles.timePickerCard}>
+              <View style={styles.timePickerHeader}>
+                <View style={styles.timePickerIcon}>
+                  <Ionicons name="time-outline" size={21} color={Colors.primary} />
+                </View>
+                <View style={styles.timePickerHeading}>
+                  <Text style={styles.timePickerTitle}>Choose reminder time</Text>
+                  <Text style={styles.timePickerSubtitle}>
+                    Set when HealthMate should remind you
+                  </Text>
+                </View>
                 <TouchableOpacity
                   onPress={closePickerModal}
-                  style={styles.modalHeaderBtn}
+                  style={styles.timePickerClose}
                   accessibilityRole="button"
+                  accessibilityLabel="Close time picker"
                 >
-                  <Text style={styles.modalCancelText}>Cancel</Text>
-                </TouchableOpacity>
-                <Text style={styles.modalTitle}>Select Dose Time</Text>
-                <TouchableOpacity
-                  onPress={confirmPickerModal}
-                  style={styles.modalHeaderBtn}
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.modalDoneText}>Done</Text>
+                  <Ionicons name="close" size={20} color={Colors.textSecondary} />
                 </TouchableOpacity>
               </View>
-              <View style={styles.pickerWrapper}>
-                <DateTimePicker
-                  value={tempPickerDate}
-                  mode="time"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  is24Hour={false}
-                  onChange={(_event, date) => {
-                    if (date) setTempPickerDate(date);
-                  }}
-                  textColor={Colors.textPrimary}
-                />
+
+              <View style={styles.timePickerControls}>
+                <View style={styles.timePickerColumn}>
+                  <TouchableOpacity
+                    style={styles.timeStepButton}
+                    onPress={() => adjustPickerTime('hour', 1)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Increase hour"
+                  >
+                    <Ionicons name="chevron-up" size={20} color={Colors.primary} />
+                  </TouchableOpacity>
+                  <Text style={styles.timePickerValue}>
+                    {String(tempPickerDate.getHours() % 12 || 12).padStart(2, '0')}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.timeStepButton}
+                    onPress={() => adjustPickerTime('hour', -1)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Decrease hour"
+                  >
+                    <Ionicons name="chevron-down" size={20} color={Colors.primary} />
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={styles.timePickerColon}>:</Text>
+
+                <View style={styles.timePickerColumn}>
+                  <TouchableOpacity
+                    style={styles.timeStepButton}
+                    onPress={() => adjustPickerTime('minute', 1)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Increase minute"
+                  >
+                    <Ionicons name="chevron-up" size={20} color={Colors.primary} />
+                  </TouchableOpacity>
+                  <Text style={styles.timePickerValue}>
+                    {String(tempPickerDate.getMinutes()).padStart(2, '0')}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.timeStepButton}
+                    onPress={() => adjustPickerTime('minute', -1)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Decrease minute"
+                  >
+                    <Ionicons name="chevron-down" size={20} color={Colors.primary} />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.timePickerPeriod}>
+                  <TouchableOpacity
+                    style={[
+                      styles.timePickerPeriodOption,
+                      tempPickerDate.getHours() < 12 && styles.timePickerPeriodOptionActive,
+                    ]}
+                    onPress={() => setPickerPeriod('AM')}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: tempPickerDate.getHours() < 12 }}
+                  >
+                    <Text
+                      style={[
+                        styles.timePickerPeriodText,
+                        tempPickerDate.getHours() < 12 && styles.timePickerPeriodTextActive,
+                      ]}
+                    >
+                      AM
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.timePickerPeriodOption,
+                      tempPickerDate.getHours() >= 12 && styles.timePickerPeriodOptionActive,
+                    ]}
+                    onPress={() => setPickerPeriod('PM')}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: tempPickerDate.getHours() >= 12 }}
+                  >
+                    <Text
+                      style={[
+                        styles.timePickerPeriodText,
+                        tempPickerDate.getHours() >= 12 && styles.timePickerPeriodTextActive,
+                      ]}
+                    >
+                      PM
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.timePickerActions}>
+                <TouchableOpacity
+                  style={[styles.timePickerAction, styles.timePickerCancel]}
+                  onPress={closePickerModal}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.timePickerCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.timePickerAction, styles.timePickerConfirm]}
+                  onPress={confirmPickerModal}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.timePickerConfirmText}>Set time</Text>
+                </TouchableOpacity>
               </View>
             </View>
-          </TouchableOpacity>
+          </View>
         </Modal>
       )}
 
       {/* Medicine Selection Modal */}
       <Modal
         visible={isMedModalVisible}
-        animationType="slide"
+        animationType="fade"
         transparent
+        statusBarTranslucent
         onRequestClose={() => setIsMedModalVisible(false)}
       >
         <View style={styles.medModalOverlay}>
@@ -1061,8 +1151,150 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(15, 23, 42, 0.60)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.lg,
+  },
+  timePickerCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: Colors.cardBackground,
+    borderRadius: Radius.xxl,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: Spacing.xl,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  timePickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    marginBottom: Spacing.xl,
+  },
+  timePickerIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timePickerHeading: {
+    flex: 1,
+  },
+  timePickerTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  timePickerSubtitle: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: Colors.textSecondary,
+    marginTop: 3,
+  },
+  timePickerClose: {
+    width: 32,
+    height: 32,
+    borderRadius: Radius.md,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timePickerControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    marginBottom: Spacing.xl,
+  },
+  timePickerColumn: {
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  timeStepButton: {
+    width: 48,
+    height: 34,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timePickerValue: {
+    minWidth: 54,
+    fontSize: 34,
+    lineHeight: 42,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    textAlign: 'center',
+    fontVariant: ['tabular-nums'],
+  },
+  timePickerColon: {
+    fontSize: 30,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+    paddingBottom: 2,
+  },
+  timePickerPeriod: {
+    gap: Spacing.sm,
+    marginLeft: Spacing.xs,
+  },
+  timePickerPeriodOption: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    minWidth: 54,
+  },
+  timePickerPeriodOptionActive: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryLight,
+  },
+  timePickerPeriodText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+  },
+  timePickerPeriodTextActive: {
+    color: Colors.primary,
+  },
+  timePickerActions: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  timePickerAction: {
+    flex: 1,
+    minHeight: 46,
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timePickerCancel: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  timePickerConfirm: {
+    backgroundColor: Colors.primary,
+  },
+  timePickerCancelText: {
+    color: Colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  timePickerConfirmText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
   },
   modalContent: {
     backgroundColor: Colors.cardBackground,
@@ -1105,17 +1337,27 @@ const styles = StyleSheet.create({
   },
   medModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.60)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.lg,
   },
   medModalContainer: {
+    width: '100%',
+    maxWidth: 420,
+    maxHeight: '85%',
     backgroundColor: Colors.cardBackground,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '80%',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 34,
+    borderRadius: Radius.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.xl,
+    paddingBottom: Spacing.lg,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 12,
   },
   medModalHeader: {
     flexDirection: 'row',

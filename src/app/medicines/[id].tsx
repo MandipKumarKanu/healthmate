@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { StyleSheet, View, Text, TouchableOpacity, Alert } from "react-native";
+import { StyleSheet, View, Text, TouchableOpacity } from "react-native";
+import { AppAlert as Alert } from "../../services/appAlert";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
