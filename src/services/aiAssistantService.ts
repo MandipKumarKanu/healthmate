@@ -20,9 +20,20 @@ const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 // Use "latest" aliases so requests follow Google's current stable channel
 // without chasing hard-coded version numbers.
 const DEFAULT_MODEL = 'gemini-flash-lite-latest';
-const FALLBACK_MODELS = 'gemini-flash-latest';
-const GEMINI_MODELS_TO_TRY = [DEFAULT_MODEL, FALLBACK_MODELS];
+const FALLBACK_MODELS = [
+  'gemini-flash-latest',
+  'gemini-2.5-flash',
+  'gemini-2.0-flash',
+  'gemini-1.5-flash',
+  'gemini-2.0-flash-lite',
+];
+export const GEMINI_MODELS_TO_TRY = [DEFAULT_MODEL, ...FALLBACK_MODELS];
 const MAX_HISTORY_TURNS = 12; // keep requests bounded; persistence holds more
+
+function buildGeminiUrl(model: string, apiKey: string): string {
+  const cleanKey = apiKey.trim();
+  return `${API_BASE}/models/${model}:generateContent?key=${encodeURIComponent(cleanKey)}`;
+}
 
 const KEY_REJECTION_HELP =
   'Google rejected this API key. Google now rejects unrestricted standard keys. Create a new key in Google AI Studio and reconnect it. If the new key still fails, check the project status, API access, and key restrictions.';
@@ -307,11 +318,11 @@ export const aiAssistantService = {
       const timer = setTimeout(() => controller.abort(), timeoutMs);
 
       try {
-        const response = await fetch(`${API_BASE}/models/${model}:generateContent`, {
+        const response = await fetch(buildGeminiUrl(model, apiKey), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey,
+            'x-goog-api-key': apiKey.trim(),
           },
           body: JSON.stringify(body),
           signal: controller.signal,
@@ -384,7 +395,7 @@ export const aiAssistantService = {
 
     try {
       for (const model of GEMINI_MODELS_TO_TRY) {
-        const response = await fetch(`${API_BASE}/models/${model}:generateContent`, {
+        const response = await fetch(buildGeminiUrl(model, trimmed), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -428,6 +439,7 @@ export const aiAssistantService = {
           'Google did not expose a supported Gemini model to this key. Check the project and API access in Google AI Studio.',
       };
     } catch (error: any) {
+      console.warn('[verifyApiKey] Network error reaching Gemini:', error);
       if (error?.name === 'AbortError') {
         return {
           valid: false,
@@ -436,7 +448,10 @@ export const aiAssistantService = {
       }
       return {
         valid: false,
-        error: 'Could not reach Gemini. Check your internet connection and retry.',
+        error:
+          error?.message && error.message !== 'Network request failed'
+            ? `Could not reach Gemini (${error.message}). Check your internet connection and retry.`
+            : 'Could not reach Gemini. Check your internet connection and retry.',
       };
     } finally {
       clearTimeout(timer);
@@ -493,11 +508,11 @@ export const aiAssistantService = {
 
         let response: Response;
         try {
-          response = await fetch(`${API_BASE}/models/${model}:generateContent`, {
+          response = await fetch(buildGeminiUrl(model, apiKey), {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'x-goog-api-key': apiKey,
+              'x-goog-api-key': apiKey.trim(),
             },
             body: JSON.stringify({
               systemInstruction: {
@@ -688,11 +703,11 @@ export const aiAssistantService = {
 
         let response: Response;
         try {
-          response = await fetch(`${API_BASE}/models/${model}:generateContent`, {
+          response = await fetch(buildGeminiUrl(model, apiKey), {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'x-goog-api-key': apiKey,
+              'x-goog-api-key': apiKey.trim(),
             },
             body: JSON.stringify({
               systemInstruction: {
