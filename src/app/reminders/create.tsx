@@ -274,7 +274,7 @@ export default function SetReminderScreen() {
       // Use the date visible in the calendar when the route did not supply one.
       // This keeps the in-memory reminder list in sync with the saved SQLite row.
       const refreshDate =
-        date && /^\\d{4}-\\d{2}-\\d{2}$/.test(date) ? date : selectedDate;
+        date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : selectedDate;
       const existingSchedule = scheduleRepository.getByMedicineId(selectedMed.id);
       const scheduleId = existingSchedule?.id ?? `sched_${selectedMed.id}`;
       const now = new Date().toISOString();
@@ -286,7 +286,7 @@ export default function SetReminderScreen() {
           recurrence,
           startDate:
             existingSchedule?.startDate ??
-            (date && /^\\d{4}-\\d{2}-\\d{2}$/.test(date)
+            (date && /^\d{4}-\d{2}-\d{2}$/.test(date)
               ? date
               : getTodayDateString()),
           endDate: existingSchedule?.endDate,
