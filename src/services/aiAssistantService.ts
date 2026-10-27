@@ -107,7 +107,10 @@ export const aiAssistantService = {
     } catch {
       // Do not cache a storage failure as "no key". A later read may succeed.
       this._cachedKey = undefined;
-      return null;
+      throw Object.assign(
+        new Error('HealthMate could not read the saved Gemini key securely. Reopen AI setup and try again.'),
+        { code: 'SECURE_STORE_READ' },
+      );
     }
   },
 
