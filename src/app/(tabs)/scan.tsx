@@ -114,8 +114,25 @@ export default function ScanScreen() {
         await processLabelImage(imageUri);
       // Packaging interpretation can invalidate and clear a rejected Gemini key
       // while still returning the local OCR extraction. Keep the scan gate in sync.
-      const persistedKey = await aiAssistantService.getApiKey().catch(() => null);
+      let persistedKey: string | null = null;
+      let keyReadSucceeded = true;
+      try {
+        persistedKey = await aiAssistantService.getApiKey();
+      } catch (keyError) {
+        keyReadSucceeded = false;
+        console.warn('Could not read the saved Gemini key after scanning:', keyError);
+      }
       setHasApiKey(Boolean(persistedKey));
+      if (hasApiKey && keyReadSucceeded && !persistedKey) {
+        Alert.alert(
+          'Gemini key rejected',
+          'Google rejected the saved API key, so this scan used local OCR extraction only. The rejected key has been disconnected. Reconnect with a valid key to restore AI-assisted packaging interpretation.',
+          [
+            { text: 'Reconnect AI', onPress: () => setShowConnectModal(true) },
+            { text: 'Review OCR results', style: 'cancel' },
+          ],
+        );
+      }
       if (__DEV__ && debugPasses) {
         setDebugPasses(debugPasses);
       }
@@ -562,7 +579,7 @@ export default function ScanScreen() {
                     color={Colors.primary}
                   />
                   <Text style={styles.gatingFeatureText}>
-                    Free API key stored securely only on your phone
+                    Key stored securely on this device, sent to Google for AI requests
                   </Text>
                 </View>
               </View>
