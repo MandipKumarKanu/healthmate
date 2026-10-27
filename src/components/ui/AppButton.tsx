@@ -70,7 +70,7 @@ export function AppButton({
     else if (variant === 'text') list.push(styles.textVariantText);
     else if (variant === 'destructive') list.push(styles.destructiveText);
 
-    if (disabled) list.push(styles.disabledText);
+    if (disabled && !loading) list.push(styles.disabledText);
     if (textStyle) list.push(textStyle);
 
     return list;
