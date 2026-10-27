@@ -46,7 +46,7 @@ export const aiRepository = {
   getLatestConversation(): AIConversation | null {
     const db = getDatabase();
     const row = db.getFirstSync<ConversationRow>(
-      'SELECT * FROM ai_conversations ORDER BY created_at DESC;',
+      'SELECT * FROM ai_conversations ORDER BY created_at DESC, rowid DESC;',
     );
     if (!row) return null;
     return {

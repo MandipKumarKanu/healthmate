@@ -96,8 +96,22 @@ class MockFile {
     return new Uint8Array(0);
   }
 
+  async write(content) {
+    if (!state.fileContents) state.fileContents = new Map();
+    state.fileContents.set(this.uri, typeof content === 'string' ? content : String(content));
+    includeDirAncestors(this.uri.substring(0, this.uri.lastIndexOf('/')));
+    state.files.add(this.uri);
+  }
+
   async text() {
-    return '';
+    return state.fileContents?.get(this.uri) ?? '';
+  }
+
+  static async pickFileAsync() {
+    if (state.mockPickedFile) {
+      return { result: state.mockPickedFile, canceled: false };
+    }
+    return { result: null, canceled: true };
   }
 }
 
@@ -150,5 +164,26 @@ module.exports = {
   File: MockFile,
   Directory: MockDirectory,
   Paths: MockPaths,
+  documentDirectory: 'file:///mock-documents/',
+  cacheDirectory: 'file:///mock-cache/',
+  writeAsStringAsync: async (uri, content) => {
+    const file = new MockFile(uri);
+    await file.write(content);
+  },
+  readAsStringAsync: async (uri) => {
+    const file = new MockFile(uri);
+    return file.text();
+  },
+  EncodingType: { UTF8: 'utf8', Base64: 'base64' },
+  StorageAccessFramework: {
+    requestDirectoryPermissionsAsync: async () => ({
+      granted: true,
+      directoryUri: 'content://mock-folder',
+    }),
+    createFileAsync: async (parentUri, fileName) => `${parentUri}/${fileName}.json`,
+  },
   __initMockState: initMockState,
+  __setMockPickedFile: (file) => {
+    state.mockPickedFile = file;
+  },
 };

@@ -1,3 +1,7 @@
+import { Platform } from 'react-native';
+import { File, Paths } from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { getDatabase, resetDatabase } from '../database/client';
 import { migrationManager } from '../database/migrationManager';
 
@@ -38,6 +42,16 @@ export interface BackupPayload {
   schemaVersion: number;
   exportedAt: string;
   tables: Record<BackupTable, Record<string, unknown>[]>;
+}
+
+export interface BackupSummary {
+  medicineCount: number;
+  scheduleCount: number;
+  doseLogCount: number;
+  scanCount: number;
+  chatCount: number;
+  exportedAt: string;
+  schemaVersion: number;
 }
 
 /** Column orders mirror the repository INSERT statements / demo adapter exactly. */
@@ -265,5 +279,129 @@ export const backupService = {
     }
 
     return { restored };
+  },
+
+  /**
+   * Generates a high-level summary of the backup payload contents.
+   */
+  getSummary(payload: BackupPayload): BackupSummary {
+    return {
+      medicineCount: payload.tables.medicines?.length ?? 0,
+      scheduleCount: payload.tables.schedules?.length ?? 0,
+      doseLogCount: payload.tables.adherence_logs?.length ?? 0,
+      scanCount: payload.tables.scan_history?.length ?? 0,
+      chatCount: payload.tables.ai_conversations?.length ?? 0,
+      exportedAt: payload.exportedAt,
+      schemaVersion: payload.schemaVersion,
+    };
+  },
+
+  /**
+   * Standard timestamped backup filename: healthmate-backup-YYYY-MM-DD-HHmmss.json
+   */
+  generateBackupFileName(date: Date = new Date()): string {
+    const timestamp = date.toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    return `healthmate-backup-${timestamp}.json`;
+  },
+
+  /**
+   * Writes the full JSON snapshot to a file in the app cache / document directory.
+   */
+  async writeBackupFile(
+    customFileName?: string,
+  ): Promise<{ uri: string; fileName: string; json: string }> {
+    const json = this.createBackupJson();
+    const fileName = customFileName ?? this.generateBackupFileName();
+    const file = new File(Paths.cache, fileName);
+    if (!file.exists) {
+      file.create({ overwrite: true });
+    }
+    await file.write(json);
+    return { uri: file.uri, fileName, json };
+  },
+
+  /**
+   * Exports backup to a file and opens the system share/save dialog.
+   */
+  async exportAndShareBackupFile(): Promise<{ uri: string; fileName: string }> {
+    const { uri, fileName } = await this.writeBackupFile();
+    const isAvailable = await Sharing.isAvailableAsync();
+    if (isAvailable) {
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/json',
+        dialogTitle: `Save ${fileName}`,
+        UTI: 'public.json',
+      });
+    }
+    return { uri, fileName };
+  },
+
+  /**
+   * Directly saves backup JSON into a user-selected Android folder via StorageAccessFramework.
+   */
+  async saveToAndroidFolder(fileName: string, json: string): Promise<boolean> {
+    if (Platform.OS !== 'android') return false;
+    const saf = FileSystem.StorageAccessFramework;
+    if (!saf) return false;
+
+    const permissions = await saf.requestDirectoryPermissionsAsync();
+    if (!permissions.granted) {
+      return false;
+    }
+
+    const cleanBaseName = fileName.replace(/\.json$/i, '');
+    const safUri = await saf.createFileAsync(
+      permissions.directoryUri,
+      cleanBaseName,
+      'application/json',
+    );
+    await FileSystem.writeAsStringAsync(safUri, json, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+    return true;
+  },
+
+  /**
+   * Opens the system file picker to select a backup JSON file,
+   * reads and validates it, and returns the payload with a summary.
+   */
+  async pickAndParseBackupFile(): Promise<
+    | { ok: true; payload: BackupPayload; fileName: string; summary: BackupSummary }
+    | { ok: false; error: string; canceled?: boolean }
+  > {
+    try {
+      const pickResult = await File.pickFileAsync({
+        mimeTypes: ['application/json', 'text/*', '*/*'],
+      });
+
+      if (pickResult.canceled || !pickResult.result) {
+        return { ok: false, error: 'File selection canceled', canceled: true };
+      }
+
+      const file = pickResult.result;
+      let content = '';
+      try {
+        content = await file.text();
+      } catch {
+        content = await FileSystem.readAsStringAsync(file.uri, {
+          encoding: FileSystem.EncodingType.UTF8,
+        });
+      }
+
+      const parsed = this.parseBackup(content);
+      if (!parsed.ok) {
+        return { ok: false, error: parsed.error };
+      }
+
+      return {
+        ok: true,
+        payload: parsed.payload,
+        fileName: file.name || 'backup.json',
+        summary: this.getSummary(parsed.payload),
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to pick backup file';
+      return { ok: false, error: message };
+    }
   },
 };
