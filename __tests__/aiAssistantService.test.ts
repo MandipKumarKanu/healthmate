@@ -23,14 +23,20 @@ const mockFetch = jest.fn() as unknown as FetchSpy;
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { aiAssistantService } = require('../src/services/aiAssistantService') as {
   aiAssistantService: {
+    _cachedKey: string | null | undefined;
     getApiKey(): Promise<string | null>;
     saveApiKey(key: string): Promise<void>;
+    deleteApiKey(): Promise<void>;
+    verifyApiKey(key: string): Promise<{ valid: boolean; error?: string }>;
     askGemini(question: string, history?: { role: string; content: string }[]): Promise<{ text: string; model: string; usedNetwork: boolean }>;
   };
 };
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const secureStoreMock = require('./__mocks__/expo-secure-store') as { __clearStore(): void };
+const secureStoreMock = require('./__mocks__/expo-secure-store') as {
+  __clearStore(): void;
+  setItemAsync: { mockRejectedValueOnce(value: unknown): unknown };
+};
 
 function okResponse(body: unknown) {
   return { ok: true, status: 200, json: () => Promise.resolve(body) };
@@ -53,6 +59,7 @@ describe('aiAssistantService (Gemini)', () => {
   beforeEach(() => {
     mockFetch.mockReset();
     secureStoreMock.__clearStore();
+    aiAssistantService._cachedKey = undefined;
   });
 
   it('refuses to answer without a key (offline-first behavior unchanged)', async () => {
@@ -66,7 +73,23 @@ describe('aiAssistantService (Gemini)', () => {
     await expect(aiAssistantService.getApiKey()).resolves.toBe('sk-test-key-123');
   });
 
-  it('calls generateContent with the correct model, key, and safety system prompt', async () => {
+  it('does not cache an empty key across reads after the service cache is reset', async () => {
+    await aiAssistantService.saveApiKey('sk-persisted-key');
+    aiAssistantService._cachedKey = undefined;
+
+    await expect(aiAssistantService.getApiKey()).resolves.toBe('sk-persisted-key');
+  });
+
+  it('rejects a key save when secure storage fails instead of reporting success', async () => {
+    secureStoreMock.setItemAsync.mockRejectedValueOnce(new Error('storage unavailable'));
+
+    await expect(aiAssistantService.saveApiKey('sk-not-persisted'))
+      .rejects.toThrow('could not save the Gemini key securely');
+
+    await expect(aiAssistantService.getApiKey()).resolves.toBeNull();
+  });
+
+  it('calls generateContent with the current model, key, and safety system prompt', async () => {
     await aiAssistantService.saveApiKey('sk-live-key');
     mockFetch.mockResolvedValueOnce(okResponse(geminiBodyWithText('A milligram is a unit of mass.')));
 
@@ -74,7 +97,7 @@ describe('aiAssistantService (Gemini)', () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const [url, init] = mockFetch.mock.calls[0];
-    expect(String(url)).toContain('https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent');
+    expect(String(url)).toContain('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent');
     const headers = (init as { headers: Record<string, string> }).headers;
     expect(headers['x-goog-api-key']).toBe('sk-live-key');
 
@@ -110,6 +133,38 @@ describe('aiAssistantService (Gemini)', () => {
 
     await expect(aiAssistantService.askGemini('hello'))
       .rejects.toMatchObject({ code: 'BAD_KEY' });
+    await expect(aiAssistantService.getApiKey()).resolves.toBeNull();
+  });
+
+  it('tries a supported fallback model when the default model returns 404', async () => {
+    await aiAssistantService.saveApiKey('sk-live-key');
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      json: () => Promise.resolve({ error: { message: 'model not found' } }),
+    });
+    mockFetch.mockResolvedValueOnce(okResponse(geminiBodyWithText('A label describes a medicine.')));
+
+    const result = await aiAssistantService.askGemini('What is a label?');
+
+    expect(result.model).toBe('gemini-3.8-flash');
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(String(mockFetch.mock.calls[1][0])).toContain('/models/gemini-3.8-flash:generateContent');
+  });
+
+  it('explains API-key restrictions when Google refuses a key during verification', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: () => Promise.resolve({
+        error: { message: 'API key not valid. Please pass a valid API key.' },
+      }),
+    });
+
+    const result = await aiAssistantService.verifyApiKey('sk-invalid');
+
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain('Google rejected this API key');
   });
 
   it('surfaces a categorized RATE_LIMIT code on 429 responses', async () => {
