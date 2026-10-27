@@ -166,7 +166,9 @@ export function ConnectGeminiModal({
     >
       <View style={styles.backdrop}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
+          // Android already resizes this Modal window (softwareKeyboardLayoutMode:
+          // "resize"). Applying "height" here as well double-shrinks the card.
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.keyboardContainer}
         >
           <View style={styles.card}>
@@ -191,6 +193,7 @@ export function ConnectGeminiModal({
             </View>
 
             <ScrollView
+              style={styles.modalScrollView}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.scrollContent}
               keyboardShouldPersistTaps="handled"
@@ -474,12 +477,15 @@ const styles = StyleSheet.create({
   keyboardContainer: {
     width: '100%',
     maxWidth: 420,
+    maxHeight: '100%',
+    flexShrink: 1,
   },
   card: {
     backgroundColor: Colors.cardBackground,
     borderRadius: Radius.card,
-    maxHeight: '90%',
-    padding: Spacing.xl,
+    maxHeight: '100%',
+    flexShrink: 1,
+    padding: Spacing.lg,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15,
@@ -517,6 +523,9 @@ const styles = StyleSheet.create({
   },
   closeBtn: {
     padding: Spacing.xs,
+  },
+  modalScrollView: {
+    flexShrink: 1,
   },
   scrollContent: {
     paddingTop: Spacing.xs,
