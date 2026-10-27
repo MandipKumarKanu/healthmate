@@ -102,6 +102,8 @@ export default function AIAssistantScreen() {
         return 'Google denied this project access to Gemini, so the offline guide answered below. Check the project status, API access, and key restrictions in Google AI Studio.\n\n';
       case 'MODEL_UNAVAILABLE':
         return 'The configured Gemini models are unavailable for this key, so the offline guide answered below. Check the available models and project access in Google AI Studio.\n\n';
+      case 'SECURE_STORE_READ':
+        return 'HealthMate could not read the saved Gemini key from secure storage, so the offline guide answered below. Open AI setup and retry before reconnecting a key.\n\n';
       case 'RATE_LIMIT':
         return 'Gemini’s free-tier limit was just reached, so the offline guide answered below.\n\n';
       case 'TIMEOUT':
