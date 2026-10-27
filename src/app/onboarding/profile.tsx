@@ -30,7 +30,7 @@ const GENDER_OPTIONS: { label: string; value: GenderOption }[] = [
 
 export default function OnboardingProfileScreen() {
   const router = useRouter();
-  const profileScrollRef = useRef<ScrollView | null>(null);
+  const profileScrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
   const focusedInputTagRef = useRef<number | null>(null);
 
   const scrollFocusedInput = useCallback((target: number) => {
