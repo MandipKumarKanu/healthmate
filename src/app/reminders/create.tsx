@@ -24,6 +24,7 @@ import { medicineRepository } from '../../database/repositories/medicineReposito
 import { scheduleRepository } from '../../database/repositories/scheduleRepository';
 import { getTodayDateString } from '../../database/seed';
 import { useReminderStore } from '../../store/reminderStore';
+import { useAppStore } from '../../store/appStore';
 import { notificationService } from '../../services/notificationService';
 import { Medicine, RecurrenceType, ReminderTime } from '../../types';
 import {
@@ -38,6 +39,7 @@ export default function SetReminderScreen() {
   const router = useRouter();
   const { medicineId, date } = useLocalSearchParams<{ medicineId?: string; date?: string }>();
   const { saveSchedule } = useReminderStore();
+  const selectedDate = useAppStore((state) => state.selectedDate);
 
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [selectedMed, setSelectedMed] = useState<Medicine | null>(null);
@@ -51,6 +53,7 @@ export default function SetReminderScreen() {
   const [amount, setAmount] = useState('1 tablet');
   const [amountError, setAmountError] = useState<string | null>(null);
   const [editingTimes, setEditingTimes] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Time picker state for modal display (iOS, Web, or fallback)
   const [pickerTarget, setPickerTarget] = useState<{ id: string | 'new'; date: Date } | null>(null);
@@ -235,12 +238,13 @@ export default function SetReminderScreen() {
   };
 
   const handleSave = async () => {
+    if (isSaving) return;
+
     if (!selectedMed) {
       Alert.alert('Error', 'Please select a medicine first.');
       return;
     }
 
-    // Validate global dose amount
     const amountValidation = validateDoseAmount(amount);
     if (!amountValidation.valid) {
       setAmountError(amountValidation.error || 'Invalid dose amount');
@@ -248,59 +252,78 @@ export default function SetReminderScreen() {
       return;
     }
 
-    // Validate all reminder times (duplicate check, time format check, per-dose amount check)
     const timesValidation = validateReminderTimes(times);
     if (!timesValidation.valid) {
       Alert.alert('Schedule Validation Error', timesValidation.error);
       return;
     }
 
-    // Ask Android/iOS for notification permission at the point the user enables reminders.
-    let canNotify = notificationsEnabled;
-    if (notificationsEnabled) {
-      canNotify = await notificationService.requestPermissions();
-      if (!canNotify) {
-        Alert.alert(
-          'Notifications are disabled',
-          'The schedule can be saved, but alarm-style reminders will not alert you until you allow notifications in system settings.'
-        );
+    setIsSaving(true);
+    try {
+      let canNotify = notificationsEnabled;
+      if (notificationsEnabled) {
+        canNotify = await notificationService.requestPermissions();
+        if (!canNotify) {
+          Alert.alert(
+            'Notifications are disabled',
+            'The schedule can be saved, but alarm-style reminders will not alert you until you allow notifications in system settings.',
+          );
+        }
       }
-    }
 
-    // Use local calendar date (not UTC) and preserve the recurrence anchor when editing.
-    const existingSchedule = scheduleRepository.getByMedicineId(selectedMed.id);
-    const scheduleId = existingSchedule?.id ?? `sched_${selectedMed.id}`;
-    const now = new Date().toISOString();
+      // Use the date visible in the calendar when the route did not supply one.
+      // This keeps the in-memory reminder list in sync with the saved SQLite row.
+      const refreshDate =
+        date && /^\\d{4}-\\d{2}-\\d{2}$/.test(date) ? date : selectedDate;
+      const existingSchedule = scheduleRepository.getByMedicineId(selectedMed.id);
+      const scheduleId = existingSchedule?.id ?? `sched_${selectedMed.id}`;
+      const now = new Date().toISOString();
 
-    const alarmsScheduled = await saveSchedule({
-      id: scheduleId,
-      medicineId: selectedMed.id,
-      recurrence,
-      startDate: existingSchedule?.startDate ?? (date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : getTodayDateString()),
-      endDate: existingSchedule?.endDate,
-      times,
-      enabled: true,
-      notificationsEnabled: canNotify,
-      createdAt: existingSchedule?.createdAt ?? now,
-      updatedAt: now,
-    });
-
-    if (!alarmsScheduled) {
-      Alert.alert(
-        'Schedule saved without alarms',
-        'Your medication schedule was saved, but at least one alarm could not be scheduled. Allow notifications and “Alarms & reminders” access in Android Settings, then edit and save this schedule again.',
-        [{ text: 'OK', onPress: () => router.back() }]
+      const alarmsScheduled = await saveSchedule(
+        {
+          id: scheduleId,
+          medicineId: selectedMed.id,
+          recurrence,
+          startDate:
+            existingSchedule?.startDate ??
+            (date && /^\\d{4}-\\d{2}-\\d{2}$/.test(date)
+              ? date
+              : getTodayDateString()),
+          endDate: existingSchedule?.endDate,
+          times,
+          enabled: true,
+          notificationsEnabled: canNotify,
+          createdAt: existingSchedule?.createdAt ?? now,
+          updatedAt: now,
+        },
+        refreshDate,
       );
-      return;
-    }
 
-    Alert.alert(
-      'Success',
-      canNotify
-        ? 'Medication schedule saved and alarm reminders scheduled.'
-        : 'Medication schedule saved. Alarm reminders are OFF until you grant notification and exact-alarm access.',
-      [{ text: 'OK', onPress: () => router.back() }]
-    );
+      if (!alarmsScheduled) {
+        Alert.alert(
+          'Schedule saved without alarms',
+          'Your medication schedule was saved, but at least one alarm could not be scheduled. Allow notifications and “Alarms & reminders” access in Android Settings, then edit and save this schedule again.',
+          [{ text: 'OK', onPress: () => router.back() }],
+        );
+        return;
+      }
+
+      Alert.alert(
+        'Success',
+        canNotify
+          ? 'Medication schedule saved and alarm reminders scheduled.'
+          : 'Medication schedule saved. Alarm reminders are OFF until you grant notification and exact-alarm access.',
+        [{ text: 'OK', onPress: () => router.back() }],
+      );
+    } catch (error) {
+      console.warn('Could not save medication schedule:', error);
+      Alert.alert(
+        'Could not save schedule',
+        'HealthMate could not finish saving this reminder. Please retry, then check the Reminders page before submitting it again.',
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const recurrenceOptions: Array<{ type: RecurrenceType; label: string }> = [
@@ -419,8 +442,8 @@ export default function SetReminderScreen() {
                     style={styles.timeValueInput}
                     value={t.label ?? ''}
                     onChangeText={(label) =>
-                      setTimes(
-                        times.map((item) =>
+                      setTimes((previous) =>
+                        previous.map((item) =>
                           item.id === t.id ? { ...item, label } : item
                         )
                       )
@@ -561,6 +584,8 @@ export default function SetReminderScreen() {
             onPress={handleSave}
             variant="primary"
             size="lg"
+            loading={isSaving}
+            disabled={isSaving}
           />
         </View>
       </View>
