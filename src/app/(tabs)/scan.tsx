@@ -550,7 +550,7 @@ export default function ScanScreen() {
                     color={Colors.success}
                   />
                   <Text style={styles.gatingFeatureText}>
-                    Powered by Google Gemini 2.0 Flash Lite
+                    Powered by Google Gemini 3.5 Flash-Lite
                   </Text>
                 </View>
                 <View style={styles.gatingFeatureRow}>
