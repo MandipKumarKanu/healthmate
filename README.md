@@ -42,7 +42,9 @@ The application faithfully reproduces the iOS-style reference design, offering a
    - Human-in-the-loop review allowing corrections before adding to cabinet or saving to history
 
 6. **AI Assistant (`/ai-assistant`)**:
-   - Live answers via the Google Gemini API (`gemini-3.5-flash-lite`, with stable-model fallback), enabled by pasting your own Gemini API key into the in-app "Connect AI" dialog (stored on-device with `expo-secure-store`)
+   - Live answers via Gemini `gemini-3.5-flash-lite`, with stable-model fallback.
+   - The in-app "Connect AI" flow verifies the key and confirms SecureStore persistence before showing a connected state. Rejected keys are disconnected and the user is prompted to reconnect.
+   - The key stays in Expo SecureStore on-device and is sent to Google when a Gemini feature is used. Google rejects unrestricted standard keys; use a new auth key or a standard key with explicit API restrictions.
    - Suggested prompts for mg vs. mL, active ingredients, batch/lot numbers, and medicine storage
    - Clinical safety guardrails: a system prompt forbids personalized medical advice, and questions seeking it are refused with a pointer to the patient leaflet, pharmacist, or prescriber
    - Offline fallback: with no key or no network, a fixed terminology guide answers instead, with a banner stating which mode is active
