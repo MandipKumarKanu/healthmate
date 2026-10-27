@@ -19,7 +19,7 @@ function summary(date: string, total = 0): DayAdherenceSummary {
   };
 }
 
-function schedule(overrides: Partial<ReminderSchedule> = {}): ReminderSchedule {
+function makeSchedule(overrides: Partial<ReminderSchedule> = {}): ReminderSchedule {
   return {
     id: "sched_live_refresh",
     medicineId: "medicine_live_refresh",
@@ -70,7 +70,7 @@ describe("Reminder store live refresh", () => {
       .mockReturnValue(summary(testDate, 1));
 
     const result = await useReminderStore.getState().saveSchedule(
-      schedule(),
+      makeSchedule(),
       testDate,
     );
 
