@@ -300,9 +300,9 @@ export function ConnectGeminiModal({
                         style={{ marginTop: 2 }}
                       />
                       <Text style={styles.infoBoxText}>
-                        <Text style={{ fontWeight: '600' }}>100% Private:</Text>{' '}
-                        Your key is stored only on this phone and is never
-                        shared with third parties.
+                        <Text style={{ fontWeight: '600' }}>Secure Storage:</Text>{' '}
+                        Your key is stored securely on this phone and sent to Google
+                        only when you use a Gemini feature.
                       </Text>
                     </View>
                   </View>
