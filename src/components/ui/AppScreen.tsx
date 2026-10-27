@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
   ScrollView,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   ViewStyle,
   StyleProp,
@@ -19,6 +20,7 @@ interface AppScreenProps {
   style?: StyleProp<ViewStyle>;
   contentContainerStyle?: StyleProp<ViewStyle>;
   extraScrollHeight?: number;
+  safeAreaEdges?: ('top' | 'bottom')[];
 }
 
 export function AppScreen({
@@ -27,20 +29,49 @@ export function AppScreen({
   style,
   contentContainerStyle,
   extraScrollHeight = 80,
+  safeAreaEdges = ['top', 'bottom'],
 }: AppScreenProps) {
   const insets = useSafeAreaInsets();
-  const { scrollViewRef, handleFocusCapture } = useKeyboardAwareScroll({
+  const { scrollViewRef, handleFocusCapture, onScroll } = useKeyboardAwareScroll({
     extraOffset: extraScrollHeight,
   });
 
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, () => setIsKeyboardVisible(true));
+    const hideSub = Keyboard.addListener(hideEvent, () => setIsKeyboardVisible(false));
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
   return (
-    <View style={[styles.screen, { paddingTop: insets.top, paddingBottom: insets.bottom }, style]}>
+    <View
+      style={[
+        styles.screen,
+        {
+          paddingTop: safeAreaEdges.includes('top') ? insets.top : 0,
+          // When soft keyboard is visible, remove safe area bottom padding
+          // to eliminate the redundant dead space above the keyboard.
+          paddingBottom: isKeyboardVisible
+            ? 0
+            : safeAreaEdges.includes('bottom')
+              ? insets.bottom
+              : 0,
+        },
+        style,
+      ]}
+    >
       <StatusBar style="dark" />
       {scrollable ? (
         <KeyboardAvoidingView
           style={styles.keyboardAvoiding}
-          // Android already resizes this window (softwareKeyboardLayoutMode: "resize").
-          // Applying "height" here as well double-shrinks the screen.
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
         >
@@ -51,7 +82,9 @@ export function AppScreen({
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-            automaticallyAdjustKeyboardInsets={false}
+            automaticallyAdjustKeyboardInsets={true}
+            onScroll={onScroll}
+            scrollEventThrottle={16}
           >
             <View style={styles.focusCaptureWrapper} onFocusCapture={handleFocusCapture}>
               {children}
@@ -64,6 +97,7 @@ export function AppScreen({
     </View>
   );
 }
+
 
 const styles = StyleSheet.create({
   screen: {

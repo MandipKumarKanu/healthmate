@@ -868,7 +868,7 @@ export default function SetReminderScreen() {
       >
         <View style={styles.medModalOverlay}>
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.medModalKeyboardContainer}
           >
             <View style={styles.medModalContainer}>

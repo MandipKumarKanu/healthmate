@@ -34,6 +34,7 @@ export default function OnboardingProfileScreen() {
     scrollViewRef: profileScrollRef,
     scrollToNode: scrollFocusedInput,
     handleFocusCapture,
+    onScroll,
   } = useKeyboardAwareScroll({ extraOffset: 80 });
 
   const { updateProfile, profile, setOnboardingStep, onboardingDraft, setOnboardingDraft } =
@@ -223,6 +224,9 @@ export default function OnboardingProfileScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          automaticallyAdjustKeyboardInsets={true}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
         >
           <View style={{ flexGrow: 1 }} onFocusCapture={handleFocusCapture}>
             {/* Top Bar: Back Button */}

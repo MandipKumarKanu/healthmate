@@ -67,8 +67,11 @@ export default function ProfileScreen() {
 
   const [geminiKey, setGeminiKey] = useState<string | null>(null);
   const [showGeminiModal, setShowGeminiModal] = useState(false);
-  const { scrollViewRef: editModalScrollRef, handleFocusCapture: handleModalFocusCapture } =
-    useKeyboardAwareScroll({ extraOffset: 60 });
+  const {
+    scrollViewRef: editModalScrollRef,
+    handleFocusCapture: handleModalFocusCapture,
+    onScroll: handleModalScroll,
+  } = useKeyboardAwareScroll({ extraOffset: 60 });
 
   const loadGeminiKey = () => {
     aiAssistantService
@@ -560,6 +563,9 @@ export default function ProfileScreen() {
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
                 keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+                automaticallyAdjustKeyboardInsets={true}
+                onScroll={handleModalScroll}
+                scrollEventThrottle={16}
               >
                 <View style={{ flexGrow: 1 }} onFocusCapture={handleModalFocusCapture}>
                   {/* Full Name */}

@@ -34,7 +34,11 @@ export function ConnectGeminiModal({
   onKeySaved,
   onDisconnected,
 }: ConnectGeminiModalProps) {
-  const { scrollViewRef: modalScrollRef, handleFocusCapture } = useKeyboardAwareScroll({
+  const {
+    scrollViewRef: modalScrollRef,
+    handleFocusCapture,
+    onScroll,
+  } = useKeyboardAwareScroll({
     extraOffset: 40,
   });
   const [keyDraft, setKeyDraft] = useState('');
@@ -196,6 +200,9 @@ export function ConnectGeminiModal({
               contentContainerStyle={styles.scrollContent}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+              automaticallyAdjustKeyboardInsets={true}
+              onScroll={onScroll}
+              scrollEventThrottle={16}
             >
               <View style={{ flexGrow: 1 }} onFocusCapture={handleFocusCapture}>
                 {showCelebration ? (

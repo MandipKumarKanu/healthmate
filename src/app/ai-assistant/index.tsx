@@ -11,6 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { Radius, Spacing, Typography } from '../../theme/tokens';
@@ -42,6 +43,7 @@ const KNOWLEDGE_RESPONSES: Record<string, string> = {
 
 export default function AIAssistantScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { query } = useLocalSearchParams<{ query?: string }>();
 
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -51,6 +53,7 @@ export default function AIAssistantScreen() {
   const [hasApiKey, setHasApiKey] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   const [keyModalVisible, setKeyModalVisible] = useState(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const scrollViewRef = useRef<React.ElementRef<typeof ScrollView>>(null);
   const lastAutoQueryRef = useRef<string | null>(null);
 
@@ -79,13 +82,24 @@ export default function AIAssistantScreen() {
     }, [checkConnectivityAndKey]),
   );
 
-  // Keep the newest message visible when Android resizes the available window
-  // for the keyboard. The composer is outside the message ScrollView by design.
+  // Keep the newest message visible when keyboard opens (WhatsApp style)
   useEffect(() => {
-    const subscription = Keyboard.addListener('keyboardDidShow', () => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, () => {
+      setIsKeyboardVisible(true);
       requestAnimationFrame(() => scrollViewRef.current?.scrollToEnd({ animated: true }));
     });
-    return () => subscription.remove();
+
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setIsKeyboardVisible(false);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
   }, []);
 
   /** Offline fallback: fixed terminology guide, unchanged behavior. */
@@ -214,7 +228,7 @@ export default function AIAssistantScreen() {
   };
 
   return (
-    <AppScreen contentContainerStyle={styles.container}>
+    <AppScreen safeAreaEdges={['top']} contentContainerStyle={styles.container}>
       <ConnectGeminiModal
         visible={keyModalVisible}
         onClose={() => setKeyModalVisible(false)}
@@ -283,10 +297,8 @@ export default function AIAssistantScreen() {
       </View>
 
       <KeyboardAvoidingView
-        // Android uses window resize in app.json. A second "height" adjustment
-        // here pushes the composer behind the keyboard on several OEM keyboards.
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
         style={styles.keyboardContainer}
       >
         <ScrollView
@@ -357,7 +369,12 @@ export default function AIAssistantScreen() {
         </ScrollView>
 
         {/* Input Bar */}
-        <View style={styles.inputBar}>
+        <View
+          style={[
+            styles.inputBar,
+            { paddingBottom: isKeyboardVisible ? 10 : Math.max(10, insets.bottom) },
+          ]}
+        >
           <TextInput
             style={styles.chatInput}
             placeholder="Ask about a medication label..."
