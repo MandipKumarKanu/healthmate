@@ -542,18 +542,14 @@ export const aiAssistantService = {
         { code: 'AI_PARSE' },
       );
     }
-    if (lastModelError || modelsToTry.length > 0) {
-      throw Object.assign(
-        new Error(
-          lastModelError
-            ? `No configured Gemini model was available: ${lastModelError}`
-            : 'No configured Gemini model was available for packaging interpretation.',
-        ),
-        { code: 'MODEL_UNAVAILABLE' },
-      );
-    }
-
-    return baseExtraction;
+    throw Object.assign(
+      new Error(
+        lastModelError
+          ? `No configured Gemini model was available: ${lastModelError}`
+          : 'No configured Gemini model was available for packaging interpretation.',
+      ),
+      { code: 'MODEL_UNAVAILABLE' },
+    );
   },
 };
 
