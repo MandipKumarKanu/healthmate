@@ -1,7 +1,7 @@
-import React, { useEffect } from "react";
+import React, { useCallback } from "react";
 import { StyleSheet, View, Text } from "react-native";
 import { AppAlert as Alert } from "../../services/appAlert";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../theme/colors";
 import { Spacing, Radius } from "../../theme/tokens";
@@ -29,9 +29,13 @@ export default function CalendarScreen() {
   const { doses, daySummary, loadDosesForDate, markDoseStatus } =
     useReminderStore();
 
-  useEffect(() => {
-    loadDosesForDate(selectedDate);
-  }, [selectedDate, loadDosesForDate]);
+  useFocusEffect(
+    useCallback(() => {
+      // SQLite is the source of truth. Re-read when returning from create/edit
+      // reminder screens even when the selected date itself has not changed.
+      loadDosesForDate(selectedDate);
+    }, [selectedDate, loadDosesForDate]),
+  );
 
   const activeSchedules = scheduleRepository.getAll();
 
