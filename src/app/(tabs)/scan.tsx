@@ -110,6 +110,10 @@ export default function ScanScreen() {
       setScanStepMessage("Step 2/2: Personal AI analyzing medicine details…");
       const { rawText, extracted, usedFallbackEngine: isDemo, debugPasses } =
         await processLabelImage(imageUri);
+      // Packaging interpretation can invalidate and clear a rejected Gemini key
+      // while still returning the local OCR extraction. Keep the scan gate in sync.
+      const persistedKey = await aiAssistantService.getApiKey().catch(() => null);
+      setHasApiKey(Boolean(persistedKey));
       if (__DEV__ && debugPasses) {
         setDebugPasses(debugPasses);
       }
@@ -984,6 +988,9 @@ export default function ScanScreen() {
       <ConnectGeminiModal
         visible={showConnectModal}
         onClose={() => setShowConnectModal(false)}
+        onKeySaved={() => {
+          setHasApiKey(true);
+        }}
         onSuccess={() => {
           setHasApiKey(true);
         }}
