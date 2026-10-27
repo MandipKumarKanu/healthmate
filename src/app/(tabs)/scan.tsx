@@ -49,18 +49,21 @@ export default function ScanScreen() {
 
   const checkPrerequisites = useCallback(async () => {
     setIsCheckingPrerequisites(true);
-    try {
-      const [online, key] = await Promise.all([
-        networkService.checkInternet(),
-        aiAssistantService.getApiKey(),
-      ]);
-      setIsOnline(online);
-      setHasApiKey(Boolean(key));
-    } catch {
-      setIsOnline(false);
-    } finally {
-      setIsCheckingPrerequisites(false);
-    }
+    const [online, key] = await Promise.all([
+      networkService.checkInternet().catch((error) => {
+        console.warn('Could not check internet connectivity:', error);
+        return false;
+      }),
+      aiAssistantService.getApiKey().catch((error) => {
+        // Keep storage failures separate from internet failures. The Connect AI
+        // modal will show the secure-store error if the user opens it.
+        console.warn('Could not read Gemini key during scan setup:', error);
+        return null;
+      }),
+    ]);
+    setIsOnline(online);
+    setHasApiKey(Boolean(key));
+    setIsCheckingPrerequisites(false);
   }, []);
 
   useFocusEffect(
@@ -108,8 +111,40 @@ export default function ScanScreen() {
     setCopiedDebugPass(null);
     try {
       setScanStepMessage("Step 2/2: Personal AI analyzing medicine details…");
-      const { rawText, extracted, usedFallbackEngine: isDemo, debugPasses } =
-        await processLabelImage(imageUri);
+      const {
+        rawText,
+        extracted,
+        usedFallbackEngine: isDemo,
+        debugPasses,
+        aiWarning,
+      } = await processLabelImage(imageUri);
+      // Packaging interpretation can invalidate and clear a rejected Gemini key
+      // while still returning the local OCR extraction. Keep the scan gate in sync.
+      let persistedKey: string | null = null;
+      let keyReadSucceeded = true;
+      try {
+        persistedKey = await aiAssistantService.getApiKey();
+      } catch (keyError) {
+        keyReadSucceeded = false;
+        console.warn('Could not read the saved Gemini key after scanning:', keyError);
+      }
+      setHasApiKey(Boolean(persistedKey));
+      if (hasApiKey && keyReadSucceeded && !persistedKey) {
+        Alert.alert(
+          'Gemini key rejected',
+          'Google rejected the saved API key, so this scan used local OCR extraction only. The rejected key has been disconnected. Reconnect with a valid key to restore AI-assisted packaging interpretation.',
+          [
+            { text: 'Reconnect AI', onPress: () => setShowConnectModal(true) },
+            { text: 'Review OCR results', style: 'cancel' },
+          ],
+        );
+      } else if (aiWarning) {
+        Alert.alert(
+          'AI interpretation unavailable',
+          `${aiWarning}\n\nThe OCR extraction is still available for review. Check every field against the original medicine packaging before saving.`,
+          [{ text: 'Continue reviewing OCR', style: 'cancel' }],
+        );
+      }
       if (__DEV__ && debugPasses) {
         setDebugPasses(debugPasses);
       }
@@ -546,7 +581,7 @@ export default function ScanScreen() {
                     color={Colors.success}
                   />
                   <Text style={styles.gatingFeatureText}>
-                    Powered by Google Gemini 2.0 Flash Lite
+                    Powered by Google Gemini 3.5 Flash-Lite
                   </Text>
                 </View>
                 <View style={styles.gatingFeatureRow}>
@@ -556,7 +591,7 @@ export default function ScanScreen() {
                     color={Colors.primary}
                   />
                   <Text style={styles.gatingFeatureText}>
-                    Free API key stored securely only on your phone
+                    Key stored securely on this device, sent to Google for AI requests
                   </Text>
                 </View>
               </View>
@@ -984,6 +1019,9 @@ export default function ScanScreen() {
       <ConnectGeminiModal
         visible={showConnectModal}
         onClose={() => setShowConnectModal(false)}
+        onKeySaved={() => {
+          setHasApiKey(true);
+        }}
         onSuccess={() => {
           setHasApiKey(true);
         }}

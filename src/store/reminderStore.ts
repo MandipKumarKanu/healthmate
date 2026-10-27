@@ -9,6 +9,7 @@ import { adherenceRepository } from "../database/repositories/adherenceRepositor
 import { scheduleRepository } from "../database/repositories/scheduleRepository";
 import { medicineRepository } from "../database/repositories/medicineRepository";
 import { notificationService } from "../services/notificationService";
+import { getTodayDateString } from "../database/seed";
 
 interface ReminderState {
   doses: ScheduledDose[];
@@ -19,11 +20,12 @@ interface ReminderState {
     status: DoseStatus,
     targetDate: string,
   ) => void;
-  saveSchedule: (schedule: ReminderSchedule) => Promise<boolean>;
-  deleteSchedule: (scheduleId: string) => Promise<void>;
+  saveSchedule: (schedule: ReminderSchedule, refreshDate?: string) => Promise<boolean>;
+  deleteSchedule: (scheduleId: string, refreshDate?: string) => Promise<void>;
   toggleScheduleEnabled: (
     scheduleId: string,
     enabled: boolean,
+    refreshDate?: string,
   ) => Promise<void>;
 }
 
@@ -48,12 +50,18 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
     get().loadDosesForDate(targetDate);
   },
 
-  saveSchedule: async (schedule) => {
-    // Cancel old triggers before replacing a schedule to avoid duplicates or stale times.
+  saveSchedule: async (schedule, refreshDate = schedule.startDate || getTodayDateString()) => {
+    // Persist first, then refresh the visible date even when alarms are disabled
+    // or Android refuses to schedule one of the notifications.
     await notificationService.cancelForSchedule(schedule.id);
     scheduleRepository.save(schedule);
 
-    if (!schedule.enabled || !schedule.notificationsEnabled) return true;
+    const refreshVisibleDate = () => get().loadDosesForDate(refreshDate);
+
+    if (!schedule.enabled || !schedule.notificationsEnabled) {
+      refreshVisibleDate();
+      return true;
+    }
 
     const medicine = medicineRepository.getById(schedule.medicineId);
     const medicineName = medicine?.name ?? "Medicine";
@@ -72,25 +80,34 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
           endDate: schedule.endDate,
         },
       );
+
       if (!identifier) {
-        // Never leave a schedule marked as notification-enabled when one or more
-        // alarms failed. Roll back any partially scheduled notifications.
+        // Never leave a schedule marked notification-enabled when only some
+        // of its alarms were scheduled. Refresh the UI after the rollback too.
         await notificationService.cancelForSchedule(schedule.id);
         scheduleRepository.save({ ...schedule, notificationsEnabled: false });
+        refreshVisibleDate();
         return false;
       }
+
       scheduledIds.push(identifier);
     }
 
+    refreshVisibleDate();
     return scheduledIds.length === schedule.times.length;
   },
 
-  deleteSchedule: async (scheduleId) => {
+  deleteSchedule: async (scheduleId, refreshDate = getTodayDateString()) => {
     await notificationService.cancelForSchedule(scheduleId);
     scheduleRepository.delete(scheduleId);
+    get().loadDosesForDate(refreshDate);
   },
 
-  toggleScheduleEnabled: async (scheduleId, enabled) => {
+  toggleScheduleEnabled: async (
+    scheduleId,
+    enabled,
+    refreshDate = getTodayDateString(),
+  ) => {
     scheduleRepository.toggleEnabled(scheduleId, enabled);
     if (!enabled) {
       await notificationService.cancelForSchedule(scheduleId);
@@ -115,5 +132,6 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
         }
       }
     }
+    get().loadDosesForDate(refreshDate);
   },
 }));

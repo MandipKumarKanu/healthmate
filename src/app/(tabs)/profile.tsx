@@ -61,7 +61,13 @@ export default function ProfileScreen() {
   const [showGeminiModal, setShowGeminiModal] = useState(false);
 
   const loadGeminiKey = () => {
-    aiAssistantService.getApiKey().then((k) => setGeminiKey(k));
+    aiAssistantService
+      .getApiKey()
+      .then((key) => setGeminiKey(key))
+      .catch((error) => {
+        console.warn('Could not read Gemini connection status:', error);
+        setGeminiKey(null);
+      });
   };
 
   useFocusEffect(
@@ -816,6 +822,9 @@ export default function ProfileScreen() {
       <ConnectGeminiModal
         visible={showGeminiModal}
         onClose={() => setShowGeminiModal(false)}
+        onKeySaved={(key) => {
+          setGeminiKey(key);
+        }}
         onSuccess={() => {
           loadGeminiKey();
         }}

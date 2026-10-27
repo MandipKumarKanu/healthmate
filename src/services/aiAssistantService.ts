@@ -14,8 +14,55 @@ import { ocrService, ExtractedMedicineData } from './ocrService';
 
 const KEY_STORE_NAME = 'gemini_api_key';
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
-const DEFAULT_MODEL = 'gemini-flash-lite-latest';
+// Use a stable model ID. A "latest" alias may move between model versions.
+const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
+const FALLBACK_MODELS = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-2.5-flash-lite'];
+const GEMINI_MODELS_TO_TRY = [DEFAULT_MODEL, ...FALLBACK_MODELS];
 const MAX_HISTORY_TURNS = 12; // keep requests bounded; persistence holds more
+
+const KEY_REJECTION_HELP =
+  'Google rejected this API key. Google now rejects unrestricted standard keys. Create a new key in Google AI Studio and reconnect it. If the new key still fails, check the project status, API access, and key restrictions.';
+
+async function readGeminiErrorMessage(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as {
+      error?: { message?: string; status?: string };
+    };
+    return body?.error?.message?.trim() || body?.error?.status?.trim() || '';
+  } catch {
+    return '';
+  }
+}
+
+function isInvalidGeminiApiKeyMessage(message: string): boolean {
+  return /api[_\s-]?key.{0,60}(invalid|not valid|reported as leaked|blocked|disabled)|(?:invalid|not valid|reported as leaked|blocked|disabled).{0,60}api[_\s-]?key|API_KEY_INVALID/i.test(
+    message,
+  );
+}
+
+function classifyGeminiError(status: number, detail = ''): { code: string; message: string } {
+  if (status === 401 || isInvalidGeminiApiKeyMessage(detail)) {
+    return { code: 'BAD_KEY', message: KEY_REJECTION_HELP };
+  }
+  if (status === 403) {
+    return {
+      code: 'ACCESS_DENIED',
+      message: detail
+        ? `Google denied access to Gemini: ${detail}. Check the Google AI Studio project status, API access, and key restrictions.`
+        : 'Google denied access to Gemini. Check the Google AI Studio project status, API access, and key restrictions.',
+    };
+  }
+  if (status === 429) {
+    return {
+      code: 'RATE_LIMIT',
+      message: 'Gemini rate limit reached. Wait a little and try again.',
+    };
+  }
+  return {
+    code: 'HTTP_ERROR',
+    message: detail || `Gemini API error ${status}.`,
+  };
+}
 
 export const MEDICATION_GUARDRAIL_SYSTEM_PROMPT = [
   'You are the medication educator inside HealthMate, a personal medication organizer app.',
@@ -54,10 +101,16 @@ export const aiAssistantService = {
   async getApiKey(): Promise<string | null> {
     if (this._cachedKey !== undefined) return this._cachedKey ?? null;
     try {
-      this._cachedKey = await SecureStore.getItemAsync(KEY_STORE_NAME);
-      return this._cachedKey ?? null;
+      const storedKey = await SecureStore.getItemAsync(KEY_STORE_NAME);
+      this._cachedKey = storedKey;
+      return storedKey ?? null;
     } catch {
-      return null;
+      // Do not cache a storage failure as "no key". A later read may succeed.
+      this._cachedKey = undefined;
+      throw Object.assign(
+        new Error('HealthMate could not read the saved Gemini key securely. Reopen AI setup and try again.'),
+        { code: 'SECURE_STORE_READ' },
+      );
     }
   },
 
@@ -67,21 +120,43 @@ export const aiAssistantService = {
       await this.deleteApiKey();
       return;
     }
+
     try {
       await SecureStore.setItemAsync(KEY_STORE_NAME, trimmed);
-      this._cachedKey = trimmed;
-    } catch (error) {
-      console.warn('Could not store Gemini API key:', error);
+      const persistedKey = await SecureStore.getItemAsync(KEY_STORE_NAME);
+      if (persistedKey !== trimmed) {
+        throw new Error('Secure storage did not return the saved key.');
+      }
+      this._cachedKey = persistedKey;
+    } catch {
+      // Never tell the UI the key was connected unless it was stored and read back.
+      this._cachedKey = undefined;
+      throw new Error(
+        'HealthMate could not save the Gemini key securely. Check device storage and try again.',
+      );
     }
   },
 
   async deleteApiKey(): Promise<void> {
+    this._cachedKey = null;
     try {
       await SecureStore.deleteItemAsync(KEY_STORE_NAME);
     } catch {
-      // ignore
+      this._cachedKey = undefined;
+      throw new Error(
+        'HealthMate could not remove the saved Gemini key. Please try again.',
+      );
     }
-    this._cachedKey = null;
+  },
+
+  async _clearRejectedApiKey(): Promise<void> {
+    try {
+      await this.deleteApiKey();
+    } catch {
+      // Keep this session disconnected even if the OS secure-store deletion fails.
+      this._cachedKey = null;
+      console.warn('Could not remove a rejected Gemini API key from secure storage.');
+    }
   },
 
   /**
@@ -138,26 +213,26 @@ export const aiAssistantService = {
     history: Pick<AIMessage, 'role' | 'content'>[] = [],
     options: { apiKey?: string; model?: string; timeoutMs?: number } = {},
   ): Promise<GeminiAnswer> {
-    const apiKey =
-      options.apiKey ??
-      (await this.getApiKey()) ??
-      (undefined as unknown as string);
+    const apiKey = options.apiKey ?? (await this.getApiKey());
     if (!apiKey) {
-      throw Object.assign(
-        new Error('No Gemini API key configured.'),
-        { code: 'NO_KEY' },
-      );
+      throw Object.assign(new Error('No Gemini API key configured.'), {
+        code: 'NO_KEY',
+      });
     }
 
-    const model = options.model ?? DEFAULT_MODEL;
+    const requestedModel = options.model ?? DEFAULT_MODEL;
+    const modelsToTry = [
+      requestedModel,
+      ...FALLBACK_MODELS.filter((model) => model !== requestedModel),
+    ];
     const contents = this.buildContents(history, prompt);
     const body = {
       systemInstruction: {
         parts: [{ text: MEDICATION_GUARDRAIL_SYSTEM_PROMPT }],
       },
-      contents: contents.map((t) => ({
-        role: t.role,
-        parts: [{ text: t.text }],
+      contents: contents.map((turn) => ({
+        role: turn.role,
+        parts: [{ text: turn.text }],
       })),
       generationConfig: {
         temperature: 0.4,
@@ -166,59 +241,71 @@ export const aiAssistantService = {
     };
 
     const timeoutMs = options.timeoutMs ?? 20000;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let lastModelError = '';
 
-    try {
-      const response = await fetch(`${API_BASE}/models/${model}:generateContent`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey,
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
+    for (const model of modelsToTry) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-      if (response.status === 401 || response.status === 403) {
-        throw Object.assign(
-          new Error('Gemini rejected the API key.'),
-          { code: 'BAD_KEY' },
-        );
-      }
-      if (response.status === 429) {
-        throw Object.assign(new Error('Rate limited.'), { code: 'RATE_LIMIT' });
-      }
-      if (!response.ok) {
-        throw Object.assign(
-          new Error(`Gemini API error ${response.status}`),
-          { code: 'HTTP_ERROR', status: response.status },
-        );
-      }
-
-      const answerText = this.extractAnswerText(await response.json());
-      if (!answerText) {
-        throw Object.assign(
-          new Error('Gemini returned an empty answer.'),
-          { code: 'EMPTY_ANSWER' },
-        );
-      }
-      return { text: answerText, model, usedNetwork: true };
-    } catch (error) {
-      if ((error as { name?: string }).name === 'AbortError') {
-        throw Object.assign(new Error('Gemini request timed out.'), {
-          code: 'TIMEOUT',
+      try {
+        const response = await fetch(`${API_BASE}/models/${model}:generateContent`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey,
+          },
+          body: JSON.stringify(body),
+          signal: controller.signal,
         });
-      }
-      if (!(error as { code?: string })?.code) {
-        // Transport-level failure (offline, DNS, TLS): categorize it so the
-        // screen can show its offline-guide fallback copy.
+
+        if (response.status === 404) {
+          lastModelError = await readGeminiErrorMessage(response);
+          continue;
+        }
+
+        if (!response.ok) {
+          const detail = await readGeminiErrorMessage(response);
+          const mapped = classifyGeminiError(response.status, detail);
+          if (mapped.code === 'BAD_KEY') {
+            await this._clearRejectedApiKey();
+          }
+          throw Object.assign(new Error(mapped.message), {
+            code: mapped.code,
+            status: response.status,
+          });
+        }
+
+        const answerText = this.extractAnswerText(await response.json());
+        if (!answerText) {
+          throw Object.assign(new Error('Gemini returned an empty answer.'), {
+            code: 'EMPTY_ANSWER',
+          });
+        }
+
+        return { text: answerText, model, usedNetwork: true };
+      } catch (error) {
+        if ((error as { name?: string }).name === 'AbortError') {
+          throw Object.assign(new Error('Gemini request timed out.'), {
+            code: 'TIMEOUT',
+          });
+        }
+        if ((error as { code?: string })?.code) throw error;
+        // Fail fast on transport errors instead of hammering multiple models
+        // while offline. Model fallback is only for an explicit 404 response.
         throw Object.assign(error as Error, { code: 'NETWORK' });
+      } finally {
+        clearTimeout(timer);
       }
-      throw error;
-    } finally {
-      clearTimeout(timer);
     }
+
+    throw Object.assign(
+      new Error(
+        lastModelError
+          ? `No configured Gemini model was available: ${lastModelError}`
+          : 'No configured Gemini model was available for this API key.',
+      ),
+      { code: 'MODEL_UNAVAILABLE' },
+    );
   },
 
   /**
@@ -229,79 +316,59 @@ export const aiAssistantService = {
     if (!trimmed) {
       return { valid: false, error: 'Please enter a Gemini API key.' };
     }
+
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 10000);
-    const modelsToTry = [
-      DEFAULT_MODEL,
-      'gemini-2.0-flash-lite',
-      'gemini-2.5-flash',
-      'gemini-1.5-flash',
-    ];
+    const timer = setTimeout(() => controller.abort(), 15000);
 
     try {
-      for (const model of modelsToTry) {
-        try {
-          const response = await fetch(
-            `${API_BASE}/models/${model}:generateContent`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-goog-api-key': trimmed,
-              },
-              body: JSON.stringify({
-                contents: [{ role: 'user', parts: [{ text: 'ping' }] }],
-                generationConfig: { maxOutputTokens: 2 },
-              }),
-              signal: controller.signal,
-            }
-          );
+      for (const model of GEMINI_MODELS_TO_TRY) {
+        const response = await fetch(
+          `${API_BASE}/models/${model}:generateContent`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': trimmed,
+            },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: 'ping' }] }],
+              generationConfig: { maxOutputTokens: 2 },
+            }),
+            signal: controller.signal,
+          },
+        );
 
-          if (response.ok) {
-            return { valid: true };
-          }
-          if (
-            response.status === 400 ||
-            response.status === 401 ||
-            response.status === 403
-          ) {
-            return {
-              valid: false,
-              error: 'Invalid API key. Please check your key from Google AI Studio.',
-            };
-          }
-          if (response.status === 429) {
-            return {
-              valid: false,
-              error: 'Rate limit exceeded on Google AI Studio. Please try again shortly.',
-            };
-          }
-          if (response.status === 404) {
-            continue;
-          }
-          return {
-            valid: false,
-            error: `Gemini API returned status ${response.status}.`,
-          };
-        } catch (innerErr: any) {
-          if (innerErr?.name === 'AbortError') throw innerErr;
-          continue;
+        if (response.ok) return { valid: true };
+
+        const detail = await readGeminiErrorMessage(response);
+        if (response.status === 404) continue;
+
+        const mapped = classifyGeminiError(response.status, detail);
+        if (mapped.code === 'BAD_KEY' || mapped.code === 'ACCESS_DENIED' || mapped.code === 'RATE_LIMIT') {
+          return { valid: false, error: mapped.message };
         }
-      }
-      return {
-        valid: false,
-        error: 'Verification failed. Could not reach Gemini models.',
-      };
-    } catch (err: any) {
-      if (err?.name === 'AbortError') {
         return {
           valid: false,
-          error: 'Verification timed out. Check your internet connection.',
+          error: detail
+            ? `Gemini verification failed: ${detail}`
+            : `Gemini API returned status ${response.status}.`,
+        };
+      }
+
+      return {
+        valid: false,
+        error: 'Google did not expose a supported Gemini model to this key. Check the project and API access in Google AI Studio.',
+      };
+    } catch (error: any) {
+      if (error?.name === 'AbortError') {
+        return {
+          valid: false,
+          error: 'Verification timed out. Check your internet connection and try again.',
         };
       }
       return {
         valid: false,
-        error: 'Network error. Please check your internet connection.',
+        error: 'Could not reach Gemini. Check your internet connection and retry.',
       };
     } finally {
       clearTimeout(timer);
@@ -344,60 +411,87 @@ export const aiAssistantService = {
       '- Return ONLY valid JSON, with NO markdown backticks or commentary.',
     ].join('\n');
 
-    const modelsToTry = [
-      DEFAULT_MODEL,
-      'gemini-2.0-flash-lite',
-      'gemini-2.5-flash',
-      'gemini-1.5-flash',
-    ];
+    const modelsToTry = GEMINI_MODELS_TO_TRY;
+    let lastPackagingParseError: unknown = null;
+    let lastModelError = '';
 
     for (const model of modelsToTry) {
       try {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 12000);
 
-        const response = await fetch(
-          `${API_BASE}/models/${model}:generateContent`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-goog-api-key': apiKey,
-            },
-            body: JSON.stringify({
-              systemInstruction: {
-                parts: [{ text: systemPrompt }],
+        let response: Response;
+        try {
+          response = await fetch(
+            `${API_BASE}/models/${model}:generateContent`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': apiKey,
               },
-              contents: [
-                {
-                  role: 'user',
-                  parts: [
-                    {
-                      text: `Raw OCR text from medication packaging:\n\n${rawOcrText}`,
-                    },
-                  ],
+              body: JSON.stringify({
+                systemInstruction: {
+                  parts: [{ text: systemPrompt }],
                 },
-              ],
-              generationConfig: {
-                temperature: 0.1,
-                responseMimeType: 'application/json',
-                maxOutputTokens: 512,
-              },
-            }),
-            signal: controller.signal,
+                contents: [
+                  {
+                    role: 'user',
+                    parts: [
+                      {
+                        text: `Raw OCR text from medication packaging:\n\n${rawOcrText}`,
+                      },
+                    ],
+                  },
+                ],
+                generationConfig: {
+                  temperature: 0.1,
+                  responseMimeType: 'application/json',
+                  maxOutputTokens: 512,
+                },
+              }),
+              signal: controller.signal,
+            }
+          );
+        } catch (error) {
+          if ((error as { name?: string })?.name === 'AbortError') {
+            throw Object.assign(
+              new Error('Gemini packaging interpretation timed out.'),
+              { code: 'TIMEOUT' },
+            );
           }
-        );
-
-        clearTimeout(timer);
+          throw Object.assign(
+            new Error('Could not reach Gemini to interpret this medicine label.'),
+            { code: 'NETWORK' },
+          );
+        } finally {
+          clearTimeout(timer);
+        }
 
         if (!response.ok) {
-          if (response.status === 404) continue;
-          break;
+          const detail = await readGeminiErrorMessage(response);
+          if (response.status === 404) {
+            lastModelError = detail;
+            continue;
+          }
+          const mapped = classifyGeminiError(response.status, detail);
+          if (mapped.code === 'BAD_KEY') {
+            await this._clearRejectedApiKey();
+          }
+          throw Object.assign(new Error(mapped.message), {
+            code: mapped.code,
+            status: response.status,
+          });
         }
 
         const data = await response.json();
         const answerText = this.extractAnswerText(data);
-        if (!answerText) break;
+        if (!answerText) {
+          throw Object.assign(
+            new Error('Gemini returned an empty packaging interpretation.'),
+            { code: 'EMPTY_ANSWER' },
+          );
+        }
 
         const cleanJson = answerText
           .replace(/```json/gi, '')
@@ -428,32 +522,34 @@ export const aiAssistantService = {
           batchNumber: parsed.batchNumber?.trim() || baseExtraction.batchNumber,
           expiryDate: parsed.expiryDate?.trim() || baseExtraction.expiryDate,
           rawText: rawOcrText,
-          isHighConfidence: Boolean(resolvedMedName || resolvedGenName),
-          confidenceScore: 0.98,
-          candidates: (resolvedMedName || resolvedGenName)
-            ? [
-                {
-                  name: resolvedMedName || resolvedGenName || '',
-                  genericName: resolvedGenName || resolvedMedName || '',
-                  isBrand: Boolean(
-                    parsed.medicineName &&
-                      parsed.genericName &&
-                      parsed.medicineName.toLowerCase() !==
-                        parsed.genericName.toLowerCase()
-                  ),
-                  score: 0.99,
-                  isExact: true,
-                  originalText: parsed.medicineName || parsed.genericName || '',
-                },
-              ]
-            : baseExtraction.candidates,
+          // Gemini output helps extract fields, but its confidence is not
+          // calibrated. Preserve the dictionary OCR score instead of inventing
+          // a 98-99% match for an AI-generated guess.
+          isHighConfidence: baseExtraction.isHighConfidence ?? false,
+          confidenceScore: baseExtraction.confidenceScore,
+          candidates: baseExtraction.candidates,
         };
       } catch (err) {
+        if ((err as { code?: string })?.code) throw err;
         console.warn(`Gemini packaging parse on model ${model} failed:`, err);
+        lastPackagingParseError = err;
       }
     }
 
-    return baseExtraction;
+    if (lastPackagingParseError) {
+      throw Object.assign(
+        new Error('Gemini could not return a reliable structured interpretation. Review the OCR fields manually.'),
+        { code: 'AI_PARSE' },
+      );
+    }
+    throw Object.assign(
+      new Error(
+        lastModelError
+          ? `No configured Gemini model was available: ${lastModelError}`
+          : 'No configured Gemini model was available for packaging interpretation.',
+      ),
+      { code: 'MODEL_UNAVAILABLE' },
+    );
   },
 };
 
