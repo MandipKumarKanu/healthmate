@@ -44,16 +44,58 @@ export class OcrConnectionError extends Error {
 }
 
 /**
+ * Validates the remote OCR endpoint URL for security.
+ * In production builds, cleartext HTTP requests to non-local hosts are blocked.
+ */
+export function validateOcrEndpoint(url: string): { valid: boolean; error?: string } {
+  if (!url || typeof url !== 'string' || !url.trim()) {
+    return {
+      valid: false,
+      error:
+        'OCR API URL is missing. Please set EXPO_PUBLIC_OCR_API_URL in your environment (.env).',
+    };
+  }
+  try {
+    const parsed = new URL(url.trim());
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return { valid: false, error: 'OCR API URL must use HTTP or HTTPS protocol.' };
+    }
+    const isLocal =
+      parsed.hostname === 'localhost' ||
+      parsed.hostname === '127.0.0.1' ||
+      parsed.hostname === '10.0.2.2';
+    const isProduction =
+      process.env.NODE_ENV === 'production' ||
+      (typeof __DEV__ !== 'undefined' && !__DEV__);
+
+    if (parsed.protocol === 'http:' && isProduction && !isLocal) {
+      return {
+        valid: false,
+        error:
+          'Insecure HTTP OCR endpoint is not allowed in production. HTTPS is required to protect patient and medication data.',
+      };
+    }
+    return { valid: true };
+  } catch {
+    return { valid: false, error: `Invalid OCR API URL: "${url}".` };
+  }
+}
+
+/**
  * Checks if the remote OCR service is reachable over the internet.
  */
 export async function checkOcrServerHealth(): Promise<boolean> {
-  if (!OCR_API_CONFIG.BASE_URL) return false;
+  const url = OCR_API_CONFIG.BASE_URL;
+  if (!url) return false;
+
+  const validation = validateOcrEndpoint(url);
+  if (!validation.valid) return false;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), OCR_API_CONFIG.HEALTH_TIMEOUT_MS);
 
   try {
-    const res = await fetch(`${OCR_API_CONFIG.BASE_URL}/health`, {
+    const res = await fetch(`${url}/health`, {
       method: 'GET',
       signal: controller.signal,
     });
@@ -118,10 +160,9 @@ export async function recognizePackagingImage(imageUri: string): Promise<RemoteO
     throw new Error('No image provided for text recognition.');
   }
 
-  if (!OCR_API_CONFIG.BASE_URL) {
-    throw new Error(
-      'OCR API URL is missing. Please set EXPO_PUBLIC_OCR_API_URL in your environment (.env).',
-    );
+  const endpointValidation = validateOcrEndpoint(OCR_API_CONFIG.BASE_URL);
+  if (!endpointValidation.valid) {
+    throw new Error(endpointValidation.error);
   }
 
   if (!OCR_API_CONFIG.API_KEY) {

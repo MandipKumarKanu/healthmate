@@ -4,6 +4,7 @@ import {
   OcrConnectionError,
   recognizePackagingImage,
   checkOcrServerHealth,
+  validateOcrEndpoint,
 } from '../src/services/remoteOcrService';
 
 describe('Remote OCR Service', () => {
@@ -52,6 +53,44 @@ describe('Remote OCR Service', () => {
       process.env.EXPO_PUBLIC_OCR_API_KEY = 'test-key';
 
       await expect(recognizePackagingImage('')).rejects.toThrow(/No image provided/);
+    });
+
+    it('validates HTTPS and transport security', () => {
+      const prevNodeEnv = process.env.NODE_ENV;
+      try {
+        process.env.NODE_ENV = 'production';
+
+        // Insecure external HTTP in production should fail
+        const httpResult = validateOcrEndpoint('http://insecure-ocr.example.com:8010');
+        expect(httpResult.valid).toBe(false);
+        expect(httpResult.error).toContain('HTTPS is required');
+
+        // Secure external HTTPS in production should succeed
+        const httpsResult = validateOcrEndpoint('https://secure-ocr.example.com');
+        expect(httpsResult.valid).toBe(true);
+
+        // Local development endpoints are allowed
+        expect(validateOcrEndpoint('http://localhost:8010').valid).toBe(true);
+        expect(validateOcrEndpoint('http://127.0.0.1:8010').valid).toBe(true);
+        expect(validateOcrEndpoint('http://10.0.2.2:8010').valid).toBe(true);
+      } finally {
+        process.env.NODE_ENV = prevNodeEnv;
+      }
+    });
+
+    it('rejects insecure HTTP OCR requests in production', async () => {
+      const prevNodeEnv = process.env.NODE_ENV;
+      try {
+        process.env.NODE_ENV = 'production';
+        process.env.EXPO_PUBLIC_OCR_API_URL = 'http://199.192.23.95:8010';
+        process.env.EXPO_PUBLIC_OCR_API_KEY = 'test-key';
+
+        await expect(recognizePackagingImage('file:///test/med.jpg')).rejects.toThrow(
+          /HTTPS is required/,
+        );
+      } finally {
+        process.env.NODE_ENV = prevNodeEnv;
+      }
     });
   });
 

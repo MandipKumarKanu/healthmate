@@ -22,6 +22,62 @@ export interface ScheduleSaveResult {
   alarmFailure?: ScheduleAlarmFailure;
 }
 
+export interface ScheduleArmResult {
+  armed: boolean;
+  alarmFailure?: ScheduleAlarmFailure;
+}
+
+/**
+ * Shared schedule-arming routine used by saveSchedule, edit, and toggleScheduleEnabled.
+ * Checks all dose scheduling results concurrently, cancels partial alarms on any failure,
+ * updates notificationsEnabled to false if arming failed, and diagnoses the reason.
+ */
+export async function armScheduleAlarms(
+  schedule: ReminderSchedule,
+): Promise<ScheduleArmResult> {
+  if (!schedule.enabled || !schedule.notificationsEnabled) {
+    return { armed: true };
+  }
+
+  const medicine = medicineRepository.getById(schedule.medicineId);
+  const medicineName = medicine?.name ?? 'Medicine';
+
+  // Schedule dose chains concurrently; each native chain is keyed by scheduleId + time
+  const scheduledIds = await Promise.all(
+    schedule.times.map((dose) =>
+      notificationService.scheduleDoseReminder(
+        schedule.id,
+        medicineName,
+        dose.amount,
+        dose.time,
+        dose.label,
+        {
+          recurrence: schedule.recurrence,
+          startDate: schedule.startDate,
+          endDate: schedule.endDate,
+        },
+      ),
+    ),
+  );
+
+  if (scheduledIds.some((identifier) => !identifier)) {
+    // Partial failure: cancel any partial OS/native alarms so state is not inconsistent
+    await notificationService.cancelForSchedule(schedule.id);
+    scheduleRepository.save({ ...schedule, notificationsEnabled: false });
+
+    // Classify WHY scheduling failed (notificationPermission vs exactAlarm vs internal)
+    const diagnosis = await notificationService.diagnoseAlarmAccess();
+    const alarmFailure: ScheduleAlarmFailure = !diagnosis.notificationPermission
+      ? 'notification_permission'
+      : !diagnosis.exactAlarm
+        ? 'exact_alarm'
+        : 'internal';
+    return { armed: false, alarmFailure };
+  }
+
+  return { armed: true };
+}
+
 interface ReminderState {
   doses: ScheduledDose[];
   daySummary: DayAdherenceSummary | null;
@@ -33,7 +89,7 @@ interface ReminderState {
     scheduleId: string,
     enabled: boolean,
     refreshDate?: string,
-  ) => Promise<void>;
+  ) => Promise<ScheduleArmResult>;
 }
 
 export const useReminderStore = create<ReminderState>((set, get) => ({
@@ -58,60 +114,18 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
   },
 
   saveSchedule: async (schedule, refreshDate = schedule.startDate || getTodayDateString()) => {
-    // Persist first, then refresh the visible date even when alarms are disabled
-    // or Android refuses to schedule one of the notifications.
+    // Persist schedule changes first
     await notificationService.cancelForSchedule(schedule.id);
     scheduleRepository.save(schedule);
 
     const refreshVisibleDate = () => get().loadDosesForDate(refreshDate);
 
-    if (!schedule.enabled || !schedule.notificationsEnabled) {
-      refreshVisibleDate();
-      return { saved: true };
-    }
-
-    const medicine = medicineRepository.getById(schedule.medicineId);
-    const medicineName = medicine?.name ?? 'Medicine';
-
-    // A schedule can contain multiple dose times. Schedule those dose chains
-    // concurrently; each native chain is keyed by scheduleId + time, and each
-    // trigger list is internally batched by notificationService.
-    const scheduledIds = await Promise.all(
-      schedule.times.map((dose) =>
-        notificationService.scheduleDoseReminder(
-          schedule.id,
-          medicineName,
-          dose.amount,
-          dose.time,
-          dose.label,
-          {
-            recurrence: schedule.recurrence,
-            startDate: schedule.startDate,
-            endDate: schedule.endDate,
-          },
-        ),
-      ),
-    );
-
-    if (scheduledIds.some((identifier) => !identifier)) {
-      // Never leave a schedule marked notification-enabled when only some
-      // of its alarms were scheduled. Cancel any partial OS/native work.
-      await notificationService.cancelForSchedule(schedule.id);
-      scheduleRepository.save({ ...schedule, notificationsEnabled: false });
-      refreshVisibleDate();
-
-      // Classify WHY scheduling failed so screens can show a named
-      // reason (permission loss vs exact-alarm denial vs internal error).
-      const diagnosis = await notificationService.diagnoseAlarmAccess();
-      const alarmFailure: ScheduleAlarmFailure = !diagnosis.notificationPermission
-        ? 'notification_permission'
-        : !diagnosis.exactAlarm
-          ? 'exact_alarm'
-          : 'internal';
-      return { saved: true, alarmFailure };
-    }
-
+    const armResult = await armScheduleAlarms(schedule);
     refreshVisibleDate();
+
+    if (!armResult.armed) {
+      return { saved: true, alarmFailure: armResult.alarmFailure };
+    }
     return { saved: true };
   },
 
@@ -123,29 +137,22 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
 
   toggleScheduleEnabled: async (scheduleId, enabled, refreshDate = getTodayDateString()) => {
     scheduleRepository.toggleEnabled(scheduleId, enabled);
+    const refreshVisibleDate = () => get().loadDosesForDate(refreshDate);
+
     if (!enabled) {
       await notificationService.cancelForSchedule(scheduleId);
-    } else {
-      const schedule = scheduleRepository.getById(scheduleId);
-      if (schedule && schedule.notificationsEnabled) {
-        const medicine = medicineRepository.getById(schedule.medicineId);
-        const medicineName = medicine?.name ?? 'Medicine';
-        for (const dose of schedule.times) {
-          await notificationService.scheduleDoseReminder(
-            schedule.id,
-            medicineName,
-            dose.amount,
-            dose.time,
-            dose.label,
-            {
-              recurrence: schedule.recurrence,
-              startDate: schedule.startDate,
-              endDate: schedule.endDate,
-            },
-          );
-        }
-      }
+      refreshVisibleDate();
+      return { armed: true };
     }
-    get().loadDosesForDate(refreshDate);
+
+    const schedule = scheduleRepository.getById(scheduleId);
+    if (!schedule) {
+      refreshVisibleDate();
+      return { armed: false };
+    }
+
+    const armResult = await armScheduleAlarms(schedule);
+    refreshVisibleDate();
+    return armResult;
   },
 }));

@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Modal } from 'react-native';
 import { AppAlert as Alert } from '../../services/appAlert';
 import { deleteAllScanImages, deleteScanImage } from '../../services/scanImageStorage';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { Colors } from '../../theme/colors';
@@ -30,9 +30,11 @@ export default function ScanHistoryScreen() {
     setScans(list);
   };
 
-  useEffect(() => {
-    loadScans();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadScans();
+    }, []),
+  );
 
   const closeSheet = () => {
     setSelectedScan(null);
@@ -41,8 +43,6 @@ export default function ScanHistoryScreen() {
 
   const handleClearHistory = () => {
     scanHistoryRepository.clearAll();
-    // Rows are gone, so their images are now orphaned too.
-    deleteAllScanImages();
     setShowClearModal(false);
     loadScans();
   };
@@ -67,8 +67,6 @@ export default function ScanHistoryScreen() {
 
   const handleDeleteScan = (scan: ScanHistoryEntry) => {
     scanHistoryRepository.delete(scan.id);
-    // Free the stable image copy with the row that referenced it.
-    deleteScanImage(scan.imageUri);
     closeSheet();
     loadScans();
   };

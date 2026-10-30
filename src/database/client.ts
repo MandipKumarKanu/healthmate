@@ -6,6 +6,7 @@ export interface ISQLiteDatabase {
   runSync(query: string, params?: unknown[]): { changes: number; lastInsertRowId: number };
   getFirstSync<T>(query: string, params?: unknown[]): T | null;
   getAllSync<T>(query: string, params?: unknown[]): T[];
+  withTransactionSync?<T>(fn: () => T): T;
 }
 
 declare const __DEV__: boolean | undefined;
@@ -43,9 +44,82 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
   private scanHistory = new Map<string, Record<string, unknown>>();
   private aiConversations = new Map<string, Record<string, unknown>>();
   private aiMessages = new Map<string, Record<string, unknown>>();
+  private transactionSnapshots: Array<{
+    schemaMigrations: Map<number, { version: number; name: string; applied_at: string }>;
+    profiles: Map<string, Record<string, unknown>>;
+    preferences: Map<string, { key: string; value: string }>;
+    medicines: Map<string, Record<string, unknown>>;
+    schedules: Map<string, Record<string, unknown>>;
+    scheduleHistory: Map<string, Record<string, unknown>>;
+    adherenceLogs: Map<string, Record<string, unknown>>;
+    refillReminders: Map<string, Record<string, unknown>>;
+    scanHistory: Map<string, Record<string, unknown>>;
+    aiConversations: Map<string, Record<string, unknown>>;
+    aiMessages: Map<string, Record<string, unknown>>;
+  }> = [];
+
+  beginTransaction(): void {
+    this.transactionSnapshots.push({
+      schemaMigrations: new Map(this.schemaMigrations),
+      profiles: new Map(this.profiles),
+      preferences: new Map(this.preferences),
+      medicines: new Map(this.medicines),
+      schedules: new Map(this.schedules),
+      scheduleHistory: new Map(this.scheduleHistory),
+      adherenceLogs: new Map(this.adherenceLogs),
+      refillReminders: new Map(this.refillReminders),
+      scanHistory: new Map(this.scanHistory),
+      aiConversations: new Map(this.aiConversations),
+      aiMessages: new Map(this.aiMessages),
+    });
+  }
+
+  commitTransaction(): void {
+    this.transactionSnapshots.pop();
+  }
+
+  rollbackTransaction(): void {
+    const snap = this.transactionSnapshots.pop();
+    if (!snap) return;
+    this.schemaMigrations = snap.schemaMigrations;
+    this.profiles = snap.profiles;
+    this.preferences = snap.preferences;
+    this.medicines = snap.medicines;
+    this.schedules = snap.schedules;
+    this.scheduleHistory = snap.scheduleHistory;
+    this.adherenceLogs = snap.adherenceLogs;
+    this.refillReminders = snap.refillReminders;
+    this.scanHistory = snap.scanHistory;
+    this.aiConversations = snap.aiConversations;
+    this.aiMessages = snap.aiMessages;
+  }
+
+  withTransactionSync<T>(fn: () => T): T {
+    this.beginTransaction();
+    try {
+      const res = fn();
+      this.commitTransaction();
+      return res;
+    } catch (e) {
+      this.rollbackTransaction();
+      throw e;
+    }
+  }
 
   execSync(sql: string): void {
     const clean = sql.trim().toUpperCase();
+    if (clean === 'BEGIN' || clean === 'BEGIN TRANSACTION' || clean === 'BEGIN TRANSACTION;') {
+      this.beginTransaction();
+      return;
+    }
+    if (clean === 'COMMIT' || clean === 'COMMIT;' || clean === 'COMMIT TRANSACTION;' || clean === 'COMMIT TRANSACTION') {
+      this.commitTransaction();
+      return;
+    }
+    if (clean === 'ROLLBACK' || clean === 'ROLLBACK;' || clean === 'ROLLBACK TRANSACTION;' || clean === 'ROLLBACK TRANSACTION') {
+      this.rollbackTransaction();
+      return;
+    }
     if (clean.includes('DROP TABLE')) {
       if (clean.includes('SCHEMA_MIGRATIONS')) {
         this.schemaMigrations.clear();
@@ -765,4 +839,24 @@ export function resetDatabase(): void {
     DROP TABLE IF EXISTS preferences;
   `);
   migrationManager.runMigrations(db);
+}
+
+export function withTransaction<T>(fn: () => T): T {
+  const db = getDatabase();
+  if (typeof (db as any).withTransactionSync === 'function') {
+    return (db as any).withTransactionSync(fn);
+  }
+  db.execSync('BEGIN TRANSACTION;');
+  try {
+    const res = fn();
+    db.execSync('COMMIT;');
+    return res;
+  } catch (err) {
+    try {
+      db.execSync('ROLLBACK;');
+    } catch {
+      // ignore rollback errors
+    }
+    throw err;
+  }
 }

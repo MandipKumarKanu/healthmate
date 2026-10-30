@@ -1,5 +1,6 @@
 import { getDatabase } from '../client';
 import { ScanHistoryEntry, DosageForm } from '../../types';
+import { deleteScanImage, deleteAllScanImages } from '../../services/scanImageStorage';
 
 interface ScanRow {
   id: string;
@@ -38,7 +39,7 @@ export const scanHistoryRepository = {
 
   add(scan: Omit<ScanHistoryEntry, 'id' | 'scannedAt'>): ScanHistoryEntry {
     const db = getDatabase();
-    const id = `scan_${Date.now()}`;
+    const id = `scan_${Date.now()}_${Math.floor(Math.random() * 1_000_000)}`;
     const scannedAt = new Date().toISOString();
 
     const entry: ScanHistoryEntry = {
@@ -74,11 +75,21 @@ export const scanHistoryRepository = {
     const existing = db.getFirstSync<ScanRow>('SELECT * FROM scan_history WHERE id = ?;', [id]);
     if (!existing) return false;
     const result = db.runSync('DELETE FROM scan_history WHERE id = ?;', [id]);
+    if (result.changes > 0 && existing.image_uri) {
+      const allRows = db.getAllSync<ScanRow>('SELECT * FROM scan_history;');
+      const isStillReferenced = allRows.some(
+        (r) => r.id !== id && r.image_uri === existing.image_uri,
+      );
+      if (!isStillReferenced) {
+        deleteScanImage(existing.image_uri);
+      }
+    }
     return result.changes > 0;
   },
 
   clearAll(): void {
     const db = getDatabase();
     db.runSync('DELETE FROM scan_history;');
+    deleteAllScanImages();
   },
 };

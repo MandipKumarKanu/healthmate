@@ -23,7 +23,8 @@ import { formatScheduleDateLabel, getDateTapAction } from '../../utils/scheduleR
 export default function CalendarScreen() {
   const router = useRouter();
   const { selectedDate, setSelectedDate } = useAppStore();
-  const { doses, daySummary, loadDosesForDate, markDoseStatus } = useReminderStore();
+  const { doses, daySummary, loadDosesForDate, markDoseStatus, deleteSchedule } =
+    useReminderStore();
 
   useFocusEffect(
     useCallback(() => {
@@ -49,6 +50,34 @@ export default function CalendarScreen() {
 
   const handleMorePress = (dose: ScheduledDose) => {
     Alert.alert(dose.medicineName, `Scheduled for ${dose.time} (${dose.amount})`, [
+      {
+        text: 'Edit Reminder',
+        onPress: () =>
+          router.push({
+            pathname: '/reminders/create',
+            params: { medicineId: dose.medicineId, date: selectedDate },
+          }),
+      },
+      {
+        text: 'Delete Reminder',
+        style: 'destructive',
+        onPress: () => {
+          Alert.alert(
+            'Delete Reminder',
+            `Delete schedule for ${dose.medicineName}? This will cancel all alarms for this reminder.`,
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Delete',
+                style: 'destructive',
+                onPress: async () => {
+                  await deleteSchedule(dose.scheduleId, selectedDate);
+                },
+              },
+            ],
+          );
+        },
+      },
       {
         text: 'Mark as Taken',
         onPress: () => markDoseStatus(dose, 'taken', selectedDate),
@@ -143,7 +172,7 @@ export default function CalendarScreen() {
         ) : (
           /* Helper Note */
           <Text style={styles.helperNote}>
-            Use the more options button to edit or delete a reminder.
+            Use the more options button (•••) on any dose card to edit, delete, or log.
           </Text>
         )}
 

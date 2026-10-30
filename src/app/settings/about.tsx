@@ -11,7 +11,8 @@ import { AppCard } from '../../components/ui/AppCard';
 
 export default function AboutScreen() {
   const router = useRouter();
-  const appVersion = Constants.expoConfig?.version ?? '1.3.1';
+  const appVersion =
+    Constants.expoConfig?.version ?? Constants.nativeAppVersion ?? 'Unavailable';
 
   return (
     <AppScreen scrollable contentContainerStyle={styles.scrollContent}>

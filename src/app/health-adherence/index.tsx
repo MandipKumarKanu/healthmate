@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { StyleSheet, View, Text } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { Radius, Spacing, Typography } from '../../theme/tokens';
@@ -24,19 +24,21 @@ export default function HealthAdherenceScreen() {
   const [totalMedicines, setTotalMedicines] = useState(0);
   const [activeSchedulesCount, setActiveSchedulesCount] = useState(0);
 
-  useEffect(() => {
-    const summary = adherenceRepository.getDayAdherenceSummary(selectedDate);
-    setTodaySummary(summary);
+  useFocusEffect(
+    useCallback(() => {
+      const summary = adherenceRepository.getDayAdherenceSummary(selectedDate);
+      setTodaySummary(summary);
 
-    const week = adherenceRepository.getWeeklyAdherenceSummaries(selectedDate);
-    setWeeklySummaries(week);
+      const week = adherenceRepository.getWeeklyAdherenceSummaries(selectedDate);
+      setWeeklySummaries(week);
 
-    const meds = medicineRepository.getAll();
-    setTotalMedicines(meds.length);
+      const meds = medicineRepository.getAll();
+      setTotalMedicines(meds.length);
 
-    const scheds = scheduleRepository.getAll().filter((s) => s.enabled);
-    setActiveSchedulesCount(scheds.length);
-  }, [selectedDate]);
+      const scheds = scheduleRepository.getAll().filter((s) => s.enabled);
+      setActiveSchedulesCount(scheds.length);
+    }, [selectedDate]),
+  );
 
   const percentage = todaySummary?.percentage ?? 50;
 

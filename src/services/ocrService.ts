@@ -15,12 +15,21 @@
 import { DosageForm } from '../types';
 import { extractAndMatchMedicineName, MedicineMatchCandidate } from './pharmaceuticalDictionary';
 
+export interface FieldConfidence {
+  medicineName: number;
+  detectedStrength?: number;
+  expiryDate?: number;
+  batchNumber?: number;
+  manufacturer?: number;
+}
+
 export interface ExtractedMedicineData {
   medicineName?: string;
   genericName?: string;
   isBrand?: boolean;
   confidenceScore?: number;
   isHighConfidence?: boolean;
+  fieldConfidence?: FieldConfidence;
   candidates?: MedicineMatchCandidate[];
   originalMatchText?: string;
   detectedStrength?: string;
@@ -367,6 +376,16 @@ export const ocrService = {
 
     const manufacturer = extractKeyedField(lines, KEY_MFG, parseManufacturerValue);
     if (manufacturer) result.manufacturer = manufacturer;
+
+    // Field-level confidence scores
+    const fieldConfidence: FieldConfidence = {
+      medicineName: result.confidenceScore ?? 0.5,
+      ...(strength ? { detectedStrength: anchorLineIndex !== null ? 0.95 : 0.85 } : {}),
+      ...(expiryDate ? { expiryDate: 0.9 } : {}),
+      ...(batchNumber ? { batchNumber: 0.9 } : {}),
+      ...(manufacturer ? { manufacturer: 0.9 } : {}),
+    };
+    result.fieldConfidence = fieldConfidence;
 
     return result;
   },

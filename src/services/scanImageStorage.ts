@@ -1,5 +1,5 @@
 import { Directory, File, Paths } from 'expo-file-system';
-import { scanHistoryRepository } from '../database/repositories/scanHistoryRepository';
+import { getDatabase } from '../database/client';
 
 /**
  * Stable scan-image storage.
@@ -107,8 +107,11 @@ export function cleanupOrphanScanImages(): number {
     if (!dir.exists) return 0;
 
     const referenced = new Set<string>();
-    for (const scan of scanHistoryRepository.getAll()) {
-      if (scan.imageUri) referenced.add(uriBaseName(scan.imageUri));
+    const rows = getDatabase().getAllSync<{ image_uri?: string | null }>(
+      'SELECT image_uri FROM scan_history;',
+    );
+    for (const scan of rows) {
+      if (scan.image_uri) referenced.add(uriBaseName(scan.image_uri));
     }
 
     let deleted = 0;

@@ -25,7 +25,20 @@ const NativeModules = {
   },
 };
 
+const Keyboard = {
+  addListener: jest.fn(() => ({ remove: jest.fn() })),
+  removeListener: jest.fn(),
+  dismiss: jest.fn(),
+};
+
+const Dimensions = {
+  get: jest.fn(() => ({ width: 390, height: 844, scale: 3, fontScale: 1 })),
+  addEventListener: jest.fn(() => ({ remove: jest.fn() })),
+};
+
 module.exports = {
   Platform,
   NativeModules,
+  Keyboard,
+  Dimensions,
 };

@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { StyleSheet, View, Text, TextInput, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { Radius, Spacing, Typography } from '../../theme/tokens';
@@ -26,17 +26,21 @@ export default function MedicinesScreen() {
     setReminderFilter,
   } = useMedicineStore();
 
-  const [schedulesMap, setSchedulesMap] = useState<Map<string, ReminderSchedule>>(new Map());
+  const [schedulesMap, setSchedulesMap] = useState<Map<string, ReminderSchedule[]>>(new Map());
 
-  useEffect(() => {
-    loadMedicines();
-    const schedules = scheduleRepository.getAll();
-    const map = new Map<string, ReminderSchedule>();
-    for (const s of schedules) {
-      map.set(s.medicineId, s);
-    }
-    setSchedulesMap(map);
-  }, [loadMedicines]);
+  useFocusEffect(
+    useCallback(() => {
+      loadMedicines();
+      const allSchedules = scheduleRepository.getAll();
+      const map = new Map<string, ReminderSchedule[]>();
+      for (const s of allSchedules) {
+        const list = map.get(s.medicineId) || [];
+        list.push(s);
+        map.set(s.medicineId, list);
+      }
+      setSchedulesMap(map);
+    }, [loadMedicines]),
+  );
 
   return (
     <AppScreen scrollable contentContainerStyle={styles.scrollContent}>
@@ -134,7 +138,7 @@ export default function MedicinesScreen() {
           <MedicineCard
             key={medicine.id}
             medicine={medicine}
-            schedule={schedulesMap.get(medicine.id)}
+            schedules={schedulesMap.get(medicine.id) || []}
             onPress={() => router.push(`/medicines/${medicine.id}`)}
           />
         ))}

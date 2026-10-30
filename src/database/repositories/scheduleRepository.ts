@@ -126,6 +126,15 @@ export const scheduleRepository = {
     return row ? mapRowToSchedule(row) : null;
   },
 
+  getAllByMedicineId(medicineId: string): ReminderSchedule[] {
+    const db = getDatabase();
+    const rows = db.getAllSync<ScheduleRow>(
+      'SELECT * FROM schedules WHERE medicine_id = ?;',
+      [medicineId],
+    );
+    return rows.map(mapRowToSchedule);
+  },
+
   getSchedulesForDate(date: string): ReminderSchedule[] {
     const db = getDatabase();
     const activeRows = db.getAllSync<ScheduleRow>('SELECT * FROM schedules WHERE enabled = 1;');

@@ -151,6 +151,32 @@ describe('Refill & Inventory Tracking (migration 003 wiring)', () => {
       );
       expect(medicineRepository.getById('med_refill_test')?.currentInventory).toBe(9);
     });
+
+    it('rolls back adherence log if stock update fails atomically', () => {
+      seedTrackedMedicine({ currentInventory: 10 });
+      const scheduleId = seedDailySchedule('med_refill_test');
+
+      jest.spyOn(refillService, 'applyStockChange').mockImplementationOnce(() => {
+        throw new Error('Simulated stock update database failure');
+      });
+
+      expect(() => {
+        adherenceRepository.logDoseStatus(
+          scheduleId,
+          'med_refill_test',
+          todayString(),
+          '10:00',
+          'taken',
+        );
+      }).toThrow(/Simulated stock update/);
+
+      // Verify stock was NOT changed
+      expect(medicineRepository.getById('med_refill_test')?.currentInventory).toBe(10);
+      // Verify adherence log was rolled back
+      const doses = adherenceRepository.getDosesForDate(todayString());
+      const dose = doses.find((d) => d.scheduleId === scheduleId);
+      expect(dose?.status).not.toBe('taken');
+    });
   });
 
   describe('Threshold crossing & refill rows', () => {

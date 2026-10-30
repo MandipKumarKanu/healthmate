@@ -135,4 +135,57 @@ describe('scanImageStorage', () => {
     expect(cleanupOrphanScanImages()).toBe(0);
     expect(local.exists).toBe(true);
   });
+
+  it('removes the managed image file when its repository record is deleted', () => {
+    const file = new File(managedDir(), 'scan_to_delete.jpg');
+    file.create();
+
+    const scan = scanHistoryRepository.add({
+      medicineName: 'Amoxicillin',
+      dosageForm: 'capsule',
+      imageUri: file.uri,
+    });
+    expect(file.exists).toBe(true);
+
+    const deleted = scanHistoryRepository.delete(scan.id);
+    expect(deleted).toBe(true);
+    expect(file.exists).toBe(false);
+  });
+
+  it('does not delete the image file on record delete if another record still references it', () => {
+    const sharedFile = new File(managedDir(), 'scan_shared.jpg');
+    sharedFile.create();
+
+    const scan1 = scanHistoryRepository.add({
+      medicineName: 'Paracetamol 1',
+      imageUri: sharedFile.uri,
+    });
+    const scan2 = scanHistoryRepository.add({
+      medicineName: 'Paracetamol 2',
+      imageUri: sharedFile.uri,
+    });
+
+    scanHistoryRepository.delete(scan1.id);
+    // Scan2 still references it, so the file must NOT be deleted
+    expect(sharedFile.exists).toBe(true);
+
+    scanHistoryRepository.delete(scan2.id);
+    // Now both are deleted, so the file must be deleted
+    expect(sharedFile.exists).toBe(false);
+  });
+
+  it('removes all managed files on scanHistoryRepository.clearAll()', () => {
+    const f1 = new File(managedDir(), 'clear_1.jpg');
+    const f2 = new File(managedDir(), 'clear_2.jpg');
+    f1.create();
+    f2.create();
+
+    scanHistoryRepository.add({ medicineName: 'Med 1', imageUri: f1.uri });
+    scanHistoryRepository.add({ medicineName: 'Med 2', imageUri: f2.uri });
+
+    scanHistoryRepository.clearAll();
+    expect(scanHistoryRepository.getAll().length).toBe(0);
+    expect(f1.exists).toBe(false);
+    expect(f2.exists).toBe(false);
+  });
 });

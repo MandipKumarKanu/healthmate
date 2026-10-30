@@ -35,7 +35,7 @@ function withAlarmPermissions(config) {
     }
 
     const app = androidManifest.application[0];
-    app.$['android:usesCleartextTraffic'] = 'true';
+    app.$['android:usesCleartextTraffic'] = 'false';
     app.$['android:networkSecurityConfig'] = '@xml/network_security_config';
     app.service = app.service || [];
     if (!app.service.some((s) => s.$['android:name'] === '.alarm.AlarmService')) {
@@ -204,11 +204,22 @@ function withAlarmNativeFiles(config) {
 
       const networkSecurityConfigContent = `<?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <base-config cleartextTrafficPermitted="true">
+    <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
     </base-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
+    </domain-config>
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </debug-overrides>
 </network-security-config>
 `;
       fs.writeFileSync(

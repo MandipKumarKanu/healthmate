@@ -249,36 +249,146 @@ export const backupService = {
   },
 
   /**
-   * Restores a validated payload: wipe → rebuild schema → re-insert rows.
-   * Returns the number of restored rows. Callers are responsible for
-   * refreshing Zustand stores and re-reconciling notifications afterwards.
+   * Validates row data across all tables before any database changes are made.
    */
-  restoreFromBackup(payload: BackupPayload): { restored: number } {
-    resetDatabase(); // Drops all data and re-runs migrations (schema v3).
+  validateBackupRows(payload: BackupPayload): { valid: boolean; error?: string } {
+    const medIds = new Set<string>();
+    const schedIds = new Set<string>();
 
-    const db = getDatabase();
-    let restored = 0;
-
-    for (const table of TABLES) {
-      const rows = payload.tables[table];
-      if (!rows || rows.length === 0) continue;
-
-      const columns = TABLE_COLUMNS[table];
-      const placeholders = columns.map(() => '?').join(', ');
-      // Plain INSERT: restore always runs on a freshly-wiped database, so
-      // there is nothing to replace (matches the adapter contract too).
-      const insertSql = `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders});`;
-
-      for (const row of rows) {
-        db.runSync(
-          insertSql,
-          columns.map((col) => row[col] ?? null),
-        );
-        restored++;
+    if (payload.tables.medicines) {
+      for (const row of payload.tables.medicines) {
+        if (!row.id || typeof row.id !== 'string') {
+          return { valid: false, error: 'Medicine record has invalid or missing id.' };
+        }
+        if (!row.name || typeof row.name !== 'string') {
+          return { valid: false, error: `Medicine "${row.id}" has missing name.` };
+        }
+        medIds.add(row.id);
       }
     }
 
-    return { restored };
+    if (payload.tables.schedules) {
+      const validRecurrences = ['daily', 'specific_days', 'interval', 'as_needed', 'weekly', 'monthly'];
+      for (const row of payload.tables.schedules) {
+        if (!row.id || typeof row.id !== 'string') {
+          return { valid: false, error: 'Schedule record has invalid or missing id.' };
+        }
+        if (!row.medicine_id || typeof row.medicine_id !== 'string') {
+          return { valid: false, error: `Schedule "${row.id}" has missing medicine_id.` };
+        }
+        if (medIds.size > 0 && !medIds.has(row.medicine_id)) {
+          return {
+            valid: false,
+            error: `Schedule "${row.id}" references non-existent medicine "${row.medicine_id}".`,
+          };
+        }
+        if (row.recurrence && !validRecurrences.includes(String(row.recurrence))) {
+          return {
+            valid: false,
+            error: `Schedule "${row.id}" has unsupported recurrence "${String(row.recurrence)}".`,
+          };
+        }
+        schedIds.add(row.id);
+      }
+    }
+
+    if (payload.tables.schedule_history) {
+      for (const row of payload.tables.schedule_history) {
+        if (row.id) schedIds.add(String(row.id));
+      }
+    }
+
+    if (payload.tables.adherence_logs) {
+      const validStatuses = ['taken', 'missed', 'skipped', 'upcoming'];
+      for (const row of payload.tables.adherence_logs) {
+        if (!row.id || typeof row.id !== 'string') {
+          return { valid: false, error: 'Adherence log has invalid or missing id.' };
+        }
+        if (row.status && !validStatuses.includes(String(row.status))) {
+          return {
+            valid: false,
+            error: `Adherence log "${row.id}" has invalid status "${String(row.status)}".`,
+          };
+        }
+        if (row.medicine_id && medIds.size > 0 && !medIds.has(String(row.medicine_id))) {
+          return {
+            valid: false,
+            error: `Adherence log "${row.id}" references unknown medicine "${row.medicine_id}".`,
+          };
+        }
+      }
+    }
+
+    return { valid: true };
+  },
+
+  /**
+   * Restores a validated payload: wipe → rebuild schema → re-insert rows.
+   * If any error occurs during restoration, it automatically rolls back
+   * to preserve previous user data, preventing partial database destruction.
+   */
+  restoreFromBackup(payload: BackupPayload): { restored: number } {
+    // 1. Comprehensive pre-validation before altering existing data
+    const validation = this.validateBackupRows(payload);
+    if (!validation.valid) {
+      throw new Error(`Backup validation failed: ${validation.error}`);
+    }
+
+    // 2. Snapshot current state for rollback protection
+    const previousSnapshot = this.createBackupJson();
+
+    // 3. Attempt restoration
+    try {
+      resetDatabase(); // Drops all data and re-runs migrations (schema v3).
+
+      const db = getDatabase();
+      let restored = 0;
+
+      for (const table of TABLES) {
+        const rows = payload.tables[table];
+        if (!rows || rows.length === 0) continue;
+
+        const columns = TABLE_COLUMNS[table];
+        const placeholders = columns.map(() => '?').join(', ');
+        const insertSql = `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders});`;
+
+        for (const row of rows) {
+          db.runSync(
+            insertSql,
+            columns.map((col) => row[col] ?? null),
+          );
+          restored++;
+        }
+      }
+
+      return { restored };
+    } catch (restoreError) {
+      // Automatic rollback to previous snapshot on failure
+      console.warn('Restoration failed midway, rolling back to previous state:', restoreError);
+      try {
+        const previousParsed = this.parseBackup(previousSnapshot);
+        if (previousParsed.ok) {
+          resetDatabase();
+          const db = getDatabase();
+          for (const table of TABLES) {
+            const rows = previousParsed.payload.tables[table];
+            if (!rows || rows.length === 0) continue;
+            const columns = TABLE_COLUMNS[table];
+            const placeholders = columns.map(() => '?').join(', ');
+            const insertSql = `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders});`;
+            for (const row of rows) {
+              db.runSync(
+                insertSql,
+                columns.map((col) => row[col] ?? null),
+              );
+            }
+          }
+        }
+      } catch (rollbackError) {
+        console.error('Fatal rollback error:', rollbackError);
+      }
+      throw restoreError;
+    }
   },
 
   /**

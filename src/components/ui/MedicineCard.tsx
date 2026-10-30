@@ -11,27 +11,37 @@ import { StatusBadge } from './StatusBadge';
 interface MedicineCardProps {
   medicine: Medicine;
   schedule?: ReminderSchedule | null;
+  schedules?: ReminderSchedule[] | null;
   onPress: () => void;
 }
 
-export function MedicineCard({ medicine, schedule, onPress }: MedicineCardProps) {
+export function MedicineCard({ medicine, schedule, schedules, onPress }: MedicineCardProps) {
   const isExpired =
     medicine.packageDetails.expiryDate?.toLowerCase().includes('2026') ||
     medicine.packageDetails.packageDetailsText?.toLowerCase().includes('expired');
 
   const formatScheduleText = () => {
-    if (!schedule || !schedule.enabled || schedule.times.length === 0) {
+    const list = schedules ?? (schedule ? [schedule] : []);
+    const activeList = list.filter((s) => s.enabled && s.times.length > 0);
+    if (activeList.length === 0) {
       return null;
     }
-    const timesStr = schedule.times.map((t) => t.time).join(' & ');
-    const recurrenceStr =
-      schedule.recurrence === 'daily'
-        ? 'Daily'
-        : schedule.recurrence.charAt(0).toUpperCase() + schedule.recurrence.slice(1);
-    return `${timesStr} · ${recurrenceStr}`;
+    return activeList
+      .map((s) => {
+        const timesStr = s.times.map((t) => t.time).join(' & ');
+        const recurrenceStr =
+          s.recurrence === 'daily'
+            ? 'Daily'
+            : s.recurrence.charAt(0).toUpperCase() + s.recurrence.slice(1);
+        return `${timesStr} · ${recurrenceStr}`;
+      })
+      .join('; ');
   };
 
   const scheduleText = formatScheduleText();
+  const hasActiveReminder =
+    (schedules ? schedules.some((s) => s.enabled && s.times.length > 0) : schedule?.enabled) ||
+    false;
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
@@ -62,7 +72,7 @@ export function MedicineCard({ medicine, schedule, onPress }: MedicineCardProps)
           <StatusBadge status="expired" />
         ) : isLowStock(medicine) ? (
           <StatusBadge status="low-stock" />
-        ) : schedule?.enabled ? (
+        ) : hasActiveReminder ? (
           <StatusBadge status="reminders-on" />
         ) : null}
       </View>

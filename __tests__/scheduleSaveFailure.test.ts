@@ -107,4 +107,22 @@ describe('saveSchedule failure classification', () => {
 
     expect(scheduleRepository.getById(SCHEDULE_ID)?.notificationsEnabled).toBe(true);
   });
+
+  it('unifies toggleScheduleEnabled failure handling with armScheduleAlarms', async () => {
+    // First save disabled schedule
+    const sched = { ...makeSchedule(), enabled: false, notificationsEnabled: true };
+    scheduleRepository.save(sched);
+
+    // Toggle enabled when notification permission is denied
+    mockPermissions(false);
+    const result = await useReminderStore.getState().toggleScheduleEnabled(SCHEDULE_ID, true);
+
+    expect(result.armed).toBe(false);
+    expect(result.alarmFailure).toBe('notification_permission');
+
+    // The schedule must not stay marked notification-enabled when alarms failed
+    const reloaded = scheduleRepository.getById(SCHEDULE_ID);
+    expect(reloaded?.notificationsEnabled).toBe(false);
+    expect(await Notifications.getAllScheduledNotificationsAsync()).toHaveLength(0);
+  });
 });

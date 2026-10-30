@@ -15,7 +15,7 @@ export default function PrivacyScreen() {
     <AppScreen scrollable contentContainerStyle={styles.scrollContent}>
       <AppHeader
         title="Privacy & Data"
-        subtitle="Local-first data isolation architecture"
+        subtitle="Transparent data architecture & processing disclosure"
         brandText="HealthMate AI"
         onBackPress={() => router.back()}
       />
@@ -25,36 +25,54 @@ export default function PrivacyScreen() {
           <View style={styles.iconCircle}>
             <Feather name="shield" size={28} color={Colors.primary} />
           </View>
-          <Text style={styles.heading}>Your Data Stays on Your Device</Text>
+          <Text style={styles.heading}>Local-First Data Storage</Text>
           <Text style={styles.paragraph}>
-            HealthMate AI is designed with privacy at its core. Your medication lists, dosage
-            schedules, adherence history, and packaging camera scans are stored exclusively in your
-            device's local SQLite database.
+            HealthMate AI is architected with a local-first design. Your medication lists, dosage
+            schedules, adherence history, and scan history records are stored in your device's
+            local SQLite database. Managed scan photos are stored in app-private persistent storage.
           </Text>
         </AppCard>
 
         <AppCard style={styles.card}>
-          <Text style={styles.sectionTitle}>Zero Third-Party Tracking</Text>
+          <Text style={styles.sectionTitle}>Cloud OCR Processing</Text>
           <Text style={styles.paragraph}>
-            We do not sell, share, or transmit your health logs or personal identifying data to
-            advertising networks or third-party brokers.
+            When scanning medicine packaging with cloud OCR enabled, label images are transmitted
+            over HTTPS to the configured OCR endpoint (e.g. RapidOCR) to extract text lines and
+            packaging details. This occurs only when initiating a scan.
           </Text>
 
           <View style={styles.divider} />
 
-          <Text style={styles.sectionTitle}>Camera & Photo Access</Text>
+          <Text style={styles.sectionTitle}>AI Health Assistant (Google Gemini)</Text>
           <Text style={styles.paragraph}>
-            Camera access is only utilized during package label scanning to extract text using
-            on-device optical character recognition. Scanned images are stored locally in
-            application cache.
+            When you connect Google Gemini or ask medication questions in the AI Assistant,
+            your prompt and relevant medicine details are transmitted directly to Google's Gemini API
+            using your saved API key. Your API key and chat history remain stored locally on your device.
           </Text>
 
           <View style={styles.divider} />
 
-          <Text style={styles.sectionTitle}>Data Control & Deletion</Text>
+          <Text style={styles.sectionTitle}>Offline Use & Manual Entry</Text>
           <Text style={styles.paragraph}>
-            You have complete sovereignty over your data. You can delete individual records, clear
-            your scan history, or wipe all application data at any time from Profile & Settings.
+            Cloud features are optional. You can manage your medications, schedule alarms, and track
+            dose adherence entirely offline by adding medicines manually without transmitting any data.
+          </Text>
+
+          <View style={styles.divider} />
+
+          <Text style={styles.sectionTitle}>Zero Third-Party Advertising</Text>
+          <Text style={styles.paragraph}>
+            We do not sell, broker, or transmit your health records, adherence data, or personal
+            information to advertising networks or external data brokers.
+          </Text>
+
+          <View style={styles.divider} />
+
+          <Text style={styles.sectionTitle}>Data Control, Export & Deletion</Text>
+          <Text style={styles.paragraph}>
+            You have complete sovereignty over your data. You can export or restore complete JSON
+            snapshots, delete individual medications or scans, or wipe all application data at any
+            time from Settings.
           </Text>
         </AppCard>
       </View>
@@ -100,7 +118,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: Colors.borderLight,
+    backgroundColor: Colors.border,
     marginVertical: 14,
   },
 });

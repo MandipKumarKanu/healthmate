@@ -213,5 +213,33 @@ Batch: PC-4521
       const extracted = ocrService.extractMedicineData(rawText);
       expect(extracted.lines).toEqual(['Metformin 500mg Tablets BP', 'Batch: DEMO-MF0426']);
     });
+
+    it('tracks field-level confidence scores for structured fields', () => {
+      const rawText = `
+Metformin Hydrochloride Tablets USP
+500 mg
+Batch No: DEMO-MF0426
+Exp Date: 12/2027
+Manufactured by: Example Pharma Ltd.
+      `;
+      const extracted = ocrService.extractMedicineData(rawText);
+      expect(extracted.fieldConfidence).toBeDefined();
+      expect(extracted.fieldConfidence?.medicineName).toBeGreaterThan(0.7);
+      expect(extracted.fieldConfidence?.detectedStrength).toBeGreaterThan(0.8);
+      expect(extracted.fieldConfidence?.expiryDate).toBeGreaterThan(0.8);
+      expect(extracted.fieldConfidence?.batchNumber).toBeGreaterThan(0.8);
+      expect(extracted.fieldConfidence?.manufacturer).toBeGreaterThan(0.8);
+    });
+
+    it('handles degraded / noisy input with low confidence and missing fields gracefully', () => {
+      // Very blurry or degraded label with only partial text
+      const blurryText = '?? random glare line\n80mg\n?? illegible';
+      const extracted = ocrService.extractMedicineData(blurryText);
+
+      expect(extracted.isHighConfidence).toBe(false);
+      expect(extracted.expiryDate).toBeUndefined();
+      expect(extracted.batchNumber).toBeUndefined();
+      expect(extracted.fieldConfidence?.medicineName).toBeLessThanOrEqual(0.6);
+    });
   });
 });

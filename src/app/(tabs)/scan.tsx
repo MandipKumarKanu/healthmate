@@ -162,8 +162,17 @@ export default function ScanScreen() {
       setMedBatch(extracted.batchNumber || '');
       setMedMfg(extracted.manufacturer || '');
 
-      // Auto-save all scans directly to scan history
+      // Auto-save all scans directly to scan history with managed persistent storage
       try {
+        let stableImageUri: string | undefined;
+        try {
+          stableImageUri = await saveScanImage(imageUri);
+        } catch (copyErr) {
+          console.warn('saveScanImage copy failed, preserving original or null:', copyErr);
+        }
+        if (stableImageUri) {
+          setCapturedImage(stableImageUri);
+        }
         scanHistoryRepository.add({
           medicineName: extracted.medicineName || 'Scanned Medicine',
           detectedStrength: extracted.detectedStrength || undefined,
@@ -172,7 +181,7 @@ export default function ScanScreen() {
           batchNumber: extracted.batchNumber || undefined,
           expiryDate: extracted.expiryDate || undefined,
           rawText: rawText,
-          imageUri: imageUri,
+          imageUri: stableImageUri ?? imageUri,
         });
       } catch (historyErr) {
         console.warn('Auto-save scan to history failed:', historyErr);

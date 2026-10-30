@@ -1,4 +1,4 @@
-import { getDatabase } from '../client';
+import { getDatabase, withTransaction } from '../client';
 import { medicineRepository } from './medicineRepository';
 import { scheduleRepository } from './scheduleRepository';
 import { refillService } from '../../services/refillService';
@@ -246,34 +246,48 @@ export const adherenceRepository = {
 
     const logId = `log_${scheduleId}_${date}_${time.replace(':', '')}`;
 
-    // Stock accounting: only transition into/out of 'taken' consumes a unit.
-    // Re-logging an already-taken dose, or logging a never-taken dose again,
-    // must not double-count (or compensate twice).
-    const previousStatus = getDatabase().getFirstSync<{ status: DoseStatus }>(
-      'SELECT status FROM adherence_logs WHERE dose_date = ? AND dose_time = ? AND schedule_id = ?;',
-      [date, time, scheduleId],
-    );
-    let stockDelta: number | null = null;
-    if (status === 'taken' && previousStatus?.status !== 'taken') stockDelta = -1;
-    else if (status !== 'taken' && previousStatus?.status === 'taken') stockDelta = 1;
+    let refillAlertNeeded: { medName: string; stock: number; unitDosage?: string } | null = null;
 
-    getDatabase().runSync(
-      `INSERT OR REPLACE INTO adherence_logs (
-        id, schedule_id, medicine_id, dose_date, dose_time, status, logged_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?);`,
-      [logId, scheduleId, medicineId, date, time, status, new Date().toISOString()],
-    );
+    // Atomically update adherence log and inventory inside a single transaction
+    withTransaction(() => {
+      // Stock accounting: only transition into/out of 'taken' consumes a unit.
+      // Re-logging an already-taken dose, or logging a never-taken dose again,
+      // must not double-count (or compensate twice).
+      const previousStatus = getDatabase().getFirstSync<{ status: DoseStatus }>(
+        'SELECT status FROM adherence_logs WHERE dose_date = ? AND dose_time = ? AND schedule_id = ?;',
+        [date, time, scheduleId],
+      );
+      let stockDelta: number | null = null;
+      if (status === 'taken' && previousStatus?.status !== 'taken') stockDelta = -1;
+      else if (status !== 'taken' && previousStatus?.status === 'taken') stockDelta = 1;
 
-    if (stockDelta !== null) {
-      const change = refillService.applyStockChange(medicineId, stockDelta);
-      if (change?.thresholdCrossed) {
-        const med = medicineRepository.getById(medicineId);
-        // Fire-and-forget: logging stays synchronous.
-        void refillService
-          .notifyRefillNeeded(med?.name ?? 'Your medicine', change.stock, med?.unitDosage)
-          .then(() => refillService.markReminded(medicineId))
-          .catch(() => undefined);
+      getDatabase().runSync(
+        `INSERT OR REPLACE INTO adherence_logs (
+          id, schedule_id, medicine_id, dose_date, dose_time, status, logged_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?);`,
+        [logId, scheduleId, medicineId, date, time, status, new Date().toISOString()],
+      );
+
+      if (stockDelta !== null) {
+        const change = refillService.applyStockChange(medicineId, stockDelta);
+        if (change?.thresholdCrossed) {
+          const med = medicineRepository.getById(medicineId);
+          refillAlertNeeded = {
+            medName: med?.name ?? 'Your medicine',
+            stock: change.stock,
+            unitDosage: med?.unitDosage,
+          };
+        }
       }
+    });
+
+    // Fire refill notification outside the database transaction
+    if (refillAlertNeeded) {
+      const { medName, stock, unitDosage } = refillAlertNeeded;
+      void refillService
+        .notifyRefillNeeded(medName, stock, unitDosage)
+        .then(() => refillService.markReminded(medicineId))
+        .catch(() => undefined);
     }
   },
 

@@ -125,4 +125,79 @@ describe('JSON backup round-trip', () => {
       ).ok,
     ).toBe(false);
   });
+
+  it('rejects invalid rows during restore and does not touch existing data', () => {
+    // Existing data was seeded in beforeEach
+    expect(profileRepository.getProfile()?.name).toBe('Priya');
+    expect(medicineRepository.getById(MEDICINE_ID)?.name).toBe('Napa Extra');
+
+    // Payload with corrupted schedule referencing a non-existent medicine
+    const invalidPayload: any = {
+      format: 'healthmate-backup',
+      formatVersion: 1,
+      schemaVersion: 3,
+      exportedAt: new Date().toISOString(),
+      tables: {
+        medicines: [{ id: 'med_valid_1', name: 'Aspirin' }],
+        schedules: [
+          {
+            id: 'sched_bad_1',
+            medicine_id: 'med_non_existent',
+            recurrence: 'daily',
+            times_json: '[]',
+          },
+        ],
+      },
+    };
+
+    expect(() => backupService.restoreFromBackup(invalidPayload)).toThrow(
+      /references non-existent medicine/,
+    );
+
+    // Verify existing database data is untouched!
+    expect(profileRepository.getProfile()?.name).toBe('Priya');
+    expect(medicineRepository.getById(MEDICINE_ID)?.name).toBe('Napa Extra');
+  });
+
+  it('safely restores older backups with missing optional tables', () => {
+    const olderBackupJson = JSON.stringify({
+      format: 'healthmate-backup',
+      formatVersion: 1,
+      schemaVersion: 2,
+      exportedAt: new Date().toISOString(),
+      tables: {
+        medicines: [
+          {
+            id: 'med_old_1',
+            name: 'Old Medicine',
+            strength: '250 mg',
+            dosage_form: 'tablet',
+            category: 'General',
+          },
+        ],
+        schedules: [
+          {
+            id: 'sched_old_1',
+            medicine_id: 'med_old_1',
+            recurrence: 'daily',
+            times_json: '[{"id":"t1","time":"08:00","amount":"1"}]',
+            enabled: 1,
+          },
+        ],
+        // schedule_history, ai_conversations, refill_reminders omitted
+      },
+    });
+
+    const parsed = backupService.parseBackup(olderBackupJson);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+
+    const { restored } = backupService.restoreFromBackup(parsed.payload);
+    expect(restored).toBe(2);
+
+    expect(medicineRepository.getById('med_old_1')?.name).toBe('Old Medicine');
+    expect(scheduleRepository.getById('sched_old_1')?.recurrence).toBe('daily');
+    // AI conversations table exists and is empty
+    expect(aiRepository.getConversations()).toEqual([]);
+  });
 });
