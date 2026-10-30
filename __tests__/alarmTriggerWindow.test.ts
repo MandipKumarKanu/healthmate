@@ -159,6 +159,39 @@ describe('Native alarm trigger window (reboot-proof chains)', () => {
     ]);
   });
 
+
+  it('does not carry a schedule past midnight when its end date is today', () => {
+    const justBeforeMidnight = new Date(2026, 9, 28, 23, 59, 59, 999);
+    const triggers = getNativeAlarmTriggerWindow(
+      {
+        recurrence: 'daily',
+        startDate: '2026-10-01',
+        endDate: '2026-10-28',
+      },
+      '08:00',
+      justBeforeMidnight,
+    );
+
+    // The final occurrence for Oct 28 has already passed. Oct 29 is outside
+    // the inclusive end date, so the next day's midnight must not revive it.
+    expect(triggers).toEqual([]);
+  });
+
+  it('keeps an occurrence at the start of the end date valid across midnight', () => {
+    const justAfterMidnight = new Date(2026, 9, 29, 0, 0, 0, 0);
+    const triggers = getNativeAlarmTriggerWindow(
+      {
+        recurrence: 'daily',
+        startDate: '2026-10-28',
+        endDate: '2026-10-29',
+      },
+      '08:00',
+      justAfterMidnight,
+    );
+
+    expect(triggers.map(millisToDateStr)).toEqual(['2026-10-29']);
+  });
+
   it('returns an empty window for invalid times', () => {
     expect(
       getNativeAlarmTriggerWindow(
