@@ -22,11 +22,14 @@ export interface NativeAlarmResult<T = boolean> {
   error?: NativeAlarmDiagnostic;
 }
 
+export type AlarmPrecisionMode = 'exact' | 'inexact_fallback';
+
 export class NativeActionResult implements NativeAlarmResult<boolean> {
   constructor(
     public success: boolean,
     public data: boolean = success,
     public error?: NativeAlarmDiagnostic,
+    public isExact: boolean = true,
   ) {}
 
   valueOf(): boolean {
@@ -262,7 +265,8 @@ export const nativeAlarmService = {
           message: 'No valid future triggers within schedule bounds',
         });
       }
-      return new NativeActionResult(true, true);
+      const isExact = await this.canScheduleExactAlarms();
+      return new NativeActionResult(true, true, undefined, isExact);
     } catch (e) {
       const mapped = mapNativeError(e);
       console.warn('nativeAlarmService.syncAlarmChain failed for schedule:', params.scheduleId, mapped.code);
@@ -333,7 +337,8 @@ export const nativeAlarmService = {
         const res = await alarmModule.cancelSnoozesForSchedule(scheduleId);
         return new NativeActionResult(res, res);
       }
-      return new NativeActionResult(true, true);
+      const isExact = await this.canScheduleExactAlarms();
+      return new NativeActionResult(true, true, undefined, isExact);
     } catch (e) {
       const mapped = mapNativeError(e);
       console.warn('nativeAlarmService.cancelSnoozesForSchedule failed for schedule:', scheduleId, mapped.code);
@@ -367,12 +372,17 @@ export const nativeAlarmService = {
   async canScheduleExactAlarms(): Promise<boolean> {
     if (Platform.OS !== 'android') return true;
     const alarmModule = getAlarmModule();
-    if (!alarmModule?.canScheduleExactAlarms) return true;
+    if (!alarmModule?.canScheduleExactAlarms) return false;
     try {
       return await alarmModule.canScheduleExactAlarms();
     } catch {
       return false;
     }
+  },
+
+  async getAlarmPrecisionMode(): Promise<AlarmPrecisionMode> {
+    const isExact = await this.canScheduleExactAlarms();
+    return isExact ? 'exact' : 'inexact_fallback';
   },
 
   async dismissKeyguard(): Promise<boolean> {

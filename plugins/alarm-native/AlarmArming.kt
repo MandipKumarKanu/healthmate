@@ -38,6 +38,7 @@ object AlarmArming {
     private const val J_TRIGGERS = "triggers"
     private const val J_SOURCE_SCHEDULE_ID = "sourceScheduleId"
     private const val J_SOURCE_INSTANCE_ID = "sourceInstanceId"
+    private const val J_IS_EXACT = "isExact"
 
     data class Entry(
         val scheduleId: String,
@@ -54,7 +55,8 @@ object AlarmArming {
         val triggers: MutableList<Long>,
         /** Set only for one-shot snooze entries. */
         val sourceScheduleId: String? = null,
-        val sourceInstanceId: String? = null
+        val sourceInstanceId: String? = null,
+        val isExact: Boolean = true
     )
 
     fun alarmKey(scheduleId: String, time: String): String = "$scheduleId|$time"
@@ -94,6 +96,7 @@ object AlarmArming {
             hasDateBounds = hasBounds,
             sourceScheduleId = if (json.isNull(J_SOURCE_SCHEDULE_ID)) null else json.optString(J_SOURCE_SCHEDULE_ID).takeIf { it.isNotBlank() },
             sourceInstanceId = if (json.isNull(J_SOURCE_INSTANCE_ID)) null else json.optString(J_SOURCE_INSTANCE_ID).takeIf { it.isNotBlank() },
+            isExact = json.optBoolean(J_IS_EXACT, true),
             triggers = json.optJSONArray(J_TRIGGERS)?.let { arr ->
                 (0 until arr.length()).map { arr.optLong(it) }.toMutableList()
             } ?: mutableListOf()
@@ -112,6 +115,7 @@ object AlarmArming {
         put(J_HAS_DATE_BOUNDS, entry.hasDateBounds)
         put(J_SOURCE_SCHEDULE_ID, entry.sourceScheduleId ?: JSONObject.NULL)
         put(J_SOURCE_INSTANCE_ID, entry.sourceInstanceId ?: JSONObject.NULL)
+        put(J_IS_EXACT, entry.isExact)
         put(J_TRIGGERS, JSONArray(entry.triggers))
     }
 
@@ -244,7 +248,7 @@ object AlarmArming {
         writePendingMap(context, JSONObject())
     }
 
-    /** Registers one exact alarm for the given dose. Throws on system/permission failure so callers receive diagnostic errors. */
+    /** Registers one exact alarm (or inexact fallback) for the given dose. Returns true if exact, false if inexact fallback. Throws on system/permission failure. */
     fun armDose(
         context: Context,
         scheduleId: String,
@@ -255,7 +259,7 @@ object AlarmArming {
         triggerAtMillis: Long,
         sourceScheduleId: String? = null,
         sourceInstanceId: String? = null
-    ) {
+    ): Boolean {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
             ?: throw IllegalStateException("AlarmManager system service is not available")
 
@@ -307,10 +311,11 @@ object AlarmArming {
                 alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
             }
         }
+        return canExact
     }
 
-    fun armEntry(context: Context, entry: Entry, triggerAtMillis: Long) {
-        armDose(
+    fun armEntry(context: Context, entry: Entry, triggerAtMillis: Long): Boolean {
+        return armDose(
             context,
             entry.scheduleId,
             entry.medicineName,
@@ -483,8 +488,8 @@ object AlarmArming {
                     saveEntry(context, entry)
                 } else {
                     entry.triggers.sort()
-                    saveEntry(context, entry)
-                    armEntry(context, entry, next)
+                    val wasExact = armEntry(context, entry, next)
+                    saveEntry(context, entry.copy(isExact = wasExact))
                 }
             }
         } catch (_: Exception) {

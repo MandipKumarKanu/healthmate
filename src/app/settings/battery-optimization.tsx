@@ -191,8 +191,10 @@ export default function BatteryOptimizationScreen() {
                     color={status?.canScheduleExactAlarms ? Colors.success : '#EF4444'}
                   />
                   <Text style={styles.checkItemText}>
-                    Alarms & Reminders Permission:{' '}
-                    {status?.canScheduleExactAlarms ? 'Allowed' : 'Denied / Missing'}
+                    Alarm Precision & Exact Alarms:{' '}
+                    {status?.canScheduleExactAlarms
+                      ? 'Exact (Precise timing)'
+                      : 'Inexact Fallback (Timing may be delayed)'}
                   </Text>
                 </View>
               </View>

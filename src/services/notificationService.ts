@@ -514,23 +514,20 @@ export const notificationService = {
       if (!notificationGranted) return false;
 
       if (Platform.OS === 'android') {
-        const notificationsAny = Notifications as any;
-        if (typeof notificationsAny.getExactAlarmPermissionsAsync === 'function') {
-          let exactAlarm = await notificationsAny.getExactAlarmPermissionsAsync();
-          if (
-            exactAlarm &&
-            !exactAlarm.granted &&
-            typeof notificationsAny.requestExactAlarmPermissionsAsync === 'function'
-          ) {
+        let exactGranted = await nativeAlarmService.canScheduleExactAlarms();
+        if (!exactGranted) {
+          const notificationsAny = Notifications as any;
+          if (typeof notificationsAny.requestExactAlarmPermissionsAsync === 'function') {
             try {
-              exactAlarm = await notificationsAny.requestExactAlarmPermissionsAsync();
+              await notificationsAny.requestExactAlarmPermissionsAsync();
             } catch (error) {
-              console.warn('Exact-alarm access was not granted:', error);
-              return false;
+              console.warn('Exact-alarm permission request threw:', error);
             }
           }
-          if (exactAlarm && !exactAlarm.granted) return false;
+          // Authoritative check via AlarmManager.canScheduleExactAlarms()
+          exactGranted = await nativeAlarmService.canScheduleExactAlarms();
         }
+        if (!exactGranted) return false;
       }
 
       return true;
@@ -546,12 +543,10 @@ export const notificationService = {
         return false;
       }
       if (Platform.OS !== 'android') return true;
-      const notificationsAny = Notifications as any;
-      if (typeof notificationsAny.getExactAlarmPermissionsAsync === 'function') {
-        const exactAlarm = await notificationsAny.getExactAlarmPermissionsAsync();
-        return Boolean(exactAlarm?.granted);
-      }
-      return true;
+
+      // Authoritative check via AlarmManager.canScheduleExactAlarms().
+      // Do not assume permission is granted because an Expo API is absent.
+      return await nativeAlarmService.canScheduleExactAlarms();
     } catch {
       return false;
     }
@@ -571,15 +566,9 @@ export const notificationService = {
       const notificationPermission = Boolean(status.granted || status.status === 'granted');
       let exactAlarm = true; // No exact-alarm concept outside Android.
       if (Platform.OS === 'android') {
-        const notificationsAny = Notifications as any;
-        if (typeof notificationsAny.getExactAlarmPermissionsAsync === 'function') {
-          try {
-            const ea = await notificationsAny.getExactAlarmPermissionsAsync();
-            exactAlarm = Boolean(ea?.granted);
-          } catch {
-            exactAlarm = false;
-          }
-        }
+        // Authoritative check: AlarmManager.canScheduleExactAlarms()
+        // Do not assume permission is granted because an Expo API is absent.
+        exactAlarm = await nativeAlarmService.canScheduleExactAlarms();
       }
       return { notificationPermission, exactAlarm };
     } catch {

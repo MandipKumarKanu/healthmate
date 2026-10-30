@@ -370,11 +370,11 @@ export default function SetReminderScreen() {
           notification_permission:
             'Your schedule is saved, but notification permission is currently denied. Allow HealthMate to send notifications in Android Settings → Apps → HealthMate → Notifications, then edit and re-save this schedule to arm reminders.',
           exact_alarm:
-            'Your schedule is saved, but exact alarm access was not granted. Allow “Alarms & reminders” in Android Settings → Apps → HealthMate → Alarms & reminders, then edit and re-save this schedule.',
+            'Your schedule is saved, but exact alarm access was not granted. Reminders will use inexact fallbacks and timing may not be precise. To ensure zero-latency exact alarms, allow “Alarms & reminders” in Android Settings → Apps → HealthMate → Alarms & reminders.',
           internal:
             'Your schedule is saved, but at least one alarm could not be scheduled (internal or network error). Try re-saving this schedule; if it keeps failing, check your connection and device storage.',
         };
-        Alert.alert('Schedule saved without alarms', failureMessages[saveResult.alarmFailure], [
+        Alert.alert('Schedule saved without exact alarms', failureMessages[saveResult.alarmFailure], [
           { text: 'OK', onPress: () => router.back() },
         ]);
         return;

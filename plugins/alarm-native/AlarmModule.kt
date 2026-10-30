@@ -170,8 +170,8 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
 
             val earliest = validMillis.firstOrNull()
             if (earliest != null) {
-                AlarmArming.saveEntry(reactContext, entry)
-                AlarmArming.armEntry(reactContext, entry, earliest)
+                val wasExact = AlarmArming.armEntry(reactContext, entry, earliest)
+                AlarmArming.saveEntry(reactContext, entry.copy(isExact = wasExact))
                 promise.resolve(true)
             } else {
                 AlarmArming.saveEntry(reactContext, entry)

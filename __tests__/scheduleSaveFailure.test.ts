@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import * as Notifications from 'expo-notifications';
+import { NativeModules } from 'react-native';
 import { medicineRepository } from '../src/database/repositories/medicineRepository';
 import { scheduleRepository } from '../src/database/repositories/scheduleRepository';
 import { notificationService } from '../src/services/notificationService';
@@ -53,6 +54,7 @@ function mockPermissions(granted: boolean, exactAlarmGranted: boolean = true): v
     granted: exactAlarmGranted,
     status: exactAlarmGranted ? 'granted' : 'denied',
   });
+  (NativeModules.AlarmModule.canScheduleExactAlarms as any).mockResolvedValue(exactAlarmGranted);
 }
 
 describe('saveSchedule failure classification', () => {

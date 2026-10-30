@@ -166,8 +166,10 @@ export function AlarmReliabilityCard() {
             ]}
           >
             {isOverallOptimal
-              ? 'Reliability status: Unrestricted & Optimal'
-              : 'Attention: Device battery restrictions may delay or kill alarms'}
+              ? 'Reliability status: Unrestricted & Exact Alarms Active'
+              : !isExactOptimal
+                ? 'Exact scheduling unavailable — reminder timing may not be precise'
+                : 'Attention: Device battery restrictions may delay or kill alarms'}
           </Text>
         </View>
 
@@ -227,7 +229,7 @@ export function AlarmReliabilityCard() {
 
           <View style={styles.divider} />
 
-          {/* Item 2: Exact Alarm Permission */}
+          {/* Item 2: Exact Alarm Permission & Precision Mode */}
           <View style={styles.statusItem}>
             <View style={styles.itemHeaderRow}>
               <View style={styles.itemLabelGroup}>
@@ -236,7 +238,7 @@ export function AlarmReliabilityCard() {
                   size={18}
                   color={isExactOptimal ? Colors.success : Colors.warning}
                 />
-                <Text style={styles.itemTitle}>Exact Alarm Triggering</Text>
+                <Text style={styles.itemTitle}>Exact Alarm Precision</Text>
               </View>
               <View
                 style={[
@@ -250,15 +252,15 @@ export function AlarmReliabilityCard() {
                     isExactOptimal ? styles.pillOptimalText : styles.pillRestrictedText,
                   ]}
                 >
-                  {isExactOptimal ? 'Granted' : 'Limited'}
+                  {isExactOptimal ? 'Exact (Precise)' : 'Inexact Fallback'}
                 </Text>
               </View>
             </View>
 
             <Text style={styles.itemDescription}>
               {isExactOptimal
-                ? 'Exact alarm hardware triggers are enabled for zero-latency reminders.'
-                : 'Android requires permission to wake the screen for critical medications.'}
+                ? 'Exact alarm hardware triggers are enabled for zero-latency, on-time reminders.'
+                : 'Exact alarm access is denied. Alarms use inexact battery-saving fallbacks, so reminder timing may be delayed or imprecise.'}
             </Text>
 
             {!isExactOptimal && isAndroid && (
@@ -273,7 +275,7 @@ export function AlarmReliabilityCard() {
                   <>
                     <Ionicons name="settings-outline" size={14} color={Colors.primary} />
                     <Text style={[styles.actionButtonText, styles.actionButtonTextSecondary]}>
-                      Enable Exact Alarms
+                      Enable Exact Alarms for Precision
                     </Text>
                   </>
                 )}
