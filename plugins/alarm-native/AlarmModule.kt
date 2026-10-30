@@ -27,21 +27,33 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
     @ReactMethod
     fun stopAlarm(promise: Promise) {
         try {
-            stopAlarmInternal()
-            reactContext.currentActivity?.runOnUiThread {
-                try {
-                    val activity = reactContext.currentActivity
-                    if (activity != null) {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-                            activity.setShowWhenLocked(false)
-                        }
-                        activity.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                    }
-                } catch (_: Exception) {}
+            stopAlarmInternal(null, null)
+            clearActivityLockFlags()
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("STOP_ALARM_FAILED", e.message, e)
+        }
+    }
+
+    @ReactMethod
+    fun stopDoseAlarm(scheduleId: String, time: String, promise: Promise) {
+        try {
+            stopAlarmInternal(scheduleId, time)
+            if (!AlarmService.hasActiveAlarms()) {
+                clearActivityLockFlags()
             }
             promise.resolve(true)
         } catch (e: Exception) {
             promise.reject("STOP_ALARM_FAILED", e.message, e)
+        }
+    }
+
+    @ReactMethod
+    fun getActiveAlarms(promise: Promise) {
+        try {
+            promise.resolve(AlarmService.getActiveAlarmsJson())
+        } catch (e: Exception) {
+            promise.resolve("[]")
         }
     }
 
@@ -74,7 +86,8 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
             }
 
             val triggerAtMillis = System.currentTimeMillis() + (snoozeMinutes * 60 * 1000L)
-            stopAlarmInternal()
+            // Stop only this specific ringing dose, leaving any simultaneous active doses ringing
+            stopAlarmInternal(sourceScheduleId, time)
             val entry = AlarmArming.Entry(
                 scheduleId = snoozeId,
                 time = time,
@@ -448,11 +461,31 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
         }
     }
 
-    private fun stopAlarmInternal() {
+    private fun stopAlarmInternal(scheduleId: String? = null, time: String? = null) {
         val stopIntent = Intent(reactContext, AlarmService::class.java).apply {
             action = AlarmService.ACTION_STOP_ALARM
+            if (!scheduleId.isNullOrEmpty()) {
+                putExtra(AlarmService.EXTRA_SCHEDULE_ID, scheduleId)
+            }
+            if (!time.isNullOrEmpty()) {
+                putExtra(AlarmService.EXTRA_TIME, time)
+            }
         }
         reactContext.startService(stopIntent)
+    }
+
+    private fun clearActivityLockFlags() {
+        reactContext.currentActivity?.runOnUiThread {
+            try {
+                val activity = reactContext.currentActivity
+                if (activity != null) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                        activity.setShowWhenLocked(false)
+                    }
+                    activity.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
+            } catch (_: Exception) {}
+        }
     }
 
     private fun cancelAlarmInternal(scheduleId: String) {

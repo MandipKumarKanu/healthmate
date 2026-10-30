@@ -41,6 +41,17 @@ export interface NativeRecoveryReport {
   details: NativeRecoveryDetail[];
 }
 
+export interface ActiveRingingAlarm {
+  scheduleId: string;
+  medicineName: string;
+  amount: string;
+  time: string;
+  label?: string;
+  instanceId?: string;
+  sourceScheduleId?: string;
+  notificationId?: number;
+}
+
 export type AlarmPrecisionMode = 'exact' | 'inexact_fallback';
 
 export class NativeActionResult implements NativeAlarmResult<boolean> {
@@ -117,6 +128,8 @@ export type NativeSnoozeResult = SnoozeAlarmResult;
 
 interface NativeAlarmModuleInterface {
   stopAlarm(): Promise<boolean>;
+  stopDoseAlarm?(scheduleId: string, time: string): Promise<boolean>;
+  getActiveAlarms?(): Promise<string>;
   syncAlarmChain(
     scheduleId: string,
     medicineName: string,
@@ -172,7 +185,7 @@ export const nativeAlarmService = {
     return Platform.OS === 'android' && Boolean(getAlarmModule());
   },
 
-  async stopAlarm(): Promise<NativeAlarmActionResult> {
+  async stopAlarm(scheduleId?: string, time?: string): Promise<NativeAlarmActionResult> {
     const alarmModule = getAlarmModule();
     if (!alarmModule) {
       return new NativeActionResult(false, false, {
@@ -181,12 +194,32 @@ export const nativeAlarmService = {
       });
     }
     try {
-      const res = await alarmModule.stopAlarm();
+      let res = false;
+      if (scheduleId && alarmModule.stopDoseAlarm) {
+        res = await alarmModule.stopDoseAlarm(scheduleId, time || '');
+      } else {
+        res = await alarmModule.stopAlarm();
+      }
       return new NativeActionResult(res, res);
     } catch (e) {
       const mapped = mapNativeError(e);
       console.warn('nativeAlarmService.stopAlarm failed:', mapped.code);
       return new NativeActionResult(false, false, mapped);
+    }
+  },
+
+  async stopDoseAlarm(scheduleId: string, time: string): Promise<NativeAlarmActionResult> {
+    return this.stopAlarm(scheduleId, time);
+  },
+
+  async getActiveAlarms(): Promise<ActiveRingingAlarm[]> {
+    const alarmModule = getAlarmModule();
+    if (!alarmModule?.getActiveAlarms) return [];
+    try {
+      const raw = await alarmModule.getActiveAlarms();
+      return raw ? (JSON.parse(raw) as ActiveRingingAlarm[]) : [];
+    } catch {
+      return [];
     }
   },
 

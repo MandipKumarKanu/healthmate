@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   StyleSheet,
   View,
@@ -9,6 +9,8 @@ import {
   Vibration,
   Platform,
   useColorScheme,
+  TouchableOpacity,
+  ScrollView,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -20,13 +22,88 @@ import { scheduleRepository } from '../database/repositories/scheduleRepository'
 import { medicineRepository } from '../database/repositories/medicineRepository';
 import { useAppStore } from '../store/appStore';
 import { Colors } from '../theme/colors';
-import { Radius, Spacing, Typography } from '../theme/tokens';
+import { Radius, Spacing } from '../theme/tokens';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SLIDER_WIDTH = Math.min(SCREEN_WIDTH - 44, 350);
 const PUCK_SIZE = 58;
 const MAX_DRAG = (SLIDER_WIDTH - PUCK_SIZE) / 2 - 6;
 const SWIPE_THRESHOLD = MAX_DRAG * 0.7;
+
+export interface ActiveDoseItem {
+  id: string;
+  scheduleId: string;
+  medicineId: string;
+  medicineName: string;
+  amount: string;
+  doseTime: string;
+  doseLabel: string;
+  dosageForm?: string;
+  instanceId?: string;
+  sourceScheduleId?: string;
+  status: 'pending' | 'taken' | 'snoozed';
+}
+
+function resolveDoseItem(
+  scheduleId: string,
+  sourceScheduleId?: string,
+  medicineName?: string,
+  amount?: string,
+  doseTime?: string,
+  doseLabel?: string,
+  instanceId?: string,
+): ActiveDoseItem {
+  const sId = sourceScheduleId || scheduleId || '';
+  let mName = medicineName ?? 'Medication';
+  let amt = amount ?? '1 dose';
+  let dTime = doseTime ?? '';
+  let dLabel = doseLabel ?? '';
+  let mId = '';
+  let dForm = '';
+
+  if (sId) {
+    const sched = scheduleRepository.getById(sId);
+    if (sched) {
+      mId = sched.medicineId;
+      const med = medicineRepository.getById(sched.medicineId);
+      if (med) {
+        mName = med.name;
+        dForm = med.dosageForm || '';
+        if (med.strength) amt = `${med.strength} · ${amt}`;
+      }
+      if (!dTime && sched.times.length > 0) {
+        dTime = sched.times[0].time;
+        dLabel = sched.times[0].label ?? dLabel;
+      }
+    }
+  }
+
+  if (!mId && mName) {
+    const matched = medicineRepository
+      .getAll()
+      .find((m) => m.name.toLowerCase() === mName.toLowerCase());
+    if (matched) {
+      mId = matched.id;
+      if (!dForm) dForm = matched.dosageForm || '';
+    }
+  }
+
+  const id = `${sId || mId || mName}_${dTime || '00:00'}_${instanceId || ''}`;
+
+  return {
+    id,
+    scheduleId: sId,
+    medicineId: mId,
+    medicineName: mName,
+    amount: amt,
+    doseTime: dTime,
+    doseLabel: dLabel,
+    dosageForm: dForm,
+    instanceId,
+    sourceScheduleId,
+    status: 'pending',
+  };
+}
 
 export default function FullScreenAlarmScreen() {
   const router = useRouter();
@@ -49,66 +126,33 @@ export default function FullScreenAlarmScreen() {
   const [currentTime, setCurrentTime] = useState<string>('');
   const [currentDate, setCurrentDate] = useState<string>('');
   const [completedAction, setCompletedAction] = useState<'taken' | 'snooze' | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
-  // Resolve medication and schedule details safely via useMemo
-  const medDetails = useMemo(() => {
-    const sId = params.sourceScheduleId || params.scheduleId || '';
-    let mName = params.medicineName ?? 'Medication';
-    let amt = params.amount ?? '1 dose';
-    let dTime = params.time ?? '';
-    let dLabel = params.label ?? '';
-    let mId = '';
-    let dForm = '';
-
-    if (sId) {
-      const sched = scheduleRepository.getById(sId);
-      if (sched) {
-        mId = sched.medicineId;
-        const med = medicineRepository.getById(sched.medicineId);
-        if (med) {
-          mName = med.name;
-          dForm = med.dosageForm || '';
-          if (med.strength) amt = `${med.strength} · ${amt}`;
-        }
-        if (!dTime && sched.times.length > 0) {
-          dTime = sched.times[0].time;
-          dLabel = sched.times[0].label ?? dLabel;
-        }
-      }
-    }
-
-    if (!mId && mName) {
-      const matched = medicineRepository
-        .getAll()
-        .find((m) => m.name.toLowerCase() === mName.toLowerCase());
-      if (matched) {
-        mId = matched.id;
-        if (!dForm) dForm = matched.dosageForm || '';
-      }
-    }
-
-    return {
-      scheduleId: sId,
-      medicineId: mId,
-      medicineName: mName,
-      amount: amt,
-      doseTime: dTime,
-      doseLabel: dLabel,
-      dosageForm: dForm,
-    };
+  // Initialize initial dose from query parameters
+  const initialDose = useMemo(() => {
+    return resolveDoseItem(
+      params.scheduleId || '',
+      params.sourceScheduleId,
+      params.medicineName,
+      params.amount,
+      params.time,
+      params.label,
+      params.instanceId,
+    );
   }, [
-    params.sourceScheduleId,
     params.scheduleId,
+    params.sourceScheduleId,
     params.medicineName,
     params.amount,
     params.time,
     params.label,
+    params.instanceId,
   ]);
 
-  const { scheduleId, medicineId, medicineName, amount, doseTime, doseLabel, dosageForm } =
-    medDetails;
+  const [doses, setDoses] = useState<ActiveDoseItem[]>([initialDose]);
+  const [selectedIndex, setSelectedIndex] = useState<number>(0);
 
   // Animation values
   const [panX] = useState(() => new Animated.Value(0));
@@ -142,7 +186,83 @@ export default function FullScreenAlarmScreen() {
     return () => clearInterval(timer);
   }, []);
 
-  // Subtle breathing chime animation (gentle and soothing, not blinding)
+  // Discover and aggregate simultaneous doses
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadSimultaneousDoses() {
+      const now = new Date();
+      const todayStr = [
+        now.getFullYear(),
+        String(now.getMonth() + 1).padStart(2, '0'),
+        String(now.getDate()).padStart(2, '0'),
+      ].join('-');
+
+      const doseMap = new Map<string, ActiveDoseItem>();
+      doseMap.set(initialDose.id, initialDose);
+
+      // 1. Fetch from active native alarms (AlarmService ringing alarms)
+      try {
+        const nativeAlarms = await nativeAlarmService.getActiveAlarms();
+        for (const na of nativeAlarms) {
+          const item = resolveDoseItem(
+            na.scheduleId,
+            na.sourceScheduleId,
+            na.medicineName,
+            na.amount,
+            na.time,
+            na.label,
+            na.instanceId,
+          );
+          if (!doseMap.has(item.id)) {
+            doseMap.set(item.id, item);
+          }
+        }
+      } catch (_e) {}
+
+      // 2. Fetch from adherence repository for today at initialDose.doseTime
+      if (initialDose.doseTime) {
+        try {
+          const todayDoses = adherenceRepository.getDosesForDate(todayStr);
+          for (const td of todayDoses) {
+            if (
+              td.time === initialDose.doseTime &&
+              td.status !== 'taken' &&
+              td.status !== 'skipped'
+            ) {
+              const item = resolveDoseItem(
+                td.scheduleId,
+                undefined,
+                td.medicineName,
+                td.amount,
+                td.time,
+                undefined,
+                undefined,
+              );
+              if (!doseMap.has(item.id)) {
+                doseMap.set(item.id, item);
+              }
+            }
+          }
+        } catch (_e) {}
+      }
+
+      if (isMounted) {
+        setDoses(Array.from(doseMap.values()));
+      }
+    }
+
+    loadSimultaneousDoses();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [initialDose]);
+
+  const currentDose = doses[selectedIndex] || doses[0];
+  const pendingDoses = useMemo(() => doses.filter((d) => d.status === 'pending'), [doses]);
+
+  // Gentle breathing chime animation
   useEffect(() => {
     const pulseAnim = Animated.loop(
       Animated.sequence([
@@ -196,13 +316,12 @@ export default function FullScreenAlarmScreen() {
     return () => {
       pulseAnim.stop();
       tiltAnim.stop();
-      nativeAlarmService.stopAlarm();
     };
   }, [chimeScale, chimeTilt]);
 
   // Swipe Action: Take Dose (Swipe Right)
   const executeTakeDose = useCallback(async () => {
-    if (isProcessing) return;
+    if (isProcessing || !currentDose) return;
     setIsProcessing(true);
     setErrorMessage(null);
 
@@ -215,13 +334,15 @@ export default function FullScreenAlarmScreen() {
 
     try {
       Vibration.vibrate(Platform.OS === 'android' ? [0, 60, 40, 60] : 100);
-      setCompletedAction('taken');
-      await nativeAlarmService.stopAlarm();
-      if (scheduleId) {
-        await nativeAlarmService.cancelSnoozesForSchedule(scheduleId);
+
+      // Stop only this specific dose alarm natively, preserving remaining active doses
+      await nativeAlarmService.stopAlarm(currentDose.scheduleId, currentDose.doseTime);
+      if (currentDose.scheduleId) {
+        await nativeAlarmService.cancelSnoozesForSchedule(currentDose.scheduleId);
       }
 
-      if (scheduleId && medicineId) {
+      // Record dose adherence log independently for this specific medication
+      if (currentDose.scheduleId && currentDose.medicineId) {
         const now = new Date();
         const todayStr = [
           now.getFullYear(),
@@ -230,35 +351,62 @@ export default function FullScreenAlarmScreen() {
         ].join('-');
 
         const targetTime =
-          doseTime ||
+          currentDose.doseTime ||
           `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
         try {
-          adherenceRepository.logDoseStatus(scheduleId, medicineId, todayStr, targetTime, 'taken');
+          adherenceRepository.logDoseStatus(
+            currentDose.scheduleId,
+            currentDose.medicineId,
+            todayStr,
+            targetTime,
+            'taken',
+          );
         } catch (logErr) {
           console.warn('Could not record dose adherence log:', logErr);
         }
       }
 
-      setTimeout(() => {
-        router.replace('/(tabs)/home');
-      }, 750);
+      const updated = doses.map((d) =>
+        d.id === currentDose.id ? { ...d, status: 'taken' as const } : d,
+      );
+      setDoses(updated);
+
+      const remainingPending = updated.filter((d) => d.status === 'pending');
+      if (remainingPending.length > 0) {
+        const nextIdx = updated.findIndex((d) => d.status === 'pending');
+        setSelectedIndex(nextIdx);
+        setToastMessage(`${currentDose.medicineName} recorded as taken`);
+        setTimeout(() => setToastMessage(null), 2500);
+        setIsProcessing(false);
+        Animated.spring(panX, {
+          toValue: 0,
+          useNativeDriver: true,
+          bounciness: 6,
+        }).start();
+      } else {
+        // All simultaneous doses completed
+        setCompletedAction('taken');
+        await nativeAlarmService.stopAlarm();
+        setTimeout(() => {
+          router.replace('/(tabs)/home');
+        }, 750);
+      }
     } catch (e) {
       console.warn('Failed to record taken dose:', e);
       setErrorMessage('Could not complete action. Please try again.');
       setIsProcessing(false);
-      setCompletedAction(null);
       Animated.spring(panX, {
         toValue: 0,
         useNativeDriver: true,
         bounciness: 8,
       }).start();
     }
-  }, [isProcessing, panX, scheduleId, medicineId, doseTime, router]);
+  }, [isProcessing, currentDose, doses, panX, router]);
 
   // Swipe Action: Snooze Alarm (Swipe Left)
   const executeSnooze = useCallback(async () => {
-    if (isProcessing) return;
+    if (isProcessing || !currentDose) return;
     setIsProcessing(true);
     setErrorMessage(null);
 
@@ -272,14 +420,15 @@ export default function FullScreenAlarmScreen() {
     try {
       Vibration.vibrate(Platform.OS === 'android' ? [0, 40, 40, 80] : 100);
       const snoozeResult = await nativeAlarmService.snoozeAlarm({
-        scheduleId,
-        instanceId: params.instanceId || `${scheduleId}:${doseTime}`,
-        medicineName,
-        amount,
-        time: doseTime,
-        label: doseLabel,
+        scheduleId: currentDose.scheduleId,
+        instanceId: currentDose.instanceId || `${currentDose.scheduleId}:${currentDose.doseTime}`,
+        medicineName: currentDose.medicineName,
+        amount: currentDose.amount,
+        time: currentDose.doseTime,
+        label: currentDose.doseLabel,
         minutes: snoozeMinutes,
       });
+
       if (!snoozeResult.success || !snoozeResult.data || snoozeResult.data <= Date.now()) {
         const errorMsg =
           snoozeResult.error?.code === 'exact_alarm_denied'
@@ -287,34 +436,96 @@ export default function FullScreenAlarmScreen() {
             : 'Could not snooze alarm. Please try again.';
         throw new Error(errorMsg);
       }
-      setCompletedAction('snooze');
 
-      setTimeout(() => {
-        router.replace('/(tabs)/home');
-      }, 750);
+      await nativeAlarmService.stopAlarm(currentDose.scheduleId, currentDose.doseTime);
+
+      const updated = doses.map((d) =>
+        d.id === currentDose.id ? { ...d, status: 'snoozed' as const } : d,
+      );
+      setDoses(updated);
+
+      const remainingPending = updated.filter((d) => d.status === 'pending');
+      if (remainingPending.length > 0) {
+        const nextIdx = updated.findIndex((d) => d.status === 'pending');
+        setSelectedIndex(nextIdx);
+        setToastMessage(`${currentDose.medicineName} snoozed for ${snoozeMinutes}m`);
+        setTimeout(() => setToastMessage(null), 2500);
+        setIsProcessing(false);
+        Animated.spring(panX, {
+          toValue: 0,
+          useNativeDriver: true,
+          bounciness: 6,
+        }).start();
+      } else {
+        setCompletedAction('snooze');
+        setTimeout(() => {
+          router.replace('/(tabs)/home');
+        }, 750);
+      }
     } catch (e: any) {
-      console.warn('Failed to snooze alarm for schedule:', scheduleId);
+      console.warn('Failed to snooze alarm for schedule:', currentDose.scheduleId);
       setErrorMessage(e?.message || 'Could not snooze alarm. Please try again.');
       setIsProcessing(false);
-      setCompletedAction(null);
       Animated.spring(panX, {
         toValue: 0,
         useNativeDriver: true,
         bounciness: 8,
       }).start();
     }
-  }, [
-    isProcessing,
-    panX,
-    scheduleId,
-    medicineName,
-    amount,
-    doseTime,
-    doseLabel,
-    snoozeMinutes,
-    router,
-    params.instanceId,
-  ]);
+  }, [isProcessing, currentDose, doses, panX, snoozeMinutes, router]);
+
+  // Action: Take All Pending Simultaneous Doses
+  const executeTakeAll = useCallback(async () => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+    setErrorMessage(null);
+
+    try {
+      Vibration.vibrate(Platform.OS === 'android' ? [0, 80, 40, 80] : 100);
+      const now = new Date();
+      const todayStr = [
+        now.getFullYear(),
+        String(now.getMonth() + 1).padStart(2, '0'),
+        String(now.getDate()).padStart(2, '0'),
+      ].join('-');
+
+      for (const d of doses) {
+        if (d.status === 'pending') {
+          await nativeAlarmService.stopAlarm(d.scheduleId, d.doseTime);
+          if (d.scheduleId) {
+            await nativeAlarmService.cancelSnoozesForSchedule(d.scheduleId);
+          }
+          if (d.scheduleId && d.medicineId) {
+            const targetTime =
+              d.doseTime ||
+              `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+            try {
+              adherenceRepository.logDoseStatus(
+                d.scheduleId,
+                d.medicineId,
+                todayStr,
+                targetTime,
+                'taken',
+              );
+            } catch (logErr) {
+              console.warn('Could not record dose adherence log for', d.scheduleId, logErr);
+            }
+          }
+        }
+      }
+
+      setDoses((prev) => prev.map((d) => ({ ...d, status: 'taken' as const })));
+      setCompletedAction('taken');
+      await nativeAlarmService.stopAlarm();
+      setTimeout(() => {
+        router.replace('/(tabs)/home');
+      }, 750);
+    } catch (e) {
+      console.warn('Failed to take all doses:', e);
+      setErrorMessage('Could not take all doses. Please try again.');
+      setIsProcessing(false);
+    }
+  }, [isProcessing, doses, router]);
 
   // Tactile PanResponder for the single physical slider
   const panResponder = useMemo(
@@ -325,7 +536,6 @@ export default function FullScreenAlarmScreen() {
         onPanResponderMove: (_, gestureState) => {
           if (isProcessing) return;
 
-          // Non-linear damping near the ends for realistic physical resistance
           let dx = gestureState.dx;
           if (Math.abs(dx) > MAX_DRAG) {
             const overflow = Math.abs(dx) - MAX_DRAG;
@@ -334,7 +544,6 @@ export default function FullScreenAlarmScreen() {
 
           panX.setValue(dx);
 
-          // Threshold haptic feedback tick attached to the active gesture
           const gs = gestureState as { dx: number; hasTriggeredHaptic?: boolean };
           if (Math.abs(dx) >= SWIPE_THRESHOLD && !gs.hasTriggeredHaptic) {
             gs.hasTriggeredHaptic = true;
@@ -353,7 +562,6 @@ export default function FullScreenAlarmScreen() {
           } else if (gestureState.dx <= -SWIPE_THRESHOLD) {
             executeSnooze();
           } else {
-            // Smooth spring return to center
             Animated.spring(panX, {
               toValue: 0,
               useNativeDriver: true,
@@ -418,6 +626,66 @@ export default function FullScreenAlarmScreen() {
           <Text style={[styles.dateText, { color: themeColors.textSecondary }]}>{currentDate}</Text>
         </View>
 
+        {/* Simultaneous Doses Tabs (if multiple doses scheduled at the same time) */}
+        {doses.length > 1 && (
+          <View style={styles.simultaneousSection}>
+            <View style={styles.simultaneousHeader}>
+              <Ionicons name="layers-outline" size={14} color={Colors.primary} />
+              <Text style={styles.simultaneousHeaderText}>
+                {doses.length} Simultaneous Doses ({pendingDoses.length} pending)
+              </Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.dosePillRow}
+            >
+              {doses.map((d, idx) => (
+                <TouchableOpacity
+                  key={d.id}
+                  testID={`dose-pill-${d.scheduleId}`}
+                  onPress={() => setSelectedIndex(idx)}
+                  style={[
+                    styles.dosePill,
+                    {
+                      backgroundColor:
+                        idx === selectedIndex ? Colors.primaryLight : themeColors.cardBg,
+                      borderColor:
+                        idx === selectedIndex ? Colors.primary : themeColors.cardBorder,
+                    },
+                    d.status === 'taken' && styles.dosePillTaken,
+                    d.status === 'snoozed' && styles.dosePillSnoozed,
+                  ]}
+                >
+                  {d.status === 'taken' ? (
+                    <Ionicons name="checkmark-circle" size={14} color="#059669" />
+                  ) : d.status === 'snoozed' ? (
+                    <Ionicons name="alarm" size={14} color="#D97706" />
+                  ) : (
+                    <Ionicons
+                      name="medkit"
+                      size={14}
+                      color={idx === selectedIndex ? Colors.primary : themeColors.textSecondary}
+                    />
+                  )}
+                  <Text
+                    style={[
+                      styles.dosePillText,
+                      {
+                        color:
+                          idx === selectedIndex ? Colors.primaryDark : themeColors.textPrimary,
+                      },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {d.medicineName}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         {/* Medication Details Hero Card */}
         <View
           style={[
@@ -432,10 +700,10 @@ export default function FullScreenAlarmScreen() {
           <View style={styles.scheduleChip}>
             <Ionicons name="time" size={14} color={Colors.primary} />
             <Text style={styles.scheduleChipText}>
-              {doseLabel
-                ? `${doseLabel} · ${doseTime}`
-                : doseTime
-                  ? `Scheduled at ${doseTime}`
+              {currentDose?.doseLabel
+                ? `${currentDose.doseLabel} · ${currentDose.doseTime}`
+                : currentDose?.doseTime
+                  ? `Scheduled at ${currentDose.doseTime}`
                   : 'Medication Due'}
             </Text>
           </View>
@@ -459,12 +727,38 @@ export default function FullScreenAlarmScreen() {
 
           {/* Medication Name & Details */}
           <Text style={[styles.medName, { color: themeColors.textPrimary }]} numberOfLines={3}>
-            {medicineName}
+            {currentDose?.medicineName}
           </Text>
           <Text style={[styles.medAmount, { color: themeColors.textSecondary }]}>
-            {dosageForm ? `${dosageForm.toUpperCase()} · ${amount}` : amount}
+            {currentDose?.dosageForm
+              ? `${currentDose.dosageForm.toUpperCase()} · ${currentDose.amount}`
+              : currentDose?.amount}
           </Text>
+
+          {/* Per-dose status indicator */}
+          {currentDose?.status === 'taken' && (
+            <View style={styles.inlineTakenStatus}>
+              <Ionicons name="checkmark-circle" size={16} color="#059669" />
+              <Text style={styles.inlineTakenStatusText}>This dose has been taken</Text>
+            </View>
+          )}
+          {currentDose?.status === 'snoozed' && (
+            <View style={styles.inlineSnoozedStatus}>
+              <Ionicons name="alarm" size={16} color="#D97706" />
+              <Text style={styles.inlineSnoozedStatusText}>
+                This dose is snoozed for {snoozeMinutes}m
+              </Text>
+            </View>
+          )}
         </View>
+
+        {/* Transient Status Feedback Toast */}
+        {toastMessage && (
+          <View style={styles.transientToast}>
+            <Ionicons name="information-circle" size={18} color="#FFFFFF" />
+            <Text style={styles.transientToastText}>{toastMessage}</Text>
+          </View>
+        )}
 
         {/* Action Status Feedback Toast */}
         {completedAction && (
@@ -481,7 +775,7 @@ export default function FullScreenAlarmScreen() {
             />
             <Text style={styles.actionToastText}>
               {completedAction === 'taken'
-                ? 'Dose Recorded as Taken'
+                ? 'All Doses Recorded as Taken'
                 : `Snoozed for ${snoozeMinutes} Minutes`}
             </Text>
           </View>
@@ -547,6 +841,21 @@ export default function FullScreenAlarmScreen() {
           <Text style={[styles.sliderHint, { color: themeColors.textSecondary }]}>
             Swipe right to take • Swipe left to snooze
           </Text>
+
+          {/* Secondary Action: Take All Doses (when multiple doses are pending) */}
+          {pendingDoses.length > 1 && (
+            <TouchableOpacity
+              testID="take-all-button"
+              style={styles.takeAllButton}
+              onPress={executeTakeAll}
+              disabled={isProcessing}
+            >
+              <Ionicons name="checkmark-done" size={18} color="#FFFFFF" />
+              <Text style={styles.takeAllButtonText}>
+                Take All Due Doses ({pendingDoses.length})
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </SafeAreaView>
     </View>
@@ -562,8 +871,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.screenPaddingHorizontal,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.xl,
+    paddingTop: Spacing.xs,
+    paddingBottom: Spacing.lg,
   },
   header: {
     alignItems: 'center',
@@ -575,9 +884,9 @@ const styles = StyleSheet.create({
     gap: 6,
     backgroundColor: Colors.primaryLight,
     paddingHorizontal: 12,
-    paddingVertical: 5,
+    paddingVertical: 4,
     borderRadius: Radius.pill,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   brandBadgeText: {
     fontSize: 12,
@@ -586,20 +895,65 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   clockText: {
-    fontSize: 44,
+    fontSize: 40,
     fontWeight: '800',
     letterSpacing: 0.5,
     fontVariant: ['tabular-nums'],
   },
   dateText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
     marginTop: 2,
+  },
+  simultaneousSection: {
+    width: '100%',
+    marginVertical: 4,
+  },
+  simultaneousHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+    justifyContent: 'center',
+  },
+  simultaneousHeaderText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.primaryDark,
+  },
+  dosePillRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 4,
+  },
+  dosePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: Radius.pill,
+    borderWidth: 1.5,
+  },
+  dosePillSelected: {
+    borderColor: Colors.primary,
+  },
+  dosePillTaken: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#10B981',
+  },
+  dosePillSnoozed: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#F59E0B',
+  },
+  dosePillText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   heroCard: {
     width: '100%',
     borderRadius: Radius.card,
-    paddingVertical: 24,
+    paddingVertical: 20,
     paddingHorizontal: 20,
     alignItems: 'center',
     borderWidth: 1,
@@ -608,7 +962,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 16,
     elevation: 4,
-    marginVertical: Spacing.sm,
+    marginVertical: Spacing.xs,
   },
   scheduleChip: {
     flexDirection: 'row',
@@ -616,9 +970,9 @@ const styles = StyleSheet.create({
     gap: 6,
     backgroundColor: Colors.primaryLight,
     paddingHorizontal: 14,
-    paddingVertical: 6,
+    paddingVertical: 5,
     borderRadius: Radius.pill,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   scheduleChipText: {
     fontSize: 13,
@@ -628,21 +982,21 @@ const styles = StyleSheet.create({
   chimeArea: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 88,
-    height: 88,
+    width: 80,
+    height: 80,
     marginVertical: 4,
   },
   chimeHalo: {
     position: 'absolute',
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: Colors.primaryLight,
   },
   chimeCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 66,
+    height: 66,
+    borderRadius: 33,
     backgroundColor: Colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
@@ -653,7 +1007,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
     textAlign: 'center',
-    marginTop: 14,
+    marginTop: 12,
     marginBottom: 4,
     lineHeight: 30,
   },
@@ -662,79 +1016,118 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
   },
-  actionToast: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: Radius.pill,
-    marginVertical: 4,
-  },
-  actionToastTaken: {
-    backgroundColor: Colors.success,
-  },
-  actionToastSnooze: {
-    backgroundColor: Colors.warning,
-  },
-  actionToastText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  errorToast: {
+  inlineTakenStatus: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: Colors.errorLight,
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: Radius.pill,
+    backgroundColor: '#ECFDF5',
+  },
+  inlineTakenStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#059669',
+  },
+  inlineSnoozedStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: Radius.pill,
+    backgroundColor: '#FFFBEB',
+  },
+  inlineSnoozedStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#D97706',
+  },
+  transientToast: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#374151',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: Radius.pill,
     marginVertical: 4,
   },
-  errorToastText: {
+  transientToastText: {
+    color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.errorDark,
+  },
+  actionToast: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: Radius.pill,
+    marginVertical: 4,
+  },
+  actionToastTaken: {
+    backgroundColor: '#059669',
+  },
+  actionToastSnooze: {
+    backgroundColor: '#D97706',
+  },
+  actionToastText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  errorToast: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: Radius.pill,
+    marginVertical: 4,
+  },
+  errorToastText: {
+    color: Colors.error,
+    fontSize: 13,
+    fontWeight: '600',
   },
   sliderContainer: {
     width: '100%',
     alignItems: 'center',
-    marginBottom: Spacing.sm,
+    marginTop: 4,
   },
   sliderTrack: {
     width: SLIDER_WIDTH,
-    height: 66,
-    borderRadius: Radius.pill,
+    height: 70,
+    borderRadius: 35,
     borderWidth: 1.5,
     justifyContent: 'center',
+    alignItems: 'center',
     overflow: 'hidden',
-    position: 'relative',
   },
   sliderFill: {
     position: 'absolute',
     top: 0,
     bottom: 0,
-    width: '50%',
-  },
-  sliderFillAmber: {
-    left: 0,
-    backgroundColor: '#FEF3C7',
+    width: '100%',
   },
   sliderFillGreen: {
-    right: 0,
-    backgroundColor: '#D1FAE5',
+    backgroundColor: 'rgba(5, 150, 105, 0.22)',
+  },
+  sliderFillAmber: {
+    backgroundColor: 'rgba(217, 119, 6, 0.22)',
   },
   sliderLabelsLayer: {
+    ...StyleSheet.absoluteFill,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
   },
   sliderLabelGroupLeft: {
     flexDirection: 'row',
@@ -744,7 +1137,7 @@ const styles = StyleSheet.create({
   sliderLabelLeftText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#B45309',
+    color: '#D97706',
   },
   sliderLabelGroupRight: {
     flexDirection: 'row',
@@ -754,27 +1147,40 @@ const styles = StyleSheet.create({
   sliderLabelRightText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#047857',
+    color: '#059669',
   },
   sliderPuck: {
     width: PUCK_SIZE,
     height: PUCK_SIZE,
     borderRadius: PUCK_SIZE / 2,
-    position: 'absolute',
-    left: (SLIDER_WIDTH - PUCK_SIZE) / 2,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.16,
+    shadowOpacity: 0.18,
     shadowRadius: 6,
-    elevation: 5,
+    elevation: 6,
   },
   sliderHint: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '500',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  takeAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: Radius.pill,
     marginTop: 10,
-    letterSpacing: 0.1,
+  },
+  takeAllButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

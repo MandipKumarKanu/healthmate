@@ -93,6 +93,8 @@ class AlarmReceiver : BroadcastReceiver() {
             putExtra(AlarmService.EXTRA_AMOUNT, amount)
             putExtra(AlarmService.EXTRA_TIME, time)
             putExtra(AlarmService.EXTRA_LABEL, label)
+            putExtra(AlarmService.EXTRA_SOURCE_SCHEDULE_ID, sourceScheduleId)
+            putExtra(AlarmService.EXTRA_SOURCE_INSTANCE_ID, instanceId)
         }
 
         try {
