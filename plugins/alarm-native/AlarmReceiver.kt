@@ -26,7 +26,9 @@ class AlarmReceiver : BroadcastReceiver() {
         val amount = intent.getStringExtra(AlarmService.EXTRA_AMOUNT) ?: ""
         val time = intent.getStringExtra(AlarmService.EXTRA_TIME) ?: ""
         val label = intent.getStringExtra(AlarmService.EXTRA_LABEL) ?: ""
-        val instanceId = intent.getLongExtra(AlarmService.EXTRA_TRIGGER_AT_MILLIS, 0L).toString()
+        val sourceScheduleId = intent.getStringExtra(AlarmService.EXTRA_SOURCE_SCHEDULE_ID) ?: ""
+        val instanceId = intent.getStringExtra(AlarmService.EXTRA_SOURCE_INSTANCE_ID)
+            ?: intent.getLongExtra(AlarmService.EXTRA_TRIGGER_AT_MILLIS, 0L).toString()
 
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
         @Suppress("DEPRECATION")
@@ -56,7 +58,8 @@ class AlarmReceiver : BroadcastReceiver() {
             "&amount=" + android.net.Uri.encode(amount) +
             "&time=" + android.net.Uri.encode(time) +
             "&label=" + android.net.Uri.encode(label) +
-            "&instanceId=" + android.net.Uri.encode(instanceId)
+            "&instanceId=" + android.net.Uri.encode(instanceId) +
+            "&sourceScheduleId=" + android.net.Uri.encode(sourceScheduleId)
         )
 
         val alarmActivityIntent = Intent(Intent.ACTION_VIEW, deepLinkUri, context, com.healthmate.app.MainActivity::class.java).apply {
@@ -69,7 +72,9 @@ class AlarmReceiver : BroadcastReceiver() {
             putExtra(AlarmService.EXTRA_AMOUNT, amount)
             putExtra(AlarmService.EXTRA_TIME, time)
             putExtra(AlarmService.EXTRA_LABEL, label)
-            putExtra(AlarmService.EXTRA_TRIGGER_AT_MILLIS, instanceId.toLongOrNull() ?: 0L)
+            putExtra(AlarmService.EXTRA_TRIGGER_AT_MILLIS, intent.getLongExtra(AlarmService.EXTRA_TRIGGER_AT_MILLIS, 0L))
+            putExtra(AlarmService.EXTRA_SOURCE_SCHEDULE_ID, sourceScheduleId)
+            putExtra(AlarmService.EXTRA_SOURCE_INSTANCE_ID, instanceId)
         }
 
         try {
