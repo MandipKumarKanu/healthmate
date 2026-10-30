@@ -62,7 +62,6 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
                 "Snooze source and instance identifiers are required"
             }
             val snoozeMinutes = if (minutes > 0) minutes else 10
-            val key = AlarmArming.alarmKey(snoozeId, time)
             val existing = AlarmArming.getEntry(reactContext, snoozeId, time)
             if (existing != null) {
                 // Idempotent retry for this ringing instance. Never create a
