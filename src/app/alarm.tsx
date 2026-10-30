@@ -40,6 +40,7 @@ export default function FullScreenAlarmScreen() {
     time?: string;
     label?: string;
     instanceId?: string;
+    sourceScheduleId?: string;
   }>();
 
   const { preferences } = useAppStore();
@@ -53,7 +54,7 @@ export default function FullScreenAlarmScreen() {
 
   // Resolve medication and schedule details safely via useMemo
   const medDetails = useMemo(() => {
-    const sId = params.scheduleId ?? '';
+    const sId = params.sourceScheduleId || params.scheduleId || '';
     let mName = params.medicineName ?? 'Medication';
     let amt = params.amount ?? '1 dose';
     let dTime = params.time ?? '';
@@ -298,6 +299,8 @@ export default function FullScreenAlarmScreen() {
     doseLabel,
     snoozeMinutes,
     router,
+    params.instanceId,
+    params.sourceScheduleId,
   ]);
 
   // Tactile PanResponder for the single physical slider
