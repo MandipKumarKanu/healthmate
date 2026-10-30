@@ -173,6 +173,7 @@ describe('Configurable Alarm Snooze Intervals', () => {
       // Second snooze: 10 minutes again
       await nativeAlarmService.snoozeAlarm({
         scheduleId: originalSchedule.id,
+        instanceId: 'dose-instance-2026-10-30T08:00:00',
         medicineName: 'Aspirin',
         amount: '1 tablet',
         time: '08:00',

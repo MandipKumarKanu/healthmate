@@ -98,7 +98,14 @@ export default function FullScreenAlarmScreen() {
       doseLabel: dLabel,
       dosageForm: dForm,
     };
-  }, [params.scheduleId, params.medicineName, params.amount, params.time, params.label]);
+  }, [
+    params.sourceScheduleId,
+    params.scheduleId,
+    params.medicineName,
+    params.amount,
+    params.time,
+    params.label,
+  ]);
 
   const { scheduleId, medicineId, medicineName, amount, doseTime, doseLabel, dosageForm } =
     medDetails;
@@ -300,7 +307,6 @@ export default function FullScreenAlarmScreen() {
     snoozeMinutes,
     router,
     params.instanceId,
-    params.sourceScheduleId,
   ]);
 
   // Tactile PanResponder for the single physical slider
