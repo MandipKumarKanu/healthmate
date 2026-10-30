@@ -114,6 +114,51 @@ describe('Native alarm trigger window (reboot-proof chains)', () => {
     ).toBe('2028-02-29');
   });
 
+  it('keeps a daily end date inclusive across a month boundary', () => {
+    const triggers = getNativeAlarmTriggerWindow(
+      { recurrence: 'daily', startDate: '2026-10-30', endDate: '2026-11-01' },
+      '08:00',
+      new Date(2026, 9, 30, 6, 0),
+    );
+
+    expect(triggers.map(millisToDateStr)).toEqual([
+      '2026-10-30',
+      '2026-10-31',
+      '2026-11-01',
+    ]);
+  });
+
+  it('does not create a daily occurrence after a year-end end date', () => {
+    const triggers = getNativeAlarmTriggerWindow(
+      { recurrence: 'daily', startDate: '2026-12-30', endDate: '2026-12-31' },
+      '08:00',
+      new Date(2026, 11, 30, 6, 0),
+    );
+
+    expect(triggers.map(millisToDateStr)).toEqual(['2026-12-30', '2026-12-31']);
+    expect(
+      getNativeAlarmTriggerWindow(
+        { recurrence: 'daily', startDate: '2026-12-30', endDate: '2026-12-31' },
+        '08:00',
+        new Date(2026, 11, 31, 9, 0),
+      ),
+    ).toEqual([]);
+  });
+
+  it('keeps weekly occurrences within an inclusive end date', () => {
+    const triggers = getNativeAlarmTriggerWindow(
+      { recurrence: 'weekly', startDate: '2026-10-26', endDate: '2026-11-09' },
+      '10:00',
+      fixedNow,
+    );
+
+    expect(triggers.map(millisToDateStr)).toEqual([
+      '2026-10-26',
+      '2026-11-02',
+      '2026-11-09',
+    ]);
+  });
+
   it('returns an empty window for invalid times', () => {
     expect(
       getNativeAlarmTriggerWindow(

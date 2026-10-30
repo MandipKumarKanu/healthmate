@@ -8,6 +8,7 @@ import android.os.Build
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Calendar
+import java.util.Locale
 
 /**
  * Shared alarm persistence + arming logic used by both AlarmModule (JS calls)
@@ -31,6 +32,9 @@ object AlarmArming {
     private const val J_AMOUNT = "amount"
     private const val J_LABEL = "label"
     private const val J_RECURRENCE = "recurrence"
+    private const val J_START_DATE = "startDate"
+    private const val J_END_DATE = "endDate"
+    private const val J_HAS_DATE_BOUNDS = "hasDateBounds"
     private const val J_TRIGGERS = "triggers"
 
     data class Entry(
@@ -40,6 +44,11 @@ object AlarmArming {
         val amount: String,
         val label: String,
         val recurrence: String,
+        /** YYYY-MM-DD in the device's local calendar, not an instant. */
+        val startDate: String,
+        val endDate: String?,
+        /** False for legacy JSON entries written before date bounds were persisted. */
+        val hasDateBounds: Boolean,
         val triggers: MutableList<Long>
     )
 
@@ -70,6 +79,9 @@ object AlarmArming {
         amount = json.optString(J_AMOUNT, ""),
         label = json.optString(J_LABEL, ""),
         recurrence = json.optString(J_RECURRENCE, "daily"),
+        startDate = json.optString(J_START_DATE, ""),
+        endDate = if (json.isNull(J_END_DATE)) null else json.optString(J_END_DATE, "").takeIf { it.isNotBlank() },
+        hasDateBounds = json.optBoolean(J_HAS_DATE_BOUNDS, false),
         triggers = json.optJSONArray(J_TRIGGERS)?.let { arr ->
             (0 until arr.length()).map { arr.optLong(it) }.toMutableList()
         } ?: mutableListOf()
@@ -82,6 +94,9 @@ object AlarmArming {
         put(J_AMOUNT, entry.amount)
         put(J_LABEL, entry.label)
         put(J_RECURRENCE, entry.recurrence)
+        put(J_START_DATE, entry.startDate)
+        put(J_END_DATE, entry.endDate ?: JSONObject.NULL)
+        put(J_HAS_DATE_BOUNDS, entry.hasDateBounds)
         put(J_TRIGGERS, JSONArray(entry.triggers))
     }
 
@@ -246,6 +261,25 @@ object AlarmArming {
     // Reboot recovery + chain advance
     // ------------------------------------------------------------------
 
+    /** YYYY-MM-DD for an epoch instant in the device's current local timezone. */
+    private fun localDateString(epochMillis: Long): String {
+        val cal = Calendar.getInstance().apply { timeInMillis = epochMillis }
+        return "%04d-%02d-%02d".format(
+            Locale.US,
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH) + 1,
+            cal.get(Calendar.DAY_OF_MONTH)
+        )
+    }
+
+    private fun isWithinScheduleDates(entry: Entry, epochMillis: Long): Boolean {
+        if (!entry.hasDateBounds) return false
+        val occurrenceDate = localDateString(epochMillis)
+        if (entry.startDate.isNotBlank() && occurrenceDate < entry.startDate) return false
+        val end = entry.endDate ?: return true
+        return occurrenceDate <= end
+    }
+
     /** Next occurrence of an HH:mm time strictly in the future. */
     private fun nextDailyOccurrenceMillis(time: String, nowMillis: Long): Long? {
         val match = Regex("^([01]\\d|2[0-3]):([0-5]\\d)$").find(time) ?: return null
@@ -267,10 +301,11 @@ object AlarmArming {
     /**
      * Called when the OS delivers a dose alarm. Drops the fired trigger from the
      * stored chain and re-arms the next one. When the chain is exhausted and the
-     * dose repeats daily, synthesizes the next occurrence so unbounded daily
-     * schedules keep ringing even if the app is never opened. Weekly and monthly
-     * schedules are never synthesized (native code must not invent occurrences);
-     * the app reconciles them on next open.
+     * dose repeats daily, synthesizes the next occurrence only when a new-format
+     * entry explicitly carries date-bound metadata and the local calendar date is
+     * within its start/end range. Legacy entries without metadata are allowed to
+     * finish their stored trigger list but are never extended. Weekly and monthly
+     * schedules are not synthesized; the app reconciles them on next open.
      */
     fun fireAndAdvance(context: Context, scheduleId: String, time: String) {
         try {
@@ -285,9 +320,9 @@ object AlarmArming {
                 return
             }
 
-            if (entry.recurrence == "daily") {
+            if (entry.recurrence == "daily" && entry.hasDateBounds) {
                 val synthesized = nextDailyOccurrenceMillis(entry.time, now)
-                if (synthesized != null) {
+                if (synthesized != null && isWithinScheduleDates(entry, synthesized)) {
                     entry.triggers.add(synthesized)
                     saveEntry(context, entry)
                     armEntry(context, entry, synthesized)
@@ -303,8 +338,9 @@ object AlarmArming {
 
     /**
      * Re-arms every stored dose alarm after a reboot, package replacement, or
-     * exact-alarm permission change. Drops past triggers, synthesizes the next
-     * daily occurrence when a chain is exhausted, and removes chains that can
+     * exact-alarm permission change. Drops past and out-of-range triggers,
+     * synthesizes the next daily occurrence only for entries with date metadata,
+     * and removes chains that can
      * no longer fire (the app reconciles those on next open).
      */
     fun reArmAll(context: Context) {
@@ -312,12 +348,16 @@ object AlarmArming {
             val now = System.currentTimeMillis()
             val entries = getAllEntries(context)
             for (entry in entries) {
-                entry.triggers.removeAll { it <= now }
+                entry.triggers.removeAll {
+                    it <= now || (entry.hasDateBounds && !isWithinScheduleDates(entry, it))
+                }
 
                 val next: Long? = entry.triggers.minOrNull()
-                if (next == null && entry.recurrence == "daily") {
+                if (next == null && entry.recurrence == "daily" && entry.hasDateBounds) {
                     val synthesized = nextDailyOccurrenceMillis(entry.time, now)
-                    if (synthesized != null) entry.triggers.add(synthesized)
+                    if (synthesized != null && isWithinScheduleDates(entry, synthesized)) {
+                        entry.triggers.add(synthesized)
+                    }
                 }
 
                 if (entry.triggers.isEmpty()) {
