@@ -196,6 +196,8 @@ describe('Configurable Alarm Snooze Intervals', () => {
       expect(snoozeSpy).toHaveBeenNthCalledWith(
         2,
         'sched_daily_dose',
+        'sched_daily_dose::snooze::dose-instance-2026-10-30T08:00:00',
+        'dose-instance-2026-10-30T08:00:00',
         'Aspirin',
         '1 tablet',
         '08:00',
@@ -203,7 +205,7 @@ describe('Configurable Alarm Snooze Intervals', () => {
         10,
       );
 
-      // The original schedule in SQLite must NOT be modified (snooze is an in-memory / AlarmManager deferral)
+      // Snoozing must not mutate the persisted recurring schedule.
       expect(saveScheduleSpy).not.toHaveBeenCalled();
       const afterSchedule = scheduleRepository.getById('sched_daily_dose');
       expect(afterSchedule?.times[0].time).toBe('08:00');
