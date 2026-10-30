@@ -87,8 +87,8 @@ object AlarmArming {
         startDate = json.optString(J_START_DATE, ""),
         endDate = if (json.isNull(J_END_DATE)) null else json.optString(J_END_DATE, "").takeIf { it.isNotBlank() },
         hasDateBounds = json.optBoolean(J_HAS_DATE_BOUNDS, false),
-        sourceScheduleId = json.optString(J_SOURCE_SCHEDULE_ID, "").takeIf { it.isNotBlank() },
-        sourceInstanceId = json.optString(J_SOURCE_INSTANCE_ID, "").takeIf { it.isNotBlank() },
+        sourceScheduleId = if (json.isNull(J_SOURCE_SCHEDULE_ID)) null else json.optString(J_SOURCE_SCHEDULE_ID).takeIf { it.isNotBlank() },
+        sourceInstanceId = if (json.isNull(J_SOURCE_INSTANCE_ID)) null else json.optString(J_SOURCE_INSTANCE_ID).takeIf { it.isNotBlank() },
         triggers = json.optJSONArray(J_TRIGGERS)?.let { arr ->
             (0 until arr.length()).map { arr.optLong(it) }.toMutableList()
         } ?: mutableListOf()
