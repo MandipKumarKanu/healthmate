@@ -1,9 +1,11 @@
 import { create } from 'zustand';
+import { Platform } from 'react-native';
 import { ScheduledDose, DoseStatus, DayAdherenceSummary, ReminderSchedule } from '../types';
 import { adherenceRepository } from '../database/repositories/adherenceRepository';
 import { scheduleRepository } from '../database/repositories/scheduleRepository';
 import { medicineRepository } from '../database/repositories/medicineRepository';
 import { notificationService } from '../services/notificationService';
+import { nativeAlarmService } from '../services/nativeAlarmService';
 import { getTodayDateString } from '../database/seed';
 
 /**
@@ -110,6 +112,9 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
       dose.time,
       status,
     );
+    if (status === 'taken' && Platform.OS === 'android') {
+      nativeAlarmService.cancelSnoozesForSchedule(dose.scheduleId).catch(() => {});
+    }
     get().loadDosesForDate(targetDate);
   },
 

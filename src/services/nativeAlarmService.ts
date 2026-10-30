@@ -34,6 +34,7 @@ interface NativeAlarmModuleInterface {
     triggerAtMillis: number,
   ): Promise<boolean>;
   cancelAlarm(scheduleId: string): Promise<boolean>;
+  cancelSnoozesForSchedule?(scheduleId: string): Promise<boolean>;
   cancelAllAlarms(): Promise<boolean>;
   canScheduleExactAlarms(): Promise<boolean>;
   dismissKeyguard(): Promise<boolean>;
@@ -173,6 +174,24 @@ export const nativeAlarmService = {
       console.warn('nativeAlarmService.cancelAlarm failed:', e);
       return false;
     }
+  },
+
+  async cancelSnoozesForSchedule(scheduleId: string): Promise<boolean> {
+    if (!AlarmModule) return false;
+    try {
+      if (AlarmModule.cancelSnoozesForSchedule) {
+        return await AlarmModule.cancelSnoozesForSchedule(scheduleId);
+      }
+      return true;
+    } catch (e) {
+      console.warn('nativeAlarmService.cancelSnoozesForSchedule failed:', e);
+      return false;
+    }
+  },
+
+  async cancelSnooze(scheduleId: string, instanceId: string): Promise<boolean> {
+    const snoozeId = `${scheduleId}::snooze::${instanceId}`;
+    return await this.cancelAlarm(snoozeId);
   },
 
   async cancelAllAlarms(): Promise<boolean> {

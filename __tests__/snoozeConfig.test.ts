@@ -211,5 +211,118 @@ describe('Configurable Alarm Snooze Intervals', () => {
       const afterSchedule = scheduleRepository.getById('sched_daily_dose');
       expect(afterSchedule?.times[0].time).toBe('08:00');
     });
+
+    it('snoozing a daily dose preserves tomorrow’s alarm', async () => {
+      const dailySchedule = {
+        id: 'sched_daily_preserve',
+        medicineId: 'med_1',
+        recurrence: 'daily' as const,
+        startDate: '2026-10-30',
+        times: [{ id: 't1', time: '08:00', amount: '1 tablet' }],
+        enabled: true,
+        notificationsEnabled: true,
+        createdAt: '2026-10-30T00:00:00.000Z',
+        updatedAt: '2026-10-30T00:00:00.000Z',
+      };
+      jest.spyOn(scheduleRepository, 'getById').mockReturnValue(dailySchedule);
+      const snoozeSpy = NativeModules.AlarmModule.snoozeAlarm;
+      const syncChainSpy = NativeModules.AlarmModule.syncAlarmChain;
+
+      // Snooze today's instance
+      const scheduledAt = await nativeAlarmService.snoozeAlarm({
+        scheduleId: dailySchedule.id,
+        instanceId: '2026-10-30T08:00:00',
+        medicineName: 'Daily Med',
+        amount: '1 tablet',
+        time: '08:00',
+        minutes: 10,
+      });
+
+      expect(scheduledAt).toBeGreaterThan(0);
+      // Snooze was created with distinct ID
+      expect(snoozeSpy).toHaveBeenCalledWith(
+        'sched_daily_preserve',
+        'sched_daily_preserve::snooze::2026-10-30T08:00:00',
+        '2026-10-30T08:00:00',
+        'Daily Med',
+        '1 tablet',
+        '08:00',
+        '',
+        10,
+      );
+      // syncAlarmChain for the recurring daily schedule was never overwritten
+      expect(syncChainSpy).not.toHaveBeenCalled();
+    });
+
+    it('snoozing a weekly dose preserves next week’s alarm', async () => {
+      const weeklySchedule = {
+        id: 'sched_weekly_preserve',
+        medicineId: 'med_2',
+        recurrence: 'weekly' as const,
+        startDate: '2026-10-30',
+        times: [{ id: 't1', time: '10:00', amount: '2 capsules' }],
+        enabled: true,
+        notificationsEnabled: true,
+        createdAt: '2026-10-30T00:00:00.000Z',
+        updatedAt: '2026-10-30T00:00:00.000Z',
+      };
+      jest.spyOn(scheduleRepository, 'getById').mockReturnValue(weeklySchedule);
+      const snoozeSpy = NativeModules.AlarmModule.snoozeAlarm;
+
+      await nativeAlarmService.snoozeAlarm({
+        scheduleId: weeklySchedule.id,
+        instanceId: '2026-10-30T10:00:00',
+        medicineName: 'Weekly Med',
+        amount: '2 capsules',
+        time: '10:00',
+        minutes: 15,
+      });
+
+      expect(snoozeSpy).toHaveBeenCalledWith(
+        'sched_weekly_preserve',
+        'sched_weekly_preserve::snooze::2026-10-30T10:00:00',
+        '2026-10-30T10:00:00',
+        'Weekly Med',
+        '2 capsules',
+        '10:00',
+        '',
+        15,
+      );
+    });
+
+    it('dismissing a snooze cancels only the snooze instance without cancelling recurrence', async () => {
+      const cancelAlarmSpy = NativeModules.AlarmModule.cancelAlarm;
+
+      // Dismiss snooze instance specifically
+      const result = await nativeAlarmService.cancelSnooze(
+        'sched_daily_dose',
+        'dose-instance-2026-10-30T08:00:00',
+      );
+
+      expect(result).toBe(true);
+      // Target is specifically the snooze ID, NOT the recurring schedule ID
+      expect(cancelAlarmSpy).toHaveBeenCalledWith(
+        'sched_daily_dose::snooze::dose-instance-2026-10-30T08:00:00',
+      );
+      expect(cancelAlarmSpy).not.toHaveBeenCalledWith('sched_daily_dose');
+    });
+
+    it('deleting a schedule cancels its pending snoozes', async () => {
+      const cancelAlarmSpy = NativeModules.AlarmModule.cancelAlarm;
+
+      // When schedule is deleted, cancelAlarm is called with schedule ID
+      // which native AlarmArming.cancelAllForSchedule matches against both
+      // scheduleId and entry.sourceScheduleId
+      await nativeAlarmService.cancelAlarm('sched_to_delete');
+      expect(cancelAlarmSpy).toHaveBeenCalledWith('sched_to_delete');
+    });
+
+    it('cancels snoozes for schedule without touching recurring schedule', async () => {
+      const cancelSnoozesSpy = NativeModules.AlarmModule.cancelSnoozesForSchedule;
+
+      const result = await nativeAlarmService.cancelSnoozesForSchedule('sched_active_dose');
+      expect(result).toBe(true);
+      expect(cancelSnoozesSpy).toHaveBeenCalledWith('sched_active_dose');
+    });
   });
 });

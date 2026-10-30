@@ -196,6 +196,33 @@ object AlarmArming {
         writePendingMap(context, map)
     }
 
+    /** Cancels only pending snooze entries that originated from the given scheduleId. */
+    fun cancelSnoozesForSchedule(context: Context, scheduleId: String) {
+        val map = readPendingMap(context)
+        val names = map.names() ?: return
+        val keys = (0 until names.length()).map { names.getString(it) }.filter { key ->
+            val json = try { map.getJSONObject(key) } catch (_: Exception) { return@filter false }
+            val entry = entryFromJson(json)
+            entry.sourceScheduleId == scheduleId
+        }
+        for (key in keys) {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+            val intent = Intent(context, AlarmReceiver::class.java)
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                key.hashCode(),
+                intent,
+                PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+            )
+            if (pendingIntent != null) {
+                alarmManager?.cancel(pendingIntent)
+                pendingIntent.cancel()
+            }
+            map.remove(key)
+        }
+        writePendingMap(context, map)
+    }
+
     fun cancelAll(context: Context) {
         val map = readPendingMap(context)
         val names = map.names() ?: return

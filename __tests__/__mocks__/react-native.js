@@ -11,6 +11,7 @@ const NativeModules = {
     snoozeAlarm: jest.fn().mockResolvedValue(Date.now() + 600000),
     scheduleAlarm: jest.fn().mockResolvedValue(true),
     cancelAlarm: jest.fn().mockResolvedValue(true),
+    cancelSnoozesForSchedule: jest.fn().mockResolvedValue(true),
     cancelAllAlarms: jest.fn().mockResolvedValue(true),
     canScheduleExactAlarms: jest.fn().mockResolvedValue(true),
     dismissKeyguard: jest.fn().mockResolvedValue(true),

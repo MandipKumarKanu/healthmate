@@ -217,6 +217,9 @@ export default function FullScreenAlarmScreen() {
       Vibration.vibrate(Platform.OS === 'android' ? [0, 60, 40, 60] : 100);
       setCompletedAction('taken');
       await nativeAlarmService.stopAlarm();
+      if (scheduleId) {
+        await nativeAlarmService.cancelSnoozesForSchedule(scheduleId);
+      }
 
       if (scheduleId && medicineId) {
         const now = new Date();

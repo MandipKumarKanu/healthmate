@@ -61,6 +61,9 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
             require(sourceScheduleId.isNotBlank() && snoozeId.isNotBlank() && sourceInstanceId.isNotBlank()) {
                 "Snooze source and instance identifiers are required"
             }
+            require(snoozeId != sourceScheduleId) {
+                "Snooze identifier cannot be identical to the recurring schedule identifier"
+            }
             val snoozeMinutes = if (minutes > 0) minutes else 10
             val existing = AlarmArming.getEntry(reactContext, snoozeId, time)
             if (existing != null) {
@@ -178,6 +181,16 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
             promise.resolve(true)
         } catch (e: Exception) {
             promise.reject("CANCEL_FAILED", e.message, e)
+        }
+    }
+
+    @ReactMethod
+    fun cancelSnoozesForSchedule(scheduleId: String, promise: Promise) {
+        try {
+            AlarmArming.cancelSnoozesForSchedule(reactContext, scheduleId)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("CANCEL_SNOOZES_FAILED", e.message, e)
         }
     }
 
@@ -426,6 +439,10 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
         recurrence: String = "once",
         triggerAtMillis: Long
     ) {
+        val existing = AlarmArming.getEntry(reactContext, scheduleId, time)
+        if (existing != null && existing.recurrence != "once") {
+            throw IllegalArgumentException("Cannot overwrite recurring schedule '$scheduleId' with a one-time alarm. Use snoozeAlarm instead.")
+        }
         // Persist first so the alarm survives reboots, then arm it.
         val entry = AlarmArming.Entry(
             scheduleId = scheduleId,
