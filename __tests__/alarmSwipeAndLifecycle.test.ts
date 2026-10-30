@@ -115,6 +115,7 @@ describe('Alarm Screen Swipe Interaction & Native Alarm Lifecycle', () => {
       // Execute snooze action
       await nativeAlarmService.snoozeAlarm({
         scheduleId: 'sched_snooze_1',
+        instanceId: 'dose-1',
         medicineName: 'Metformin',
         amount: '500mg',
         time: '08:00',
@@ -125,6 +126,7 @@ describe('Alarm Screen Swipe Interaction & Native Alarm Lifecycle', () => {
 
       expect(snoozeSpy).toHaveBeenCalledWith({
         scheduleId: 'sched_snooze_1',
+        instanceId: 'dose-1',
         medicineName: 'Metformin',
         amount: '500mg',
         time: '08:00',
@@ -147,6 +149,7 @@ describe('Alarm Screen Swipe Interaction & Native Alarm Lifecycle', () => {
         snoozeCalls++;
         await nativeAlarmService.snoozeAlarm({
           scheduleId: 's1',
+          instanceId: 'dose-1',
           medicineName: 'Med',
           amount: '1',
           time: '08:00',
@@ -231,6 +234,7 @@ describe('Alarm Screen Swipe Interaction & Native Alarm Lifecycle', () => {
       try {
         await nativeAlarmService.snoozeAlarm({
           scheduleId: 'sched_fail',
+          instanceId: 'dose-fail',
           medicineName: 'Med',
           amount: '1',
           time: '08:00',
