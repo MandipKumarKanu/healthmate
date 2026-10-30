@@ -397,15 +397,20 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
         triggerAtMillis: Long
     ) {
         // Persist first so the alarm survives reboots, then arm it.
-        AlarmArming.saveEntry(
-            reactContext,
-            AlarmArming.Entry(scheduleId, time, medicineName, amount, label, recurrence, mutableListOf(triggerAtMillis))
+        val entry = AlarmArming.Entry(
+            scheduleId = scheduleId,
+            time = time,
+            medicineName = medicineName,
+            amount = amount,
+            label = label,
+            recurrence = recurrence,
+            startDate = "",
+            endDate = null,
+            hasDateBounds = false,
+            triggers = mutableListOf(triggerAtMillis)
         )
-        AlarmArming.armEntry(
-            reactContext,
-            AlarmArming.Entry(scheduleId, time, medicineName, amount, label, recurrence, mutableListOf(triggerAtMillis)),
-            triggerAtMillis
-        )
+        AlarmArming.saveEntry(reactContext, entry)
+        AlarmArming.armEntry(reactContext, entry, triggerAtMillis)
 
         // Track active schedule ID
         val currentIds = prefs.getStringSet("active_ids", emptySet())?.toMutableSet() ?: mutableSetOf()
