@@ -25,6 +25,7 @@ import java.util.Locale
 object AlarmArming {
     const val PREFS_NAME = "healthmate_active_alarms"
     private const val KEY_PENDING = "pending_alarms"
+    const val KEY_LAST_RECOVERY = "last_recovery_report"
 
     private const val J_SCHEDULE_ID = "scheduleId"
     private const val J_TIME = "time"
@@ -58,6 +59,46 @@ object AlarmArming {
         val sourceInstanceId: String? = null,
         val isExact: Boolean = true
     )
+
+    data class EntryRecoveryDetail(
+        val scheduleId: String,
+        val time: String,
+        val status: String, // "recovered", "expired", "failed", "malformed"
+        val isExact: Boolean = false,
+        val triggerAtMillis: Long = 0L,
+        val error: String? = null
+    )
+
+    data class RecoveryReport(
+        val timestamp: Long,
+        val totalProcessed: Int,
+        val recoveredCount: Int,
+        val expiredCount: Int,
+        val failedCount: Int,
+        val malformedCount: Int,
+        val details: List<EntryRecoveryDetail>
+    ) {
+        fun toJson(): JSONObject = JSONObject().apply {
+            put("timestamp", timestamp)
+            put("totalProcessed", totalProcessed)
+            put("recoveredCount", recoveredCount)
+            put("expiredCount", expiredCount)
+            put("failedCount", failedCount)
+            put("malformedCount", malformedCount)
+            val detailsArray = JSONArray()
+            for (d in details) {
+                detailsArray.put(JSONObject().apply {
+                    put("scheduleId", d.scheduleId)
+                    put("time", d.time)
+                    put("status", d.status)
+                    put("isExact", d.isExact)
+                    put("triggerAtMillis", d.triggerAtMillis)
+                    if (d.error != null) put("error", d.error)
+                })
+            }
+            put("details", detailsArray)
+        }
+    }
 
     fun alarmKey(scheduleId: String, time: String): String = "$scheduleId|$time"
 
@@ -122,7 +163,17 @@ object AlarmArming {
     fun getAllEntries(context: Context): List<Entry> {
         val map = readPendingMap(context)
         val names = map.names() ?: return emptyList()
-        return (0 until names.length()).map { entryFromJson(map.getJSONObject(names.getString(it))) }
+        val list = mutableListOf<Entry>()
+        for (i in 0 until names.length()) {
+            val key = names.getString(i)
+            try {
+                val json = map.getJSONObject(key)
+                list.add(entryFromJson(json))
+            } catch (_: Exception) {
+                // One malformed JSON entry does not block other valid entries
+            }
+        }
+        return list
     }
 
     fun getEntry(context: Context, scheduleId: String, time: String): Entry? {
@@ -454,45 +505,200 @@ object AlarmArming {
         }
     }
 
+    fun getLastRecoveryReport(context: Context): String? {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getString(KEY_LAST_RECOVERY, null)
+    }
+
+    private fun saveRecoveryReport(context: Context, report: RecoveryReport) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putString(KEY_LAST_RECOVERY, report.toJson().toString()).apply()
+    }
+
     /**
      * Re-arms every stored dose alarm after a reboot, package replacement, or
-     * exact-alarm permission change. Drops past and out-of-range triggers,
-     * synthesizes the next daily/weekly occurrence only for entries with date metadata
-     * if within range, and removes chains that can no longer fire.
+     * exact-alarm permission change.
+     * - Individual malformed entries never block recovery of valid entries.
+     * - Expired entries (past endDate or past one-time dates) are pruned and not restored.
+     * - Triggers are deduplicated and armed with FLAG_UPDATE_CURRENT to prevent duplicates.
+     * - Generates a diagnosable per-entry RecoveryReport stored in SharedPreferences.
      */
-    fun reArmAll(context: Context) {
-        try {
-            val now = System.currentTimeMillis()
-            val entries = getAllEntries(context)
-            for (entry in entries) {
+    fun reArmAll(context: Context): RecoveryReport {
+        val now = System.currentTimeMillis()
+        val todayStr = localDateString(now)
+        val map = readPendingMap(context)
+        val names = map.names()
+        val total = names?.length() ?: 0
+
+        var recoveredCount = 0
+        var expiredCount = 0
+        var failedCount = 0
+        var malformedCount = 0
+        val details = mutableListOf<EntryRecoveryDetail>()
+
+        if (names == null || total == 0) {
+            val emptyReport = RecoveryReport(now, 0, 0, 0, 0, 0, emptyList())
+            saveRecoveryReport(context, emptyReport)
+            return emptyReport
+        }
+
+        var mapMutated = false
+
+        for (i in 0 until total) {
+            val key = names.getString(i)
+            val json: JSONObject
+            val entry: Entry
+            try {
+                json = map.getJSONObject(key)
+                entry = entryFromJson(json)
+            } catch (e: Exception) {
+                malformedCount++
+                details.add(
+                    EntryRecoveryDetail(
+                        scheduleId = key.substringBefore("|"),
+                        time = key.substringAfter("|", ""),
+                        status = "malformed",
+                        error = e.message ?: "Invalid JSON entry format"
+                    )
+                )
+                map.remove(key)
+                mapMutated = true
+                continue
+            }
+
+            try {
+                if (entry.scheduleId.isBlank()) {
+                    malformedCount++
+                    details.add(
+                        EntryRecoveryDetail(
+                            scheduleId = "",
+                            time = entry.time,
+                            status = "malformed",
+                            error = "Missing scheduleId"
+                        )
+                    )
+                    map.remove(key)
+                    mapMutated = true
+                    continue
+                }
+
+                // Check expired end dates: a bounded schedule whose endDate is in the past must never restore!
+                if (entry.hasDateBounds && entry.endDate != null && entry.endDate < todayStr) {
+                    cancelPendingIntent(context, entry.scheduleId, entry.time)
+                    map.remove(key)
+                    mapMutated = true
+                    expiredCount++
+                    details.add(
+                        EntryRecoveryDetail(
+                            scheduleId = entry.scheduleId,
+                            time = entry.time,
+                            status = "expired",
+                            error = "Schedule end date ${entry.endDate} has passed"
+                        )
+                    )
+                    continue
+                }
+
+                // Clean out past triggers and triggers outside schedule bounds
                 entry.triggers.removeAll {
                     it <= now || (entry.hasDateBounds && !isWithinScheduleDates(entry, it))
                 }
 
+                // Deduplicate remaining triggers to avoid duplicate events
+                val uniqueTriggers = entry.triggers.distinct().toMutableList()
+                entry.triggers.clear()
+                entry.triggers.addAll(uniqueTriggers)
+
+                // If triggers are exhausted, check if we can synthesize next recurrence
                 var next: Long? = entry.triggers.minOrNull()
-                if (next == null && entry.hasDateBounds) {
-                    val synthesized = when (entry.recurrence) {
-                        "daily" -> nextDailyOccurrenceMillis(entry.time, now)
-                        "weekly" -> nextWeeklyOccurrenceMillis(entry.time, entry.startDate, now)
-                        else -> null
+                if (next == null) {
+                    if (entry.recurrence == "once") {
+                        // One-time schedules that already passed must never be restored or synthesized
+                        cancelPendingIntent(context, entry.scheduleId, entry.time)
+                        map.remove(key)
+                        mapMutated = true
+                        expiredCount++
+                        details.add(
+                            EntryRecoveryDetail(
+                                scheduleId = entry.scheduleId,
+                                time = entry.time,
+                                status = "expired",
+                                error = "One-time schedule has already passed"
+                            )
+                        )
+                        continue
                     }
-                    if (synthesized != null && isWithinScheduleDates(entry, synthesized)) {
-                        entry.triggers.add(synthesized)
-                        next = synthesized
+
+                    if (entry.hasDateBounds) {
+                        val synthesized = when (entry.recurrence) {
+                            "daily" -> nextDailyOccurrenceMillis(entry.time, now)
+                            "weekly" -> nextWeeklyOccurrenceMillis(entry.time, entry.startDate, now)
+                            else -> null
+                        }
+                        if (synthesized != null && isWithinScheduleDates(entry, synthesized)) {
+                            entry.triggers.add(synthesized)
+                            next = synthesized
+                        }
                     }
                 }
 
                 if (entry.triggers.isEmpty() || next == null) {
                     cancelPendingIntent(context, entry.scheduleId, entry.time)
-                    entry.triggers.clear()
-                    saveEntry(context, entry)
+                    map.remove(key)
+                    mapMutated = true
+                    expiredCount++
+                    details.add(
+                        EntryRecoveryDetail(
+                            scheduleId = entry.scheduleId,
+                            time = entry.time,
+                            status = "expired",
+                            error = "No future triggers remain within schedule bounds"
+                        )
+                    )
                 } else {
                     entry.triggers.sort()
                     val wasExact = armEntry(context, entry, next)
-                    saveEntry(context, entry.copy(isExact = wasExact))
+                    val updatedEntry = entry.copy(isExact = wasExact)
+                    map.put(key, entryToJson(updatedEntry))
+                    mapMutated = true
+                    recoveredCount++
+                    details.add(
+                        EntryRecoveryDetail(
+                            scheduleId = entry.scheduleId,
+                            time = entry.time,
+                            status = "recovered",
+                            isExact = wasExact,
+                            triggerAtMillis = next
+                        )
+                    )
                 }
+            } catch (entryErr: Exception) {
+                failedCount++
+                details.add(
+                    EntryRecoveryDetail(
+                        scheduleId = entry.scheduleId,
+                        time = entry.time,
+                        status = "failed",
+                        error = entryErr.message ?: "Failed to arm entry"
+                    )
+                )
             }
-        } catch (_: Exception) {
         }
+
+        if (mapMutated) {
+            writePendingMap(context, map)
+        }
+
+        val report = RecoveryReport(
+            timestamp = now,
+            totalProcessed = total,
+            recoveredCount = recoveredCount,
+            expiredCount = expiredCount,
+            failedCount = failedCount,
+            malformedCount = malformedCount,
+            details = details
+        )
+        saveRecoveryReport(context, report)
+        return report
     }
 }

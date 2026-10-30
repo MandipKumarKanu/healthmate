@@ -22,6 +22,25 @@ export interface NativeAlarmResult<T = boolean> {
   error?: NativeAlarmDiagnostic;
 }
 
+export interface NativeRecoveryDetail {
+  scheduleId: string;
+  time: string;
+  status: 'recovered' | 'expired' | 'failed' | 'malformed';
+  isExact?: boolean;
+  triggerAtMillis?: number;
+  error?: string;
+}
+
+export interface NativeRecoveryReport {
+  timestamp: number;
+  totalProcessed: number;
+  recoveredCount: number;
+  expiredCount: number;
+  failedCount: number;
+  malformedCount: number;
+  details: NativeRecoveryDetail[];
+}
+
 export type AlarmPrecisionMode = 'exact' | 'inexact_fallback';
 
 export class NativeActionResult implements NativeAlarmResult<boolean> {
@@ -131,6 +150,8 @@ interface NativeAlarmModuleInterface {
   cancelSnoozesForSchedule?(scheduleId: string): Promise<boolean>;
   cancelAllAlarms(): Promise<boolean>;
   canScheduleExactAlarms(): Promise<boolean>;
+  getLastRecoveryReport?(): Promise<string | null>;
+  triggerRecovery?(): Promise<string>;
   dismissKeyguard(): Promise<boolean>;
   isIgnoringBatteryOptimizations(): Promise<boolean>;
   requestIgnoreBatteryOptimizations(): Promise<boolean>;
@@ -383,6 +404,28 @@ export const nativeAlarmService = {
   async getAlarmPrecisionMode(): Promise<AlarmPrecisionMode> {
     const isExact = await this.canScheduleExactAlarms();
     return isExact ? 'exact' : 'inexact_fallback';
+  },
+
+  async getLastRecoveryReport(): Promise<NativeRecoveryReport | null> {
+    const alarmModule = getAlarmModule();
+    if (!alarmModule?.getLastRecoveryReport) return null;
+    try {
+      const raw = await alarmModule.getLastRecoveryReport();
+      return raw ? (JSON.parse(raw) as NativeRecoveryReport) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  async triggerRecovery(): Promise<NativeRecoveryReport | null> {
+    const alarmModule = getAlarmModule();
+    if (!alarmModule?.triggerRecovery) return null;
+    try {
+      const raw = await alarmModule.triggerRecovery();
+      return raw ? (JSON.parse(raw) as NativeRecoveryReport) : null;
+    } catch {
+      return null;
+    }
   },
 
   async dismissKeyguard(): Promise<boolean> {

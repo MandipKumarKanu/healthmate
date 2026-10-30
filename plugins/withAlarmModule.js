@@ -8,86 +8,89 @@ const {
 const fs = require('fs');
 const path = require('path');
 
-function withAlarmPermissions(config) {
-  return withAndroidManifest(config, (config) => {
-    const androidManifest = config.modResults.manifest;
+function applyManifestModifications(androidManifest) {
+  const permissions = [
+    'android.permission.INTERNET',
+    'android.permission.ACCESS_NETWORK_STATE',
+    'android.permission.USE_FULL_SCREEN_INTENT',
+    'android.permission.FOREGROUND_SERVICE',
+    'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK',
+    'android.permission.WAKE_LOCK',
+    'android.permission.SCHEDULE_EXACT_ALARM',
+    'android.permission.RECEIVE_BOOT_COMPLETED',
+    'android.permission.VIBRATE',
+    'android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS',
+  ];
 
-    const permissions = [
-      'android.permission.INTERNET',
-      'android.permission.ACCESS_NETWORK_STATE',
-      'android.permission.USE_FULL_SCREEN_INTENT',
-      'android.permission.FOREGROUND_SERVICE',
-      'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK',
-      'android.permission.WAKE_LOCK',
-      'android.permission.SCHEDULE_EXACT_ALARM',
-      'android.permission.RECEIVE_BOOT_COMPLETED',
-      'android.permission.VIBRATE',
-      'android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS',
-    ];
-
-    androidManifest['uses-permission'] = androidManifest['uses-permission'] || [];
-    for (const perm of permissions) {
-      if (!androidManifest['uses-permission'].some((p) => p.$['android:name'] === perm)) {
-        androidManifest['uses-permission'].push({
-          $: { 'android:name': perm },
-        });
-      }
-    }
-
-    const app = androidManifest.application[0];
-    app.$['android:usesCleartextTraffic'] = 'false';
-    app.$['android:networkSecurityConfig'] = '@xml/network_security_config';
-    app.service = app.service || [];
-    if (!app.service.some((s) => s.$['android:name'] === '.alarm.AlarmService')) {
-      app.service.push({
-        $: {
-          'android:name': '.alarm.AlarmService',
-          'android:enabled': 'true',
-          'android:exported': 'false',
-          'android:foregroundServiceType': 'mediaPlayback',
-        },
+  androidManifest['uses-permission'] = androidManifest['uses-permission'] || [];
+  for (const perm of permissions) {
+    if (!androidManifest['uses-permission'].some((p) => p.$['android:name'] === perm)) {
+      androidManifest['uses-permission'].push({
+        $: { 'android:name': perm },
       });
     }
+  }
 
-    app.receiver = app.receiver || [];
-    const receiverIndex = app.receiver.findIndex(
-      (r) => r.$['android:name'] === '.alarm.AlarmReceiver',
-    );
-    const receiverObj = {
+  const app = androidManifest.application[0];
+  app.$['android:usesCleartextTraffic'] = 'false';
+  app.$['android:networkSecurityConfig'] = '@xml/network_security_config';
+  app.service = app.service || [];
+  if (!app.service.some((s) => s.$['android:name'] === '.alarm.AlarmService')) {
+    app.service.push({
       $: {
-        'android:name': '.alarm.AlarmReceiver',
+        'android:name': '.alarm.AlarmService',
         'android:enabled': 'true',
         'android:exported': 'false',
+        'android:foregroundServiceType': 'mediaPlayback',
       },
-      'intent-filter': [
-        {
-          action: [
-            { $: { 'android:name': 'android.intent.action.BOOT_COMPLETED' } },
-            {
-              $: {
-                'android:name': 'android.intent.action.MY_PACKAGE_REPLACED',
-              },
-            },
-            {
-              $: {
-                'android:name': 'android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED',
-              },
-            },
-          ],
-        },
-      ],
-    };
-    if (receiverIndex >= 0) {
-      app.receiver[receiverIndex] = receiverObj;
-    } else {
-      app.receiver.push(receiverObj);
-    }
+    });
+  }
 
-    if (app.activity && app.activity[0]) {
-      app.activity[0].$['android:showWhenLocked'] = 'true';
-      app.activity[0].$['android:turnScreenOn'] = 'true';
-    }
+  app.receiver = app.receiver || [];
+  const receiverIndex = app.receiver.findIndex(
+    (r) => r.$['android:name'] === '.alarm.AlarmReceiver',
+  );
+  const receiverObj = {
+    $: {
+      'android:name': '.alarm.AlarmReceiver',
+      'android:enabled': 'true',
+      'android:exported': 'true',
+    },
+    'intent-filter': [
+      {
+        action: [
+          { $: { 'android:name': 'android.intent.action.BOOT_COMPLETED' } },
+          { $: { 'android:name': 'android.intent.action.LOCKED_BOOT_COMPLETED' } },
+          { $: { 'android:name': 'android.intent.action.MY_PACKAGE_REPLACED' } },
+          { $: { 'android:name': 'android.intent.action.QUICKBOOT_POWERON' } },
+          { $: { 'android:name': 'com.htc.intent.action.QUICKBOOT_POWERON' } },
+          {
+            $: {
+              'android:name': 'android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED',
+            },
+          },
+        ],
+      },
+    ],
+  };
+  if (receiverIndex >= 0) {
+    app.receiver[receiverIndex] = receiverObj;
+  } else {
+    app.receiver.push(receiverObj);
+  }
 
+  if (app.activity && app.activity[0]) {
+    app.activity[0].$ = app.activity[0].$ || {};
+    app.activity[0].$['android:showWhenLocked'] = 'true';
+    app.activity[0].$['android:turnScreenOn'] = 'true';
+  }
+
+  return androidManifest;
+}
+
+function withAlarmPermissions(config) {
+  return withAndroidManifest(config, (config) => {
+    applyManifestModifications(config.modResults.manifest);
     return config;
   });
 }
@@ -241,4 +244,7 @@ const withAlarmModule = (config) => {
   return config;
 };
 
-module.exports = createRunOncePlugin(withAlarmModule, 'withAlarmModule', '1.0.0');
+const plugin = createRunOncePlugin(withAlarmModule, 'withAlarmModule', '1.0.0');
+plugin.applyManifestModifications = applyManifestModifications;
+
+module.exports = plugin;

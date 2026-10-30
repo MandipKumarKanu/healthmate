@@ -14,6 +14,18 @@ const NativeModules = {
     cancelSnoozesForSchedule: jest.fn().mockResolvedValue(true),
     cancelAllAlarms: jest.fn().mockResolvedValue(true),
     canScheduleExactAlarms: jest.fn().mockResolvedValue(true),
+    getLastRecoveryReport: jest.fn().mockResolvedValue(null),
+    triggerRecovery: jest.fn().mockResolvedValue(
+      JSON.stringify({
+        timestamp: Date.now(),
+        totalProcessed: 0,
+        recoveredCount: 0,
+        expiredCount: 0,
+        failedCount: 0,
+        malformedCount: 0,
+        details: [],
+      }),
+    ),
     dismissKeyguard: jest.fn().mockResolvedValue(true),
     isIgnoringBatteryOptimizations: jest.fn().mockResolvedValue(true),
     requestIgnoreBatteryOptimizations: jest.fn().mockResolvedValue(true),

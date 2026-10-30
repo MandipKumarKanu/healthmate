@@ -10,13 +10,14 @@ class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action
         if (action == Intent.ACTION_BOOT_COMPLETED ||
+            action == Intent.ACTION_LOCKED_BOOT_COMPLETED ||
             action == Intent.ACTION_MY_PACKAGE_REPLACED ||
+            action == "android.intent.action.QUICKBOOT_POWERON" ||
+            action == "com.htc.intent.action.QUICKBOOT_POWERON" ||
             action == "android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED"
         ) {
-            // Android wipes all AlarmManager alarms on reboot. Re-arm every
-            // stored dose alarm natively here instead of waiting for the app to
-            // next become active (the old behavior left doses silent until the
-            // user opened the app).
+            // Android wipes all AlarmManager alarms on reboot or app updates.
+            // Re-arm every stored dose alarm natively here.
             AlarmArming.reArmAll(context)
             return
         }

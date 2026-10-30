@@ -219,6 +219,26 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
     }
 
     @ReactMethod
+    fun getLastRecoveryReport(promise: Promise) {
+        try {
+            val reportJson = AlarmArming.getLastRecoveryReport(reactContext)
+            promise.resolve(reportJson)
+        } catch (e: Exception) {
+            promise.resolve(null)
+        }
+    }
+
+    @ReactMethod
+    fun triggerRecovery(promise: Promise) {
+        try {
+            val report = AlarmArming.reArmAll(reactContext)
+            promise.resolve(report.toJson().toString())
+        } catch (e: Exception) {
+            promise.reject("RECOVERY_FAILED", e.message, e)
+        }
+    }
+
+    @ReactMethod
     fun canScheduleExactAlarms(promise: Promise) {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
