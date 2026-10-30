@@ -271,7 +271,7 @@ export default function FullScreenAlarmScreen() {
 
     try {
       Vibration.vibrate(Platform.OS === 'android' ? [0, 40, 40, 80] : 100);
-      const scheduledAt = await nativeAlarmService.snoozeAlarm({
+      const snoozeResult = await nativeAlarmService.snoozeAlarm({
         scheduleId,
         instanceId: params.instanceId || `${scheduleId}:${doseTime}`,
         medicineName,
@@ -280,17 +280,21 @@ export default function FullScreenAlarmScreen() {
         label: doseLabel,
         minutes: snoozeMinutes,
       });
-      if (scheduledAt === null || scheduledAt <= Date.now()) {
-        throw new Error('Native snooze scheduling was not confirmed');
+      if (!snoozeResult.success || !snoozeResult.data || snoozeResult.data <= Date.now()) {
+        const errorMsg =
+          snoozeResult.error?.code === 'exact_alarm_denied'
+            ? 'Alarm permission missing. Cannot snooze.'
+            : 'Could not snooze alarm. Please try again.';
+        throw new Error(errorMsg);
       }
       setCompletedAction('snooze');
 
       setTimeout(() => {
         router.replace('/(tabs)/home');
       }, 750);
-    } catch (e) {
-      console.warn('Failed to snooze alarm:', e);
-      setErrorMessage('Could not snooze alarm. Please try again.');
+    } catch (e: any) {
+      console.warn('Failed to snooze alarm for schedule:', scheduleId);
+      setErrorMessage(e?.message || 'Could not snooze alarm. Please try again.');
       setIsProcessing(false);
       setCompletedAction(null);
       Animated.spring(panX, {

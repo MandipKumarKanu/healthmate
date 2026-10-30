@@ -92,8 +92,12 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
             AlarmArming.saveEntry(reactContext, entry)
             AlarmArming.armEntry(reactContext, entry, triggerAtMillis)
             promise.resolve(triggerAtMillis.toDouble())
+        } catch (e: SecurityException) {
+            promise.reject("EXACT_ALARM_DENIED", e.message, e)
+        } catch (e: IllegalArgumentException) {
+            promise.reject("INVALID_TRIGGER", e.message, e)
         } catch (e: Exception) {
-            promise.reject("SNOOZE_FAILED", e.message, e)
+            promise.reject("REGISTRATION_FAILED", e.message, e)
         }
     }
 
@@ -110,8 +114,12 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
         try {
             scheduleAlarmInternal(scheduleId, medicineName, amount, time, label, "once", triggerAtMillis.toLong())
             promise.resolve(true)
+        } catch (e: SecurityException) {
+            promise.reject("EXACT_ALARM_DENIED", e.message, e)
+        } catch (e: IllegalArgumentException) {
+            promise.reject("INVALID_TRIGGER", e.message, e)
         } catch (e: Exception) {
-            promise.reject("SCHEDULE_FAILED", e.message, e)
+            promise.reject("REGISTRATION_FAILED", e.message, e)
         }
     }
 
@@ -169,8 +177,12 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
                 AlarmArming.saveEntry(reactContext, entry)
                 promise.resolve(false)
             }
+        } catch (e: SecurityException) {
+            promise.reject("EXACT_ALARM_DENIED", e.message, e)
+        } catch (e: IllegalArgumentException) {
+            promise.reject("INVALID_TRIGGER", e.message, e)
         } catch (e: Exception) {
-            promise.reject("SYNC_CHAIN_FAILED", e.message, e)
+            promise.reject("REGISTRATION_FAILED", e.message, e)
         }
     }
 
@@ -180,7 +192,7 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
             cancelAlarmInternal(scheduleId)
             promise.resolve(true)
         } catch (e: Exception) {
-            promise.reject("CANCEL_FAILED", e.message, e)
+            promise.reject("CANCELLATION_FAILED", e.message, e)
         }
     }
 
@@ -190,7 +202,7 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
             AlarmArming.cancelSnoozesForSchedule(reactContext, scheduleId)
             promise.resolve(true)
         } catch (e: Exception) {
-            promise.reject("CANCEL_SNOOZES_FAILED", e.message, e)
+            promise.reject("CANCELLATION_FAILED", e.message, e)
         }
     }
 
@@ -202,7 +214,7 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
             prefs.edit().remove("active_ids").apply()
             promise.resolve(true)
         } catch (e: Exception) {
-            promise.reject("CANCEL_ALL_FAILED", e.message, e)
+            promise.reject("CANCELLATION_FAILED", e.message, e)
         }
     }
 

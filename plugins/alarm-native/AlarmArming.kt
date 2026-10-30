@@ -244,7 +244,7 @@ object AlarmArming {
         writePendingMap(context, JSONObject())
     }
 
-    /** Registers one exact alarm (with a safe inexact fallback) for the given dose. */
+    /** Registers one exact alarm for the given dose. Throws on system/permission failure so callers receive diagnostic errors. */
     fun armDose(
         context: Context,
         scheduleId: String,
@@ -256,49 +256,56 @@ object AlarmArming {
         sourceScheduleId: String? = null,
         sourceInstanceId: String? = null
     ) {
-        try {
-            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
-            val intent = Intent(context, AlarmReceiver::class.java).apply {
-                putExtra(AlarmService.EXTRA_SCHEDULE_ID, scheduleId)
-                putExtra(AlarmService.EXTRA_MEDICINE_NAME, medicineName)
-                putExtra(AlarmService.EXTRA_AMOUNT, amount)
-                putExtra(AlarmService.EXTRA_TIME, time)
-                putExtra(AlarmService.EXTRA_LABEL, label)
-                putExtra(AlarmService.EXTRA_TRIGGER_AT_MILLIS, triggerAtMillis)
-                putExtra(AlarmService.EXTRA_SOURCE_SCHEDULE_ID, sourceScheduleId ?: "")
-                putExtra(AlarmService.EXTRA_SOURCE_INSTANCE_ID, sourceInstanceId ?: triggerAtMillis.toString())
-            }
-            val key = alarmKey(scheduleId, time)
-            val pendingIntent = pendingIntentFor(context, key, intent)
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+            ?: throw IllegalStateException("AlarmManager system service is not available")
 
-            val showIntent = Intent(context, com.healthmate.app.MainActivity::class.java)
-            val showPendingIntent = PendingIntent.getActivity(
-                context,
-                key.hashCode(),
-                showIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
+        if (triggerAtMillis <= System.currentTimeMillis()) {
+            throw IllegalArgumentException("Invalid trigger time: must be in the future")
+        }
 
-            val canExact = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                alarmManager.canScheduleExactAlarms()
-            } else {
-                true
-            }
+        val intent = Intent(context, AlarmReceiver::class.java).apply {
+            putExtra(AlarmService.EXTRA_SCHEDULE_ID, scheduleId)
+            putExtra(AlarmService.EXTRA_MEDICINE_NAME, medicineName)
+            putExtra(AlarmService.EXTRA_AMOUNT, amount)
+            putExtra(AlarmService.EXTRA_TIME, time)
+            putExtra(AlarmService.EXTRA_LABEL, label)
+            putExtra(AlarmService.EXTRA_TRIGGER_AT_MILLIS, triggerAtMillis)
+            putExtra(AlarmService.EXTRA_SOURCE_SCHEDULE_ID, sourceScheduleId ?: "")
+            putExtra(AlarmService.EXTRA_SOURCE_INSTANCE_ID, sourceInstanceId ?: triggerAtMillis.toString())
+        }
+        val key = alarmKey(scheduleId, time)
+        val pendingIntent = pendingIntentFor(context, key, intent)
 
-            if (canExact) {
+        val showIntent = Intent(context, com.healthmate.app.MainActivity::class.java)
+        val showPendingIntent = PendingIntent.getActivity(
+            context,
+            key.hashCode(),
+            showIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val canExact = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            alarmManager.canScheduleExactAlarms()
+        } else {
+            true
+        }
+
+        if (canExact) {
+            try {
                 alarmManager.setAlarmClock(
                     AlarmManager.AlarmClockInfo(triggerAtMillis, showPendingIntent),
                     pendingIntent
                 )
-            } else {
-                // Graceful fallback if exact-alarm permission was revoked or absent
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
-                } else {
-                    alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
-                }
+            } catch (secEx: SecurityException) {
+                throw SecurityException("Exact alarm permission SCHEDULE_EXACT_ALARM is not granted", secEx)
             }
-        } catch (_: Exception) {
+        } else {
+            // Graceful fallback if exact-alarm permission was revoked or absent
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
+            } else {
+                alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
+            }
         }
     }
 

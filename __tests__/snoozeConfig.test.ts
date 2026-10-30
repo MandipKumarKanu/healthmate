@@ -238,7 +238,8 @@ describe('Configurable Alarm Snooze Intervals', () => {
         minutes: 10,
       });
 
-      expect(scheduledAt).toBeGreaterThan(0);
+      expect(scheduledAt.success).toBe(true);
+      expect(scheduledAt.scheduledAt).toBeGreaterThan(0);
       // Snooze was created with distinct ID
       expect(snoozeSpy).toHaveBeenCalledWith(
         'sched_daily_preserve',
@@ -299,7 +300,7 @@ describe('Configurable Alarm Snooze Intervals', () => {
         'dose-instance-2026-10-30T08:00:00',
       );
 
-      expect(result).toBe(true);
+      expect(result.success).toBe(true);
       // Target is specifically the snooze ID, NOT the recurring schedule ID
       expect(cancelAlarmSpy).toHaveBeenCalledWith(
         'sched_daily_dose::snooze::dose-instance-2026-10-30T08:00:00',
@@ -321,7 +322,7 @@ describe('Configurable Alarm Snooze Intervals', () => {
       const cancelSnoozesSpy = NativeModules.AlarmModule.cancelSnoozesForSchedule;
 
       const result = await nativeAlarmService.cancelSnoozesForSchedule('sched_active_dose');
-      expect(result).toBe(true);
+      expect(result.success).toBe(true);
       expect(cancelSnoozesSpy).toHaveBeenCalledWith('sched_active_dose');
     });
   });

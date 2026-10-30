@@ -636,7 +636,6 @@ export const notificationService = {
         console.warn('Reminder not scheduled: no valid future triggers for schedule.', {
           scheduleId,
           time,
-          scheduleConfig,
         });
         return null;
       }
@@ -680,7 +679,7 @@ export const notificationService = {
         try {
           const windowMillis = getNativeAlarmTriggerWindow(scheduleConfig, time, new Date());
           if (windowMillis.length > 0) {
-            await nativeAlarmService.syncAlarmChain({
+            const syncResult = await nativeAlarmService.syncAlarmChain({
               scheduleId,
               medicineName,
               amount,
@@ -692,15 +691,30 @@ export const notificationService = {
               endDate: scheduleConfig?.endDate,
               triggerMillis: windowMillis,
             });
+            if (!syncResult.success) {
+              console.warn(
+                'Native alarm chain registration failed for schedule:',
+                scheduleId,
+                syncResult.error?.code,
+              );
+              await Promise.all(
+                identifiers.map((id) => Notifications.cancelScheduledNotificationAsync(id)),
+              );
+              return null;
+            }
           }
         } catch (alarmErr) {
-          console.warn('Could not schedule native alarm chain:', alarmErr);
+          console.warn('Could not schedule native alarm chain for schedule:', scheduleId);
+          await Promise.all(
+            identifiers.map((id) => Notifications.cancelScheduledNotificationAsync(id)),
+          );
+          return null;
         }
       }
 
       return identifiers[0] ?? null;
     } catch (error) {
-      console.warn('Failed to schedule medication alarm:', error);
+      console.warn('Failed to schedule medication alarm for schedule:', scheduleId);
       return null;
     }
   },
@@ -713,9 +727,16 @@ export const notificationService = {
     }
   },
 
-  async cancelForSchedule(scheduleId: string): Promise<void> {
+  async cancelForSchedule(scheduleId: string): Promise<boolean | void> {
     try {
-      await nativeAlarmService.cancelAlarm(scheduleId);
+      const cancelResult = await nativeAlarmService.cancelAlarm(scheduleId);
+      if (!cancelResult.success) {
+        console.warn(
+          'Native alarm cancellation failed for schedule:',
+          scheduleId,
+          cancelResult.error?.code,
+        );
+      }
       const scheduled = await Notifications.getAllScheduledNotificationsAsync();
       const matching = scheduled.filter(
         (notification) => notification.content.data?.scheduleId === scheduleId,
@@ -725,8 +746,10 @@ export const notificationService = {
           Notifications.cancelScheduledNotificationAsync(notification.identifier),
         ),
       );
+      return cancelResult.success;
     } catch (error) {
-      console.warn('Failed to cancel schedule notifications:', error);
+      console.warn('Failed to cancel schedule notifications for schedule:', scheduleId);
+      return false;
     }
   },
 

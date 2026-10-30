@@ -2,6 +2,97 @@ import { NativeModules, Platform } from 'react-native';
 import type { ReminderSchedule } from '../types';
 import { profileRepository } from '../database/repositories/profileRepository';
 
+export type NativeAlarmErrorCode =
+  | 'module_unavailable'
+  | 'exact_alarm_denied'
+  | 'permission_denied'
+  | 'invalid_trigger'
+  | 'registration_failed'
+  | 'cancellation_failed'
+  | 'unknown';
+
+export interface NativeAlarmDiagnostic {
+  code: NativeAlarmErrorCode;
+  message: string;
+}
+
+export interface NativeAlarmResult<T = boolean> {
+  success: boolean;
+  data?: T;
+  error?: NativeAlarmDiagnostic;
+}
+
+export class NativeActionResult implements NativeAlarmResult<boolean> {
+  constructor(
+    public success: boolean,
+    public data: boolean = success,
+    public error?: NativeAlarmDiagnostic,
+  ) {}
+
+  valueOf(): boolean {
+    return this.success;
+  }
+}
+
+export class SnoozeAlarmResult implements NativeAlarmResult<number> {
+  constructor(
+    public success: boolean,
+    public data?: number,
+    public error?: NativeAlarmDiagnostic,
+  ) {}
+
+  get scheduledAt(): number | undefined {
+    return this.data;
+  }
+
+  valueOf(): number {
+    return this.data ?? 0;
+  }
+}
+
+export function mapNativeError(e: unknown): NativeAlarmDiagnostic {
+  const codeStr = String((e as any)?.code ?? '').toUpperCase();
+  const msg = String((e as any)?.message ?? (e instanceof Error ? e.message : String(e)));
+
+  if (
+    codeStr.includes('EXACT_ALARM') ||
+    codeStr.includes('SCHEDULE_EXACT') ||
+    msg.toLowerCase().includes('exact alarm')
+  ) {
+    return { code: 'exact_alarm_denied', message: 'Exact alarm permission is denied or revoked' };
+  }
+  if (
+    codeStr.includes('PERMISSION') ||
+    msg.toLowerCase().includes('permission') ||
+    msg.toLowerCase().includes('security')
+  ) {
+    return { code: 'permission_denied', message: 'Notification or alarm permission is denied' };
+  }
+  if (
+    codeStr.includes('INVALID_TRIGGER') ||
+    msg.toLowerCase().includes('trigger') ||
+    msg.toLowerCase().includes('future')
+  ) {
+    return { code: 'invalid_trigger', message: 'Invalid alarm trigger timestamp or format' };
+  }
+  if (codeStr.includes('CANCEL') || msg.toLowerCase().includes('cancel')) {
+    return { code: 'cancellation_failed', message: 'Failed to cancel alarm with system alarm manager' };
+  }
+  if (
+    codeStr.includes('REGISTRATION') ||
+    codeStr.includes('SCHEDULE') ||
+    msg.toLowerCase().includes('alarmmanager') ||
+    msg.toLowerCase().includes('register')
+  ) {
+    return { code: 'registration_failed', message: 'Android system failed to register alarm with AlarmManager' };
+  }
+
+  return { code: 'unknown', message: msg || 'An unknown native alarm error occurred' };
+}
+
+export type NativeAlarmActionResult = NativeActionResult;
+export type NativeSnoozeResult = SnoozeAlarmResult;
+
 interface NativeAlarmModuleInterface {
   stopAlarm(): Promise<boolean>;
   syncAlarmChain(
@@ -48,21 +139,30 @@ interface NativeAlarmModuleInterface {
   getDeviceManufacturer(): Promise<string>;
 }
 
-const AlarmModule: NativeAlarmModuleInterface | undefined =
-  Platform.OS === 'android' ? NativeModules.AlarmModule : undefined;
+function getAlarmModule(): NativeAlarmModuleInterface | undefined {
+  return Platform.OS === 'android' ? (NativeModules.AlarmModule as NativeAlarmModuleInterface | undefined) : undefined;
+}
 
 export const nativeAlarmService = {
   isAvailable(): boolean {
-    return Platform.OS === 'android' && Boolean(AlarmModule);
+    return Platform.OS === 'android' && Boolean(getAlarmModule());
   },
 
-  async stopAlarm(): Promise<boolean> {
-    if (!AlarmModule) return false;
+  async stopAlarm(): Promise<NativeAlarmActionResult> {
+    const alarmModule = getAlarmModule();
+    if (!alarmModule) {
+      return new NativeActionResult(false, false, {
+        code: 'module_unavailable',
+        message: 'Native AlarmModule is unavailable',
+      });
+    }
     try {
-      return await AlarmModule.stopAlarm();
+      const res = await alarmModule.stopAlarm();
+      return new NativeActionResult(res, res);
     } catch (e) {
-      console.warn('nativeAlarmService.stopAlarm failed:', e);
-      return false;
+      const mapped = mapNativeError(e);
+      console.warn('nativeAlarmService.stopAlarm failed:', mapped.code);
+      return new NativeActionResult(false, false, mapped);
     }
   },
 
@@ -74,8 +174,14 @@ export const nativeAlarmService = {
     time: string;
     label?: string;
     minutes?: number;
-  }): Promise<number | null> {
-    if (!AlarmModule) return null;
+  }): Promise<SnoozeAlarmResult> {
+    const alarmModule = getAlarmModule();
+    if (!alarmModule) {
+      return new SnoozeAlarmResult(false, undefined, {
+        code: 'module_unavailable',
+        message: 'Native AlarmModule is unavailable',
+      });
+    }
     try {
       let snoozeMinutes = params.minutes;
       if (!snoozeMinutes || ![5, 10, 15, 20].includes(snoozeMinutes)) {
@@ -91,7 +197,7 @@ export const nativeAlarmService = {
       }
 
       const snoozeId = `${params.scheduleId}::snooze::${params.instanceId}`;
-      return await AlarmModule.snoozeAlarm(
+      const scheduledAt = await alarmModule.snoozeAlarm(
         params.scheduleId,
         snoozeId,
         params.instanceId,
@@ -101,9 +207,17 @@ export const nativeAlarmService = {
         params.label ?? '',
         snoozeMinutes,
       );
+      if (!scheduledAt || scheduledAt <= Date.now()) {
+        return new SnoozeAlarmResult(false, undefined, {
+          code: 'registration_failed',
+          message: 'Native snooze registration returned invalid trigger timestamp',
+        });
+      }
+      return new SnoozeAlarmResult(true, scheduledAt);
     } catch (e) {
-      console.warn('nativeAlarmService.snoozeAlarm failed:', e);
-      return null;
+      const mapped = mapNativeError(e);
+      console.warn('nativeAlarmService.snoozeAlarm failed for schedule:', params.scheduleId, mapped.code);
+      return new SnoozeAlarmResult(false, undefined, mapped);
     }
   },
 
@@ -122,10 +236,16 @@ export const nativeAlarmService = {
     startDate: string;
     endDate?: string;
     triggerMillis: number[];
-  }): Promise<boolean> {
-    if (!AlarmModule) return false;
+  }): Promise<NativeAlarmActionResult> {
+    const alarmModule = getAlarmModule();
+    if (!alarmModule) {
+      return new NativeActionResult(false, false, {
+        code: 'module_unavailable',
+        message: 'Native AlarmModule is unavailable',
+      });
+    }
     try {
-      return await AlarmModule.syncAlarmChain(
+      const res = await alarmModule.syncAlarmChain(
         params.scheduleId,
         params.medicineName,
         params.amount,
@@ -136,9 +256,17 @@ export const nativeAlarmService = {
         params.endDate ?? '',
         JSON.stringify(params.triggerMillis),
       );
+      if (!res) {
+        return new NativeActionResult(false, false, {
+          code: 'invalid_trigger',
+          message: 'No valid future triggers within schedule bounds',
+        });
+      }
+      return new NativeActionResult(true, true);
     } catch (e) {
-      console.warn('nativeAlarmService.syncAlarmChain failed:', e);
-      return false;
+      const mapped = mapNativeError(e);
+      console.warn('nativeAlarmService.syncAlarmChain failed for schedule:', params.scheduleId, mapped.code);
+      return new NativeActionResult(false, false, mapped);
     }
   },
 
@@ -149,10 +277,16 @@ export const nativeAlarmService = {
     time: string;
     label?: string;
     triggerAtMillis: number;
-  }): Promise<boolean> {
-    if (!AlarmModule) return false;
+  }): Promise<NativeAlarmActionResult> {
+    const alarmModule = getAlarmModule();
+    if (!alarmModule) {
+      return new NativeActionResult(false, false, {
+        code: 'module_unavailable',
+        message: 'Native AlarmModule is unavailable',
+      });
+    }
     try {
-      return await AlarmModule.scheduleAlarm(
+      const res = await alarmModule.scheduleAlarm(
         params.scheduleId,
         params.medicineName,
         params.amount,
@@ -160,64 +294,92 @@ export const nativeAlarmService = {
         params.label ?? '',
         params.triggerAtMillis,
       );
+      return new NativeActionResult(res, res);
     } catch (e) {
-      console.warn('nativeAlarmService.scheduleAlarm failed:', e);
-      return false;
+      const mapped = mapNativeError(e);
+      console.warn('nativeAlarmService.scheduleAlarm failed for schedule:', params.scheduleId, mapped.code);
+      return new NativeActionResult(false, false, mapped);
     }
   },
 
-  async cancelAlarm(scheduleId: string): Promise<boolean> {
-    if (!AlarmModule) return false;
+  async cancelAlarm(scheduleId: string): Promise<NativeAlarmActionResult> {
+    const alarmModule = getAlarmModule();
+    if (!alarmModule) {
+      return new NativeActionResult(false, false, {
+        code: 'module_unavailable',
+        message: 'Native AlarmModule is unavailable',
+      });
+    }
     try {
-      return await AlarmModule.cancelAlarm(scheduleId);
+      const res = await alarmModule.cancelAlarm(scheduleId);
+      return new NativeActionResult(res, res);
     } catch (e) {
-      console.warn('nativeAlarmService.cancelAlarm failed:', e);
-      return false;
+      const mapped = mapNativeError(e);
+      console.warn('nativeAlarmService.cancelAlarm failed for schedule:', scheduleId, mapped.code);
+      return new NativeActionResult(false, false, mapped);
     }
   },
 
-  async cancelSnoozesForSchedule(scheduleId: string): Promise<boolean> {
-    if (!AlarmModule) return false;
+  async cancelSnoozesForSchedule(scheduleId: string): Promise<NativeAlarmActionResult> {
+    const alarmModule = getAlarmModule();
+    if (!alarmModule) {
+      return new NativeActionResult(false, false, {
+        code: 'module_unavailable',
+        message: 'Native AlarmModule is unavailable',
+      });
+    }
     try {
-      if (AlarmModule.cancelSnoozesForSchedule) {
-        return await AlarmModule.cancelSnoozesForSchedule(scheduleId);
+      if (alarmModule.cancelSnoozesForSchedule) {
+        const res = await alarmModule.cancelSnoozesForSchedule(scheduleId);
+        return new NativeActionResult(res, res);
       }
-      return true;
+      return new NativeActionResult(true, true);
     } catch (e) {
-      console.warn('nativeAlarmService.cancelSnoozesForSchedule failed:', e);
-      return false;
+      const mapped = mapNativeError(e);
+      console.warn('nativeAlarmService.cancelSnoozesForSchedule failed for schedule:', scheduleId, mapped.code);
+      return new NativeActionResult(false, false, mapped);
     }
   },
 
-  async cancelSnooze(scheduleId: string, instanceId: string): Promise<boolean> {
+  async cancelSnooze(scheduleId: string, instanceId: string): Promise<NativeAlarmActionResult> {
     const snoozeId = `${scheduleId}::snooze::${instanceId}`;
     return await this.cancelAlarm(snoozeId);
   },
 
-  async cancelAllAlarms(): Promise<boolean> {
-    if (!AlarmModule) return false;
+  async cancelAllAlarms(): Promise<NativeAlarmActionResult> {
+    const alarmModule = getAlarmModule();
+    if (!alarmModule) {
+      return new NativeActionResult(false, false, {
+        code: 'module_unavailable',
+        message: 'Native AlarmModule is unavailable',
+      });
+    }
     try {
-      return await AlarmModule.cancelAllAlarms();
+      const res = await alarmModule.cancelAllAlarms();
+      return new NativeActionResult(res, res);
     } catch (e) {
-      console.warn('nativeAlarmService.cancelAllAlarms failed:', e);
-      return false;
+      const mapped = mapNativeError(e);
+      console.warn('nativeAlarmService.cancelAllAlarms failed:', mapped.code);
+      return new NativeActionResult(false, false, mapped);
     }
   },
 
   async canScheduleExactAlarms(): Promise<boolean> {
     if (Platform.OS !== 'android') return true;
-    if (!AlarmModule?.canScheduleExactAlarms) return true;
+    const alarmModule = getAlarmModule();
+    if (!alarmModule?.canScheduleExactAlarms) return true;
     try {
-      return await AlarmModule.canScheduleExactAlarms();
+      return await alarmModule.canScheduleExactAlarms();
     } catch {
       return false;
     }
   },
 
   async dismissKeyguard(): Promise<boolean> {
-    if (!AlarmModule) return false;
+    const alarmModule = getAlarmModule();
+    if (!alarmModule) return false;
     try {
-      return await AlarmModule.dismissKeyguard();
+      return await alarmModule.dismissKeyguard();
     } catch (e) {
       console.warn('nativeAlarmService.dismissKeyguard failed:', e);
       return false;
@@ -226,9 +388,10 @@ export const nativeAlarmService = {
 
   async isIgnoringBatteryOptimizations(): Promise<boolean> {
     if (Platform.OS !== 'android') return true;
-    if (!AlarmModule?.isIgnoringBatteryOptimizations) return true;
+    const alarmModule = getAlarmModule();
+    if (!alarmModule?.isIgnoringBatteryOptimizations) return true;
     try {
-      return await AlarmModule.isIgnoringBatteryOptimizations();
+      return await alarmModule.isIgnoringBatteryOptimizations();
     } catch (e) {
       console.warn('nativeAlarmService.isIgnoringBatteryOptimizations failed:', e);
       return false;
@@ -237,9 +400,10 @@ export const nativeAlarmService = {
 
   async requestIgnoreBatteryOptimizations(): Promise<boolean> {
     if (Platform.OS !== 'android') return true;
-    if (!AlarmModule?.requestIgnoreBatteryOptimizations) return false;
+    const alarmModule = getAlarmModule();
+    if (!alarmModule?.requestIgnoreBatteryOptimizations) return false;
     try {
-      return await AlarmModule.requestIgnoreBatteryOptimizations();
+      return await alarmModule.requestIgnoreBatteryOptimizations();
     } catch (e) {
       console.warn('nativeAlarmService.requestIgnoreBatteryOptimizations failed:', e);
       return false;
@@ -248,9 +412,10 @@ export const nativeAlarmService = {
 
   async openExactAlarmSettings(): Promise<boolean> {
     if (Platform.OS !== 'android') return true;
-    if (!AlarmModule?.openExactAlarmSettings) return false;
+    const alarmModule = getAlarmModule();
+    if (!alarmModule?.openExactAlarmSettings) return false;
     try {
-      return await AlarmModule.openExactAlarmSettings();
+      return await alarmModule.openExactAlarmSettings();
     } catch (e) {
       console.warn('nativeAlarmService.openExactAlarmSettings failed:', e);
       return false;
@@ -259,9 +424,10 @@ export const nativeAlarmService = {
 
   async openAppBatterySettings(): Promise<boolean> {
     if (Platform.OS !== 'android') return true;
-    if (!AlarmModule?.openAppBatterySettings) return false;
+    const alarmModule = getAlarmModule();
+    if (!alarmModule?.openAppBatterySettings) return false;
     try {
-      return await AlarmModule.openAppBatterySettings();
+      return await alarmModule.openAppBatterySettings();
     } catch (e) {
       console.warn('nativeAlarmService.openAppBatterySettings failed:', e);
       return false;
@@ -270,9 +436,10 @@ export const nativeAlarmService = {
 
   async openOemAutoStartSettings(): Promise<boolean> {
     if (Platform.OS !== 'android') return true;
-    if (!AlarmModule?.openOemAutoStartSettings) return false;
+    const alarmModule = getAlarmModule();
+    if (!alarmModule?.openOemAutoStartSettings) return false;
     try {
-      return await AlarmModule.openOemAutoStartSettings();
+      return await alarmModule.openOemAutoStartSettings();
     } catch (e) {
       console.warn('nativeAlarmService.openOemAutoStartSettings failed:', e);
       return false;
@@ -281,9 +448,10 @@ export const nativeAlarmService = {
 
   async canUseFullScreenIntent(): Promise<boolean> {
     if (Platform.OS !== 'android') return true;
-    if (!AlarmModule?.canUseFullScreenIntent) return true;
+    const alarmModule = getAlarmModule();
+    if (!alarmModule?.canUseFullScreenIntent) return true;
     try {
-      return await AlarmModule.canUseFullScreenIntent();
+      return await alarmModule.canUseFullScreenIntent();
     } catch {
       return true;
     }
@@ -291,9 +459,10 @@ export const nativeAlarmService = {
 
   async openFullScreenIntentSettings(): Promise<boolean> {
     if (Platform.OS !== 'android') return true;
-    if (!AlarmModule?.openFullScreenIntentSettings) return false;
+    const alarmModule = getAlarmModule();
+    if (!alarmModule?.openFullScreenIntentSettings) return false;
     try {
-      return await AlarmModule.openFullScreenIntentSettings();
+      return await alarmModule.openFullScreenIntentSettings();
     } catch (e) {
       console.warn('nativeAlarmService.openFullScreenIntentSettings failed:', e);
       return false;
@@ -302,9 +471,10 @@ export const nativeAlarmService = {
 
   async getDeviceManufacturer(): Promise<string> {
     if (Platform.OS !== 'android') return 'generic';
-    if (!AlarmModule?.getDeviceManufacturer) return 'unknown';
+    const alarmModule = getAlarmModule();
+    if (!alarmModule?.getDeviceManufacturer) return 'unknown';
     try {
-      return await AlarmModule.getDeviceManufacturer();
+      return await alarmModule.getDeviceManufacturer();
     } catch (e) {
       console.warn('nativeAlarmService.getDeviceManufacturer failed:', e);
       return 'unknown';

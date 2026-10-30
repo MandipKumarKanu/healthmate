@@ -1,5 +1,9 @@
 import { describe, expect, it, beforeEach, jest } from '@jest/globals';
-import { nativeAlarmService } from '../src/services/nativeAlarmService';
+import {
+  nativeAlarmService,
+  NativeActionResult,
+  SnoozeAlarmResult,
+} from '../src/services/nativeAlarmService';
 import { adherenceRepository } from '../src/database/repositories/adherenceRepository';
 import { scheduleRepository } from '../src/database/repositories/scheduleRepository';
 import { medicineRepository } from '../src/database/repositories/medicineRepository';
@@ -63,7 +67,9 @@ describe('Alarm Screen Swipe Interaction & Native Alarm Lifecycle', () => {
 
   describe('Swipe-Right Action: Take Dose Completion', () => {
     it('stops active alarm and logs dose status as taken in adherence repository', async () => {
-      const stopAlarmSpy = jest.spyOn(nativeAlarmService, 'stopAlarm').mockResolvedValue(true);
+      const stopAlarmSpy = jest
+        .spyOn(nativeAlarmService, 'stopAlarm')
+        .mockResolvedValue(new NativeActionResult(true));
       const logDoseSpy = jest
         .spyOn(adherenceRepository, 'logDoseStatus')
         .mockReturnValue(undefined);
@@ -83,7 +89,9 @@ describe('Alarm Screen Swipe Interaction & Native Alarm Lifecycle', () => {
     });
 
     it('prevents duplicate execution if user attempts to trigger while action is processing', async () => {
-      const stopAlarmSpy = jest.spyOn(nativeAlarmService, 'stopAlarm').mockResolvedValue(true);
+      const stopAlarmSpy = jest
+        .spyOn(nativeAlarmService, 'stopAlarm')
+        .mockResolvedValue(new NativeActionResult(true));
       let isProcessing = false;
       let executionCount = 0;
 
@@ -109,8 +117,10 @@ describe('Alarm Screen Swipe Interaction & Native Alarm Lifecycle', () => {
 
       const snoozeSpy = jest
         .spyOn(nativeAlarmService, 'snoozeAlarm')
-        .mockResolvedValue(Date.now() + 15 * 60000);
-      const stopAlarmSpy = jest.spyOn(nativeAlarmService, 'stopAlarm').mockResolvedValue(true);
+        .mockResolvedValue(new SnoozeAlarmResult(true, Date.now() + 15 * 60000));
+      const stopAlarmSpy = jest
+        .spyOn(nativeAlarmService, 'stopAlarm')
+        .mockResolvedValue(new NativeActionResult(true));
 
       // Execute snooze action
       await nativeAlarmService.snoozeAlarm({
@@ -139,7 +149,7 @@ describe('Alarm Screen Swipe Interaction & Native Alarm Lifecycle', () => {
     it('prevents duplicate snooze execution while an action is already in flight', async () => {
       const snoozeSpy = jest
         .spyOn(nativeAlarmService, 'snoozeAlarm')
-        .mockResolvedValue(Date.now() + 600000);
+        .mockResolvedValue(new SnoozeAlarmResult(true, Date.now() + 600000));
       let isProcessing = false;
       let snoozeCalls = 0;
 
@@ -199,7 +209,9 @@ describe('Alarm Screen Swipe Interaction & Native Alarm Lifecycle', () => {
 
   describe('Error Handling and Failure Recovery', () => {
     it('resets isProcessing state and does not falsely mark dose taken if logging fails', async () => {
-      jest.spyOn(nativeAlarmService, 'stopAlarm').mockResolvedValue(true);
+      jest
+        .spyOn(nativeAlarmService, 'stopAlarm')
+        .mockResolvedValue(new NativeActionResult(true));
       jest.spyOn(adherenceRepository, 'logDoseStatus').mockImplementation(() => {
         throw new Error('SQLite disk full or locked');
       });
@@ -254,7 +266,9 @@ describe('Alarm Screen Swipe Interaction & Native Alarm Lifecycle', () => {
 
   describe('Alarm Dismissal and Window Flag Cleanup', () => {
     it('calls stopAlarm on unmount or dismissal to clear audio, vibration, and wake locks', async () => {
-      const stopAlarmSpy = jest.spyOn(nativeAlarmService, 'stopAlarm').mockResolvedValue(true);
+      const stopAlarmSpy = jest
+        .spyOn(nativeAlarmService, 'stopAlarm')
+        .mockResolvedValue(new NativeActionResult(true));
 
       // Simulate unmount cleanup effect
       await nativeAlarmService.stopAlarm();
