@@ -687,6 +687,9 @@ export const notificationService = {
               time,
               label: doseLabel,
               recurrence: scheduleConfig?.recurrence ?? 'daily',
+              // Schedule dates are ISO local calendar dates (YYYY-MM-DD), not UTC timestamps.
+              startDate: scheduleConfig?.startDate ?? toDateStringOf(new Date()),
+              endDate: scheduleConfig?.endDate,
               triggerMillis: windowMillis,
             });
           }
