@@ -39,6 +39,7 @@ export default function FullScreenAlarmScreen() {
     amount?: string;
     time?: string;
     label?: string;
+    instanceId?: string;
   }>();
 
   const { preferences } = useAppStore();
@@ -259,16 +260,19 @@ export default function FullScreenAlarmScreen() {
 
     try {
       Vibration.vibrate(Platform.OS === 'android' ? [0, 40, 40, 80] : 100);
-      setCompletedAction('snooze');
-
-      await nativeAlarmService.snoozeAlarm({
+      const scheduledAt = await nativeAlarmService.snoozeAlarm({
         scheduleId,
+        instanceId: params.instanceId || `${scheduleId}:${doseTime}`,
         medicineName,
         amount,
         time: doseTime,
         label: doseLabel,
         minutes: snoozeMinutes,
       });
+      if (scheduledAt === null || scheduledAt <= Date.now()) {
+        throw new Error('Native snooze scheduling was not confirmed');
+      }
+      setCompletedAction('snooze');
 
       setTimeout(() => {
         router.replace('/(tabs)/home');
