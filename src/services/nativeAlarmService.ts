@@ -16,7 +16,9 @@ interface NativeAlarmModuleInterface {
     triggersJson: string,
   ): Promise<boolean>;
   snoozeAlarm(
-    scheduleId: string,
+    sourceScheduleId: string,
+    snoozeId: string,
+    sourceInstanceId: string,
     medicineName: string,
     amount: string,
     time: string,
@@ -65,6 +67,7 @@ export const nativeAlarmService = {
 
   async snoozeAlarm(params: {
     scheduleId: string;
+    instanceId: string;
     medicineName: string;
     amount: string;
     time: string;
@@ -86,8 +89,11 @@ export const nativeAlarmService = {
         snoozeMinutes = 10;
       }
 
+      const snoozeId = `${params.scheduleId}::snooze::${params.instanceId}`;
       return await AlarmModule.snoozeAlarm(
         params.scheduleId,
+        snoozeId,
+        params.instanceId,
         params.medicineName,
         params.amount,
         params.time,
