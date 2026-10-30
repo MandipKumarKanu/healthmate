@@ -33,7 +33,7 @@ import { useKeyboardAwareScroll } from '../../hooks/useKeyboardAwareScroll';
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const appVersion = Constants.expoConfig?.version ?? '1.3.2';
+  const appVersion = Constants.expoConfig?.version ?? '1.4.0';
   const {
     profile,
     preferences,
