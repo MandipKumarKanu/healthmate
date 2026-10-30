@@ -169,7 +169,7 @@ export function ConnectGeminiModal({
         <KeyboardAvoidingView
           // Android already resizes this Modal window (softwareKeyboardLayoutMode:
           // "resize"). Applying "height" here as well double-shrinks the card.
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardContainer}
         >
           <View style={styles.card}>

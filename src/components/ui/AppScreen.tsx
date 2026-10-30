@@ -72,7 +72,11 @@ export function AppScreen({
       {scrollable ? (
         <KeyboardAvoidingView
           style={styles.keyboardAvoiding}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          // Android: 'undefined' behavior relies on the system's adjustResize,
+          // which Android disables when the app draws edge-to-edge — the window
+          // stopped resizing and inputs hid under the keyboard. 'height' is
+          // driven by JS keyboard events and keeps working edge-to-edge.
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
         >
           <ScrollView

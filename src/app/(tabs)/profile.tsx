@@ -551,7 +551,7 @@ export default function ProfileScreen() {
         <View style={styles.modalOverlay}>
           <KeyboardAvoidingView
             // Android already resizes this modal window. Avoid applying "height" which double-shrinks the card.
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={{ width: '100%', maxWidth: 420, maxHeight: '100%', flexShrink: 1 }}
           >
             <View style={styles.profileModalCard}>

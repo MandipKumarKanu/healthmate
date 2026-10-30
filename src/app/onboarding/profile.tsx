@@ -216,7 +216,7 @@ export default function OnboardingProfileScreen() {
         style={styles.keyboardView}
         // Android already resizes this window. Avoid applying a second height
         // reduction on top of adjustResize while still allowing the form to scroll.
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView
           ref={profileScrollRef}

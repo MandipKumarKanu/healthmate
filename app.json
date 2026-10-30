@@ -34,10 +34,6 @@
         "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
       ]
     },
-    "web": {
-      "output": "server",
-      "favicon": "./assets/images/favicon.png"
-    },
     "plugins": [
       "./plugins/withAlarmModule",
       "./plugins/withReleaseOptimization",
