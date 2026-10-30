@@ -99,6 +99,8 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
         time: String,
         label: String,
         recurrence: String,
+        startDate: String,
+        endDate: String,
         triggersJson: String,
         promise: Promise
     ) {
@@ -113,7 +115,18 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
             // Replace any previously armed alarm for the same dose.
             AlarmArming.cancelPendingIntent(reactContext, scheduleId, time)
 
-            val entry = AlarmArming.Entry(scheduleId, time, medicineName, amount, label, recurrence, millis)
+            val entry = AlarmArming.Entry(
+                scheduleId = scheduleId,
+                time = time,
+                medicineName = medicineName,
+                amount = amount,
+                label = label,
+                recurrence = recurrence,
+                startDate = startDate,
+                endDate = endDate.takeIf { it.isNotBlank() },
+                hasDateBounds = true,
+                triggers = millis
+            )
             AlarmArming.saveEntry(reactContext, entry)
 
             val earliest = millis.firstOrNull()
