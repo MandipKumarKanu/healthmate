@@ -35,6 +35,9 @@ class AlarmService : Service() {
         const val EXTRA_AMOUNT = "amount"
         const val EXTRA_TIME = "time"
         const val EXTRA_LABEL = "label"
+        const val EXTRA_TRIGGER_AT_MILLIS = "triggerAtMillis"
+        const val EXTRA_SOURCE_SCHEDULE_ID = "sourceScheduleId"
+        const val EXTRA_SOURCE_INSTANCE_ID = "sourceInstanceId"
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
