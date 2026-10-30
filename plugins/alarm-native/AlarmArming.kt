@@ -8,6 +8,7 @@ import android.os.Build
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Calendar
+import java.util.Locale
 
 /**
  * Shared alarm persistence + arming logic used by both AlarmModule (JS calls)
@@ -264,6 +265,7 @@ object AlarmArming {
     private fun localDateString(epochMillis: Long): String {
         val cal = Calendar.getInstance().apply { timeInMillis = epochMillis }
         return "%04d-%02d-%02d".format(
+            Locale.US,
             cal.get(Calendar.YEAR),
             cal.get(Calendar.MONTH) + 1,
             cal.get(Calendar.DAY_OF_MONTH)
@@ -299,10 +301,11 @@ object AlarmArming {
     /**
      * Called when the OS delivers a dose alarm. Drops the fired trigger from the
      * stored chain and re-arms the next one. When the chain is exhausted and the
-     * dose repeats daily, synthesizes the next occurrence so unbounded daily
-     * schedules keep ringing even if the app is never opened. Weekly and monthly
-     * schedules are never synthesized (native code must not invent occurrences);
-     * the app reconciles them on next open.
+     * dose repeats daily, synthesizes the next occurrence only when a new-format
+     * entry explicitly carries date-bound metadata and the local calendar date is
+     * within its start/end range. Legacy entries without metadata are allowed to
+     * finish their stored trigger list but are never extended. Weekly and monthly
+     * schedules are not synthesized; the app reconciles them on next open.
      */
     fun fireAndAdvance(context: Context, scheduleId: String, time: String) {
         try {
@@ -335,8 +338,9 @@ object AlarmArming {
 
     /**
      * Re-arms every stored dose alarm after a reboot, package replacement, or
-     * exact-alarm permission change. Drops past triggers, synthesizes the next
-     * daily occurrence when a chain is exhausted, and removes chains that can
+     * exact-alarm permission change. Drops past and out-of-range triggers,
+     * synthesizes the next daily occurrence only for entries with date metadata,
+     * and removes chains that can
      * no longer fire (the app reconciles those on next open).
      */
     fun reArmAll(context: Context) {
