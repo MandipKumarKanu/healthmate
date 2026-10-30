@@ -47,7 +47,9 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
 
     @ReactMethod
     fun snoozeAlarm(
-        scheduleId: String,
+        sourceScheduleId: String,
+        snoozeId: String,
+        sourceInstanceId: String,
         medicineName: String,
         amount: String,
         time: String,
@@ -56,12 +58,37 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
         promise: Promise
     ) {
         try {
-            stopAlarmInternal()
-
+            require(sourceScheduleId.isNotBlank() && snoozeId.isNotBlank() && sourceInstanceId.isNotBlank()) {
+                "Snooze source and instance identifiers are required"
+            }
             val snoozeMinutes = if (minutes > 0) minutes else 10
-            val triggerAtMillis = System.currentTimeMillis() + (snoozeMinutes * 60 * 1000L)
+            val key = AlarmArming.alarmKey(snoozeId, time)
+            val existing = AlarmArming.getEntry(reactContext, snoozeId, time)
+            if (existing != null) {
+                // Idempotent retry for this ringing instance. Never create a
+                // second pending snooze for the same dose occurrence.
+                promise.resolve(existing.triggers.firstOrNull()?.toDouble() ?: 0.0)
+                return
+            }
 
-            scheduleAlarmInternal(scheduleId, medicineName, amount, time, label, "once", triggerAtMillis)
+            val triggerAtMillis = System.currentTimeMillis() + (snoozeMinutes * 60 * 1000L)
+            stopAlarmInternal()
+            val entry = AlarmArming.Entry(
+                scheduleId = snoozeId,
+                time = time,
+                medicineName = medicineName,
+                amount = amount,
+                label = label,
+                recurrence = "once",
+                startDate = "",
+                endDate = null,
+                hasDateBounds = false,
+                triggers = mutableListOf(triggerAtMillis),
+                sourceScheduleId = sourceScheduleId,
+                sourceInstanceId = sourceInstanceId
+            )
+            AlarmArming.saveEntry(reactContext, entry)
+            AlarmArming.armEntry(reactContext, entry, triggerAtMillis)
             promise.resolve(triggerAtMillis.toDouble())
         } catch (e: Exception) {
             promise.reject("SNOOZE_FAILED", e.message, e)
