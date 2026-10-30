@@ -80,7 +80,7 @@ object AlarmArming {
         label = json.optString(J_LABEL, ""),
         recurrence = json.optString(J_RECURRENCE, "daily"),
         startDate = json.optString(J_START_DATE, ""),
-        endDate = json.optString(J_END_DATE, "").takeIf { it.isNotBlank() },
+        endDate = if (json.isNull(J_END_DATE)) null else json.optString(J_END_DATE, "").takeIf { it.isNotBlank() },
         hasDateBounds = json.optBoolean(J_HAS_DATE_BOUNDS, false),
         triggers = json.optJSONArray(J_TRIGGERS)?.let { arr ->
             (0 until arr.length()).map { arr.optLong(it) }.toMutableList()
