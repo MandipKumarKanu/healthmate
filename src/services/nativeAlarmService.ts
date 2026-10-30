@@ -11,6 +11,8 @@ interface NativeAlarmModuleInterface {
     time: string,
     label: string,
     recurrence: string,
+    startDate: string,
+    endDate: string,
     triggersJson: string,
   ): Promise<boolean>;
   snoozeAlarm(
@@ -110,6 +112,8 @@ export const nativeAlarmService = {
     time: string;
     label?: string;
     recurrence: ReminderSchedule['recurrence'];
+    startDate: string;
+    endDate?: string;
     triggerMillis: number[];
   }): Promise<boolean> {
     if (!AlarmModule) return false;
@@ -121,6 +125,8 @@ export const nativeAlarmService = {
         params.time,
         params.label ?? '',
         params.recurrence,
+        params.startDate,
+        params.endDate ?? '',
         JSON.stringify(params.triggerMillis),
       );
     } catch (e) {
