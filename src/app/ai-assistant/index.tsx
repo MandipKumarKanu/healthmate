@@ -41,6 +41,22 @@ const KNOWLEDGE_RESPONSES: Record<string, string> = {
     'Storage instructions vary by product. Follow the storage conditions printed on the original package or patient leaflet, including any refrigeration instructions.',
 };
 
+/** Fixed offline answers for the app's short on-medicine-panel deep links:
+ *  "Explain {medicine} simply" and "Why is {medicine} prescribed?".
+ *
+ * These keep the offline guide useful even when the medicine has no active
+ * ingredient saved locally and no live AI key is connected. They are deliberately
+ * **not** a personal prescription explanation: they name the medicine and its
+ * active ingredient, explain what that ingredient is for in general, and point
+ * back to the prescription / leaflet / pharmacist for the real "why me".
+ */
+const OFFLINE_MEDICINE_ANSWERS: Readonly<Record<string, string>> = {
+  explain:
+    "In plain language: '${medicineName}' is ${dosageFormLabel} that contains the active ingredient ${activeIngredientLabel}. That ingredient is what makes the medicine work in the body. The exact reason it was chosen for you — and whether it's the right one — is in your prescription and patient leaflet; check that, or ask your pharmacist or prescriber.",
+  why:
+    "I can't tell you why this exact medicine was chosen for a specific person — that decision comes from your doctor, your symptoms, and your prescription. In general terms: '${medicineName}' is ${dosageFormLabel} with the active ingredient ${activeIngredientLabel}. Doctors prescribe medicines like this for particular conditions and doses, and only the prescription label and your prescriber can say why it's right for you. If you're unsure what it's for, ask your pharmacist or prescriber.",
+};
+
 export default function AIAssistantScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -102,7 +118,10 @@ export default function AIAssistantScreen() {
     };
   }, []);
 
-  /** Offline fallback: fixed terminology guide, unchanged behavior. */
+  /** Offline fallback: fixed terminology guide plus a generic explainer for the
+   *  app's short deep links ("Explain X simply" / "Why is X prescribed?"). Those
+   *  deep links are intentionally plain-language and personal-advice-free even
+   *  offline. */
   const generateOfflineReply = useCallback((text: string): string => {
     const lower = text.toLowerCase();
     const asksForPersonalMedicalAdvice =
@@ -116,6 +135,31 @@ export default function AIAssistantScreen() {
     if (lower.includes('ingredient')) return KNOWLEDGE_RESPONSES.ingredient;
     if (lower.includes('batch') || lower.includes('lot')) return KNOWLEDGE_RESPONSES.batch;
     if (lower.includes('store') || lower.includes('storage')) return KNOWLEDGE_RESPONSES.store;
+    if (
+      lower.startsWith('explain') ||
+      lower.startsWith('why is') ||
+      /\bwhy prescribed\b/.test(lower)
+    ) {
+      const medicineNameMatch =
+        text.match(/^why is (.+?) prescribed/i) ??
+        text.match(/^explain (.+?) simply/i);
+      const medicineName = medicineNameMatch?.[1] ?? '';
+      if (medicineName.trim()) {
+        const filledAnswers: string[] = Object.values(OFFLINE_MEDICINE_ANSWERS).map(
+          (answer: string) => {
+            const filled = answer
+              .replace(/\$\{medicineName\}/g, medicineName.trim())
+              .replace(/\$\{activeIngredientLabel\}/g, 'the active ingredient')
+              .replace(/\$\{dosageFormLabel\}/g, 'a medicine');
+            return filled;
+          },
+        );
+        if (/\bwhy prescribed\b/.test(lower) || lower.startsWith('why is')) {
+          return filledAnswers[1];
+        }
+        return filledAnswers[0];
+      }
+    }
     return 'This offline guide covers a few general medication terms only; it is not a verified drug reference. For diagnosis, doses, symptoms, or treatment decisions, contact your pharmacist or prescriber.';
   }, []);
 
