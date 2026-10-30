@@ -77,22 +77,28 @@ object AlarmArming {
         prefs.edit().putString(KEY_PENDING, map.toString()).apply()
     }
 
-    private fun entryFromJson(json: JSONObject): Entry = Entry(
-        scheduleId = json.optString(J_SCHEDULE_ID, ""),
-        time = json.optString(J_TIME, "00:00"),
-        medicineName = json.optString(J_MEDICINE_NAME, "Medication"),
-        amount = json.optString(J_AMOUNT, ""),
-        label = json.optString(J_LABEL, ""),
-        recurrence = json.optString(J_RECURRENCE, "daily"),
-        startDate = json.optString(J_START_DATE, ""),
-        endDate = if (json.isNull(J_END_DATE)) null else json.optString(J_END_DATE, "").takeIf { it.isNotBlank() },
-        hasDateBounds = json.optBoolean(J_HAS_DATE_BOUNDS, false),
-        sourceScheduleId = if (json.isNull(J_SOURCE_SCHEDULE_ID)) null else json.optString(J_SOURCE_SCHEDULE_ID).takeIf { it.isNotBlank() },
-        sourceInstanceId = if (json.isNull(J_SOURCE_INSTANCE_ID)) null else json.optString(J_SOURCE_INSTANCE_ID).takeIf { it.isNotBlank() },
-        triggers = json.optJSONArray(J_TRIGGERS)?.let { arr ->
-            (0 until arr.length()).map { arr.optLong(it) }.toMutableList()
-        } ?: mutableListOf()
-    )
+    private fun entryFromJson(json: JSONObject): Entry {
+        val sDate = json.optString(J_START_DATE, "")
+        val eDate = if (json.isNull(J_END_DATE)) null else json.optString(J_END_DATE, "").takeIf { it.isNotBlank() }
+        val explicitBounds = json.optBoolean(J_HAS_DATE_BOUNDS, false)
+        val hasBounds = explicitBounds || eDate != null || sDate.isNotBlank()
+        return Entry(
+            scheduleId = json.optString(J_SCHEDULE_ID, ""),
+            time = json.optString(J_TIME, "00:00"),
+            medicineName = json.optString(J_MEDICINE_NAME, "Medication"),
+            amount = json.optString(J_AMOUNT, ""),
+            label = json.optString(J_LABEL, ""),
+            recurrence = json.optString(J_RECURRENCE, "daily"),
+            startDate = sDate,
+            endDate = eDate,
+            hasDateBounds = hasBounds,
+            sourceScheduleId = if (json.isNull(J_SOURCE_SCHEDULE_ID)) null else json.optString(J_SOURCE_SCHEDULE_ID).takeIf { it.isNotBlank() },
+            sourceInstanceId = if (json.isNull(J_SOURCE_INSTANCE_ID)) null else json.optString(J_SOURCE_INSTANCE_ID).takeIf { it.isNotBlank() },
+            triggers = json.optJSONArray(J_TRIGGERS)?.let { arr ->
+                (0 until arr.length()).map { arr.optLong(it) }.toMutableList()
+            } ?: mutableListOf()
+        )
+    }
 
     private fun entryToJson(entry: Entry): JSONObject = JSONObject().apply {
         put(J_SCHEDULE_ID, entry.scheduleId)
@@ -288,7 +294,7 @@ object AlarmArming {
     // ------------------------------------------------------------------
 
     /** YYYY-MM-DD for an epoch instant in the device's current local timezone. */
-    private fun localDateString(epochMillis: Long): String {
+    fun localDateString(epochMillis: Long): String {
         val cal = Calendar.getInstance().apply { timeInMillis = epochMillis }
         return "%04d-%02d-%02d".format(
             Locale.US,
@@ -298,7 +304,7 @@ object AlarmArming {
         )
     }
 
-    private fun isWithinScheduleDates(entry: Entry, epochMillis: Long): Boolean {
+    fun isWithinScheduleDates(entry: Entry, epochMillis: Long): Boolean {
         if (!entry.hasDateBounds) return false
         val occurrenceDate = localDateString(epochMillis)
         if (entry.startDate.isNotBlank() && occurrenceDate < entry.startDate) return false
@@ -307,7 +313,7 @@ object AlarmArming {
     }
 
     /** Next occurrence of an HH:mm time strictly in the future. */
-    private fun nextDailyOccurrenceMillis(time: String, nowMillis: Long): Long? {
+    fun nextDailyOccurrenceMillis(time: String, nowMillis: Long): Long? {
         val match = Regex("^([01]\\d|2[0-3]):([0-5]\\d)$").find(time) ?: return null
         val hour = match.groupValues[1].toInt()
         val minute = match.groupValues[2].toInt()
@@ -318,8 +324,46 @@ object AlarmArming {
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
         }
-        if (cal.timeInMillis <= nowMillis) {
+        if (cal.timeInMillis <= nowMillis + 60_000L) {
             cal.add(Calendar.DAY_OF_YEAR, 1)
+        }
+        return cal.timeInMillis
+    }
+
+    /** Next weekly occurrence of an HH:mm time on the same weekday as startDate strictly in the future. */
+    fun nextWeeklyOccurrenceMillis(time: String, startDate: String, nowMillis: Long): Long? {
+        val match = Regex("^([01]\\d|2[0-3]):([0-5]\\d)$").find(time) ?: return null
+        val hour = match.groupValues[1].toInt()
+        val minute = match.groupValues[2].toInt()
+
+        val startParts = startDate.split("-")
+        val targetDayOfWeek = if (startParts.size == 3) {
+            val sy = startParts[0].toIntOrNull()
+            val sm = startParts[1].toIntOrNull()
+            val sd = startParts[2].toIntOrNull()
+            if (sy != null && sm != null && sd != null) {
+                Calendar.getInstance().apply {
+                    set(sy, sm - 1, sd, 12, 0, 0)
+                }.get(Calendar.DAY_OF_WEEK)
+            } else null
+        } else null
+
+        val cal = Calendar.getInstance().apply {
+            timeInMillis = nowMillis
+            set(Calendar.HOUR_OF_DAY, hour)
+            set(Calendar.MINUTE, minute)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+
+        if (targetDayOfWeek != null) {
+            while (cal.timeInMillis <= nowMillis + 60_000L || cal.get(Calendar.DAY_OF_WEEK) != targetDayOfWeek) {
+                cal.add(Calendar.DAY_OF_YEAR, 1)
+            }
+        } else {
+            if (cal.timeInMillis <= nowMillis + 60_000L) {
+                cal.add(Calendar.DAY_OF_YEAR, 7)
+            }
         }
         return cal.timeInMillis
     }
@@ -327,11 +371,10 @@ object AlarmArming {
     /**
      * Called when the OS delivers a dose alarm. Drops the fired trigger from the
      * stored chain and re-arms the next one. When the chain is exhausted and the
-     * dose repeats daily, synthesizes the next occurrence only when a new-format
-     * entry explicitly carries date-bound metadata and the local calendar date is
-     * within its start/end range. Legacy entries without metadata are allowed to
-     * finish their stored trigger list but are never extended. Weekly and monthly
-     * schedules are not synthesized; the app reconciles them on next open.
+     * dose repeats daily or weekly, synthesizes the next occurrence only when an
+     * entry carries date-bound metadata and the local calendar date is within its
+     * start/end range. Legacy entries without metadata are allowed to finish their
+     * stored trigger list but are never extended. 'once' schedules never synthesize.
      */
     fun fireAndAdvance(context: Context, scheduleId: String, time: String) {
         try {
@@ -348,17 +391,25 @@ object AlarmArming {
                 return
             }
 
-            if (entry.recurrence == "daily" && entry.hasDateBounds) {
-                val synthesized = nextDailyOccurrenceMillis(entry.time, now)
-                if (synthesized != null && isWithinScheduleDates(entry, synthesized)) {
-                    entry.triggers.add(synthesized)
-                    saveEntry(context, entry)
-                    armEntry(context, entry, synthesized)
-                    return
+            var synthesized: Long? = null
+            if (entry.hasDateBounds) {
+                when (entry.recurrence) {
+                    "daily" -> synthesized = nextDailyOccurrenceMillis(entry.time, now)
+                    "weekly" -> synthesized = nextWeeklyOccurrenceMillis(entry.time, entry.startDate, now)
+                    else -> {}
                 }
             }
 
-            // Nothing left to ring; forget the entry. The app reconciles on next open.
+            if (synthesized != null && isWithinScheduleDates(entry, synthesized)) {
+                entry.triggers.add(synthesized)
+                saveEntry(context, entry)
+                armEntry(context, entry, synthesized)
+                return
+            }
+
+            // Nothing left to ring; forget the entry and cancel any pending intent.
+            cancelPendingIntent(context, entry.scheduleId, entry.time)
+            entry.triggers.clear()
             saveEntry(context, entry)
         } catch (_: Exception) {
         }
@@ -367,9 +418,8 @@ object AlarmArming {
     /**
      * Re-arms every stored dose alarm after a reboot, package replacement, or
      * exact-alarm permission change. Drops past and out-of-range triggers,
-     * synthesizes the next daily occurrence only for entries with date metadata,
-     * and removes chains that can
-     * no longer fire (the app reconciles those on next open).
+     * synthesizes the next daily/weekly occurrence only for entries with date metadata
+     * if within range, and removes chains that can no longer fire.
      */
     fun reArmAll(context: Context) {
         try {
@@ -380,21 +430,27 @@ object AlarmArming {
                     it <= now || (entry.hasDateBounds && !isWithinScheduleDates(entry, it))
                 }
 
-                val next: Long? = entry.triggers.minOrNull()
-                if (next == null && entry.recurrence == "daily" && entry.hasDateBounds) {
-                    val synthesized = nextDailyOccurrenceMillis(entry.time, now)
+                var next: Long? = entry.triggers.minOrNull()
+                if (next == null && entry.hasDateBounds) {
+                    val synthesized = when (entry.recurrence) {
+                        "daily" -> nextDailyOccurrenceMillis(entry.time, now)
+                        "weekly" -> nextWeeklyOccurrenceMillis(entry.time, entry.startDate, now)
+                        else -> null
+                    }
                     if (synthesized != null && isWithinScheduleDates(entry, synthesized)) {
                         entry.triggers.add(synthesized)
+                        next = synthesized
                     }
                 }
 
-                if (entry.triggers.isEmpty()) {
+                if (entry.triggers.isEmpty() || next == null) {
                     cancelPendingIntent(context, entry.scheduleId, entry.time)
+                    entry.triggers.clear()
                     saveEntry(context, entry)
                 } else {
                     entry.triggers.sort()
                     saveEntry(context, entry)
-                    armEntry(context, entry, entry.triggers.first())
+                    armEntry(context, entry, next)
                 }
             }
         } catch (_: Exception) {

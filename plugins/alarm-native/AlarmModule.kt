@@ -151,15 +151,19 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
                 startDate = startDate,
                 endDate = endDate.takeIf { it.isNotBlank() },
                 hasDateBounds = true,
-                triggers = millis
+                triggers = mutableListOf()
             )
-            AlarmArming.saveEntry(reactContext, entry)
 
-            val earliest = millis.firstOrNull()
+            val validMillis = millis.filter { AlarmArming.isWithinScheduleDates(entry, it) }.toMutableList()
+            entry.triggers.addAll(validMillis)
+
+            val earliest = validMillis.firstOrNull()
             if (earliest != null) {
+                AlarmArming.saveEntry(reactContext, entry)
                 AlarmArming.armEntry(reactContext, entry, earliest)
                 promise.resolve(true)
             } else {
+                AlarmArming.saveEntry(reactContext, entry)
                 promise.resolve(false)
             }
         } catch (e: Exception) {

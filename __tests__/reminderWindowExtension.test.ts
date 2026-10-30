@@ -234,6 +234,11 @@ describe('Notification trigger-window extension (cap fix)', () => {
 
     it('leaves repeating (native DAILY) triggers untouched', async () => {
       // Unbounded started daily schedule -> native repeating DAILY trigger.
+      scheduleRepository.save({
+        ...makeSchedule(),
+        endDate: undefined,
+      });
+
       const id = await notificationService.scheduleDoseReminder(
         SCHEDULE_ID,
         'Cap Extension Test Medicine',

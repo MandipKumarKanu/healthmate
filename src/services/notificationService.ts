@@ -430,7 +430,7 @@ export function getRequiredCoverageThroughDate(
 
   let requiredThrough = toDateStringOf(horizon);
   if (endDate) {
-    if (endDate <= today) return null;
+    if (endDate < today) return null;
     if (endDate < requiredThrough) requiredThrough = endDate;
   }
   return requiredThrough;
@@ -957,13 +957,27 @@ async function performReconcile(): Promise<ReconcileResult> {
         // matches (medicine renamed / dose edited outside saveSchedule).
         const identityMismatch = mismatchedKeys.has(key);
 
-        if (coverage === undefined || needsExtension || identityMismatch) {
-          if (needsExtension || identityMismatch) {
-            // Replace the expiring/mismatched window in full: cancel its
+        // Overhanging coverage occurs when:
+        // 1. The schedule has expired or requires no coverage (requiredThrough === null), but triggers exist.
+        // 2. The schedule has an endDate, but coverage is currently 'forever' (was previously unbounded).
+        // 3. The schedule's endDate was moved earlier than current coverage (coverage > requiredThrough).
+        const hasOverhangingCoverage =
+          (coverage !== undefined && requiredThrough === null) ||
+          (coverage === 'forever' && Boolean(schedule.endDate)) ||
+          (typeof coverage === 'string' &&
+            coverage !== 'forever' &&
+            requiredThrough !== null &&
+            coverage > requiredThrough);
+
+        if (
+          coverage === undefined ||
+          needsExtension ||
+          identityMismatch ||
+          hasOverhangingCoverage
+        ) {
+          if (needsExtension || identityMismatch || hasOverhangingCoverage) {
+            // Replace the expiring/mismatched/overhanging window in full: cancel its
             // entries first, then arm a fresh window from today.
-            // scheduleDoseReminder also re-syncs the native reboot-proof
-            // alarm chain, so weekly/monthly chains that exhausted their
-            // stored triggers recover too.
             const expiring = notificationsByKey.get(key) ?? [];
             await Promise.all(
               expiring.map((notif) =>
@@ -972,24 +986,31 @@ async function performReconcile(): Promise<ReconcileResult> {
             );
           }
 
-          const id = await notificationService.scheduleDoseReminder(
-            schedule.id,
-            medicineName,
-            dose.amount,
-            dose.time,
-            dose.label,
-            {
-              recurrence: schedule.recurrence,
-              startDate: schedule.startDate,
-              endDate: schedule.endDate,
-            },
-          );
-          if (id) {
-            rescheduled++;
-            if (needsExtension && requiredThrough) {
-              // The fresh window reaches the required horizon; record it so
-              // the extension is idempotent across reconcile passes.
-              existingCoverage.set(key, requiredThrough);
+          if (requiredThrough === null) {
+            // Schedule expired or requires no future triggers: cancel native alarm too
+            await nativeAlarmService.cancelAlarm(schedule.id);
+            existingCoverage.delete(key);
+            cancelledStale++;
+          } else {
+            const id = await notificationService.scheduleDoseReminder(
+              schedule.id,
+              medicineName,
+              dose.amount,
+              dose.time,
+              dose.label,
+              {
+                recurrence: schedule.recurrence,
+                startDate: schedule.startDate,
+                endDate: schedule.endDate,
+              },
+            );
+            if (id) {
+              rescheduled++;
+              if ((needsExtension || hasOverhangingCoverage) && requiredThrough) {
+                // The fresh window reaches the required horizon; record it so
+                // the extension is idempotent across reconcile passes.
+                existingCoverage.set(key, requiredThrough);
+              }
             }
           }
         }
