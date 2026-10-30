@@ -77,6 +77,7 @@ describe('Configurable Alarm Snooze Intervals', () => {
 
       await nativeAlarmService.snoozeAlarm({
         scheduleId: 'sched_test_1',
+        instanceId: '1782451200000',
         medicineName: 'Metformin',
         amount: '500mg',
         time: '08:00',
@@ -86,6 +87,8 @@ describe('Configurable Alarm Snooze Intervals', () => {
 
       expect(snoozeSpy).toHaveBeenCalledWith(
         'sched_test_1',
+        'sched_test_1::snooze::1782451200000',
+        '1782451200000',
         'Metformin',
         '500mg',
         '08:00',
@@ -100,6 +103,7 @@ describe('Configurable Alarm Snooze Intervals', () => {
 
       await nativeAlarmService.snoozeAlarm({
         scheduleId: 'sched_test_2',
+        instanceId: '1782451200000',
         medicineName: 'Amoxicillin',
         amount: '250mg',
         time: '12:00',
@@ -107,6 +111,8 @@ describe('Configurable Alarm Snooze Intervals', () => {
 
       expect(snoozeSpy).toHaveBeenCalledWith(
         'sched_test_2',
+        'sched_test_2::snooze::1782451200000',
+        '1782451200000',
         'Amoxicillin',
         '250mg',
         '12:00',
@@ -120,6 +126,7 @@ describe('Configurable Alarm Snooze Intervals', () => {
 
       await nativeAlarmService.snoozeAlarm({
         scheduleId: 'sched_test_3',
+        instanceId: '1782451200000',
         medicineName: 'Lisinopril',
         amount: '10mg',
         time: '18:00',
@@ -129,7 +136,7 @@ describe('Configurable Alarm Snooze Intervals', () => {
       // Since 99 is invalid and default in store is 10 (or whatever is stored), falls back safely to valid preference / 10
       const passedMinutes = (snoozeSpy as any).mock.calls[
         (snoozeSpy as any).mock.calls.length - 1
-      ][5];
+      ][7];
       expect([5, 10, 15, 20]).toContain(passedMinutes);
     });
   });
@@ -155,6 +162,7 @@ describe('Configurable Alarm Snooze Intervals', () => {
       // First snooze: 10 minutes
       await nativeAlarmService.snoozeAlarm({
         scheduleId: originalSchedule.id,
+        instanceId: 'dose-instance-2026-10-30T08:00:00',
         medicineName: 'Aspirin',
         amount: '1 tablet',
         time: '08:00',
@@ -172,11 +180,13 @@ describe('Configurable Alarm Snooze Intervals', () => {
         minutes: 10,
       });
 
-      // Native module snooze called twice with the same scheduleId (updating PendingIntent in Android)
+      // Both calls target the same isolated snooze entry for this dose instance.
       expect(snoozeSpy).toHaveBeenCalledTimes(2);
       expect(snoozeSpy).toHaveBeenNthCalledWith(
         1,
         'sched_daily_dose',
+        'sched_daily_dose::snooze::dose-instance-2026-10-30T08:00:00',
+        'dose-instance-2026-10-30T08:00:00',
         'Aspirin',
         '1 tablet',
         '08:00',
