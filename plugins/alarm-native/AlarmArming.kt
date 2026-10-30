@@ -219,7 +219,9 @@ object AlarmArming {
         amount: String,
         time: String,
         label: String,
-        triggerAtMillis: Long
+        triggerAtMillis: Long,
+        sourceScheduleId: String? = null,
+        sourceInstanceId: String? = null
     ) {
         try {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
@@ -230,6 +232,8 @@ object AlarmArming {
                 putExtra(AlarmService.EXTRA_TIME, time)
                 putExtra(AlarmService.EXTRA_LABEL, label)
                 putExtra(AlarmService.EXTRA_TRIGGER_AT_MILLIS, triggerAtMillis)
+                putExtra(AlarmService.EXTRA_SOURCE_SCHEDULE_ID, sourceScheduleId ?: "")
+                putExtra(AlarmService.EXTRA_SOURCE_INSTANCE_ID, sourceInstanceId ?: triggerAtMillis.toString())
             }
             val key = alarmKey(scheduleId, time)
             val pendingIntent = pendingIntentFor(context, key, intent)
@@ -266,7 +270,17 @@ object AlarmArming {
     }
 
     fun armEntry(context: Context, entry: Entry, triggerAtMillis: Long) {
-        armDose(context, entry.scheduleId, entry.medicineName, entry.amount, entry.time, entry.label, triggerAtMillis)
+        armDose(
+            context,
+            entry.scheduleId,
+            entry.medicineName,
+            entry.amount,
+            entry.time,
+            entry.label,
+            triggerAtMillis,
+            entry.sourceScheduleId,
+            entry.sourceInstanceId
+        )
     }
 
     // ------------------------------------------------------------------
