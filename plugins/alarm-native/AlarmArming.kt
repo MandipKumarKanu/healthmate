@@ -311,7 +311,9 @@ object AlarmArming {
         try {
             val entry = getEntry(context, scheduleId, time) ?: return
             val now = System.currentTimeMillis()
-            entry.triggers.removeAll { it <= now }
+            entry.triggers.removeAll {
+                it <= now || (entry.hasDateBounds && !isWithinScheduleDates(entry, it))
+            }
 
             val next: Long? = entry.triggers.minOrNull()
             if (next != null) {
