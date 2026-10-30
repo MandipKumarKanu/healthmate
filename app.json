@@ -40,6 +40,7 @@
     },
     "plugins": [
       "./plugins/withAlarmModule",
+      "./plugins/withReleaseOptimization",
       "expo-router",
       [
         "expo-notifications",
