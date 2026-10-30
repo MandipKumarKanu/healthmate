@@ -36,6 +36,8 @@ object AlarmArming {
     private const val J_END_DATE = "endDate"
     private const val J_HAS_DATE_BOUNDS = "hasDateBounds"
     private const val J_TRIGGERS = "triggers"
+    private const val J_SOURCE_SCHEDULE_ID = "sourceScheduleId"
+    private const val J_SOURCE_INSTANCE_ID = "sourceInstanceId"
 
     data class Entry(
         val scheduleId: String,
@@ -49,7 +51,10 @@ object AlarmArming {
         val endDate: String?,
         /** False for legacy JSON entries written before date bounds were persisted. */
         val hasDateBounds: Boolean,
-        val triggers: MutableList<Long>
+        val triggers: MutableList<Long>,
+        /** Set only for one-shot snooze entries. */
+        val sourceScheduleId: String? = null,
+        val sourceInstanceId: String? = null
     )
 
     fun alarmKey(scheduleId: String, time: String): String = "$scheduleId|$time"
@@ -82,6 +87,8 @@ object AlarmArming {
         startDate = json.optString(J_START_DATE, ""),
         endDate = if (json.isNull(J_END_DATE)) null else json.optString(J_END_DATE, "").takeIf { it.isNotBlank() },
         hasDateBounds = json.optBoolean(J_HAS_DATE_BOUNDS, false),
+        sourceScheduleId = json.optString(J_SOURCE_SCHEDULE_ID, "").takeIf { it.isNotBlank() },
+        sourceInstanceId = json.optString(J_SOURCE_INSTANCE_ID, "").takeIf { it.isNotBlank() },
         triggers = json.optJSONArray(J_TRIGGERS)?.let { arr ->
             (0 until arr.length()).map { arr.optLong(it) }.toMutableList()
         } ?: mutableListOf()
@@ -97,6 +104,8 @@ object AlarmArming {
         put(J_START_DATE, entry.startDate)
         put(J_END_DATE, entry.endDate ?: JSONObject.NULL)
         put(J_HAS_DATE_BOUNDS, entry.hasDateBounds)
+        put(J_SOURCE_SCHEDULE_ID, entry.sourceScheduleId ?: JSONObject.NULL)
+        put(J_SOURCE_INSTANCE_ID, entry.sourceInstanceId ?: JSONObject.NULL)
         put(J_TRIGGERS, JSONArray(entry.triggers))
     }
 
@@ -158,10 +167,12 @@ object AlarmArming {
     fun cancelAllForSchedule(context: Context, scheduleId: String) {
         val map = readPendingMap(context)
         val names = map.names() ?: return
-        val keys = (0 until names.length()).map { names.getString(it) }.filter { it.startsWith("$scheduleId|") }
-        for (key in keys) {
-            val json = try { map.getJSONObject(key) } catch (_: Exception) { continue }
+        val keys = (0 until names.length()).map { names.getString(it) }.filter { key ->
+            val json = try { map.getJSONObject(key) } catch (_: Exception) { return@filter false }
             val entry = entryFromJson(json)
+            key.startsWith("$scheduleId|") || entry.sourceScheduleId == scheduleId
+        }
+        for (key in keys) {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
             val intent = Intent(context, AlarmReceiver::class.java)
             val pendingIntent = PendingIntent.getBroadcast(
@@ -218,6 +229,7 @@ object AlarmArming {
                 putExtra(AlarmService.EXTRA_AMOUNT, amount)
                 putExtra(AlarmService.EXTRA_TIME, time)
                 putExtra(AlarmService.EXTRA_LABEL, label)
+                putExtra(AlarmService.EXTRA_TRIGGER_AT_MILLIS, triggerAtMillis)
             }
             val key = alarmKey(scheduleId, time)
             val pendingIntent = pendingIntentFor(context, key, intent)
