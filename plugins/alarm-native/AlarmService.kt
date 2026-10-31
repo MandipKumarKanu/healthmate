@@ -193,6 +193,7 @@ class AlarmService : Service() {
             putExtra(EXTRA_LABEL, alarm.label)
             putExtra(EXTRA_SOURCE_SCHEDULE_ID, alarm.sourceScheduleId)
             putExtra(EXTRA_SOURCE_INSTANCE_ID, alarm.instanceId)
+            putExtra("is_alarm_intent", true)
         }
     }
 

@@ -76,6 +76,7 @@ class AlarmReceiver : BroadcastReceiver() {
             putExtra(AlarmService.EXTRA_TRIGGER_AT_MILLIS, intent.getLongExtra(AlarmService.EXTRA_TRIGGER_AT_MILLIS, 0L))
             putExtra(AlarmService.EXTRA_SOURCE_SCHEDULE_ID, sourceScheduleId)
             putExtra(AlarmService.EXTRA_SOURCE_INSTANCE_ID, instanceId)
+            putExtra("is_alarm_intent", true)
         }
 
         try {
@@ -95,6 +96,7 @@ class AlarmReceiver : BroadcastReceiver() {
             putExtra(AlarmService.EXTRA_LABEL, label)
             putExtra(AlarmService.EXTRA_SOURCE_SCHEDULE_ID, sourceScheduleId)
             putExtra(AlarmService.EXTRA_SOURCE_INSTANCE_ID, instanceId)
+            putExtra("is_alarm_intent", true)
         }
 
         try {

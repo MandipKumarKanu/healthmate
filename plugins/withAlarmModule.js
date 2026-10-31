@@ -79,11 +79,9 @@ function applyManifestModifications(androidManifest) {
     app.receiver.push(receiverObj);
   }
 
-  if (app.activity && app.activity[0]) {
-    app.activity[0].$ = app.activity[0].$ || {};
-    app.activity[0].$['android:showWhenLocked'] = 'true';
-    app.activity[0].$['android:turnScreenOn'] = 'true';
-  }
+  // NOTE: Do not set android:showWhenLocked on MainActivity in AndroidManifest.xml.
+  // Lock screen overlap is controlled dynamically at runtime so that ONLY the
+  // alarm screen overlaps the lock screen. Normal app screens remain locked.
 
   return androidManifest;
 }
@@ -98,50 +96,68 @@ function withAlarmPermissions(config) {
 function withAlarmMainActivity(config) {
   return withMainActivity(config, (config) => {
     let contents = config.modResults.contents;
-    if (!contents.includes('setShowWhenLocked')) {
-      const lockScreenCode = `
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-      setShowWhenLocked(true)
-      setTurnScreenOn(true)
-    } else {
-      @Suppress("DEPRECATION")
-      window.addFlags(
-        android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-        android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
-        android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
-        android.view.WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
-      )
+    if (!contents.includes('updateLockScreenFlags')) {
+      const helperCode = `
+  private fun isAlarmIntent(intent: android.content.Intent?): Boolean {
+    if (intent == null) return false
+    val data = intent.data
+    if (data != null && data.scheme == "healthmate" && data.host == "alarm") {
+      return true
     }
-    window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    if (intent.hasExtra("schedule_id") ||
+        intent.hasExtra("is_alarm_intent") ||
+        intent.action == "com.healthmate.app.alarm.ACTION_START_ALARM") {
+      return true
+    }
+    return false
+  }
+
+  private fun updateLockScreenFlags(intent: android.content.Intent?) {
+    val isAlarm = isAlarmIntent(intent)
+    if (isAlarm) {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+        setShowWhenLocked(true)
+        setTurnScreenOn(true)
+      } else {
+        @Suppress("DEPRECATION")
+        window.addFlags(
+          android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+          android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+          android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+        )
+      }
+      window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    } else {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+        setShowWhenLocked(false)
+        setTurnScreenOn(false)
+      } else {
+        @Suppress("DEPRECATION")
+        window.clearFlags(
+          android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+          android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+          android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+        )
+      }
+      window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+  }
 `;
+      const onCreateHook = `    updateLockScreenFlags(intent)\n    super.onCreate(null)`;
       const onNewIntentCode = `
   override fun onNewIntent(intent: android.content.Intent) {
     super.onNewIntent(intent)
     setIntent(intent)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-      setShowWhenLocked(true)
-      setTurnScreenOn(true)
-    } else {
-      @Suppress("DEPRECATION")
-      window.addFlags(
-        android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-        android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
-        android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
-        android.view.WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
-      )
-    }
-    window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-    val keyguardManager = getSystemService(android.content.Context.KEYGUARD_SERVICE) as? android.app.KeyguardManager
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-      keyguardManager?.requestDismissKeyguard(this, null)
-    }
+    updateLockScreenFlags(intent)
   }
 `;
-      // Insert lockScreenCode before super.onCreate(null)
+      // Insert helper code right after class declaration
       contents = contents.replace(
-        'super.onCreate(null)',
-        `${lockScreenCode}\n    super.onCreate(null)`,
+        /(class MainActivity\s*:\s*ReactActivity\(\)\s*\{)/,
+        `$1\n${helperCode}`,
       );
+      // Insert onCreateHook before super.onCreate(null)
+      contents = contents.replace('super.onCreate(null)', onCreateHook);
       // Insert onNewIntent immediately after onCreate closing brace
       contents = contents.replace(
         /(super\.onCreate\(null\)\s*\n\s*\})/,

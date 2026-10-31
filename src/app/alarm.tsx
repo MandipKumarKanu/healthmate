@@ -11,6 +11,7 @@ import {
   useColorScheme,
   TouchableOpacity,
   ScrollView,
+  BackHandler,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -159,9 +160,14 @@ export default function FullScreenAlarmScreen() {
   const [chimeScale] = useState(() => new Animated.Value(1));
   const [pulseGlow] = useState(() => new Animated.Value(0.4));
 
-  // Clock ticker & native lockscreen keyguard unlock
+  // Clock ticker & scoped lockscreen window overlap
   useEffect(() => {
-    nativeAlarmService.dismissKeyguard();
+    void nativeAlarmService.setLockScreenOverlap(true);
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      // Prevent exiting the alarm or backing into the app via back button on lock screen
+      return true;
+    });
 
     const updateClock = () => {
       const now = new Date();
@@ -183,7 +189,11 @@ export default function FullScreenAlarmScreen() {
 
     updateClock();
     const timer = setInterval(updateClock, 1000);
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      backHandler.remove();
+      void nativeAlarmService.setLockScreenOverlap(false);
+    };
   }, []);
 
   // Discover and aggregate simultaneous doses
@@ -367,6 +377,7 @@ export default function FullScreenAlarmScreen() {
       } else {
         // All simultaneous doses completed
         setCompletedAction('taken');
+        await nativeAlarmService.setLockScreenOverlap(false);
         await nativeAlarmService.stopAlarm();
         setTimeout(() => {
           router.replace('/(tabs)/home');
@@ -437,6 +448,7 @@ export default function FullScreenAlarmScreen() {
         }).start();
       } else {
         setCompletedAction('snooze');
+        await nativeAlarmService.setLockScreenOverlap(false);
         setTimeout(() => {
           router.replace('/(tabs)/home');
         }, 750);
@@ -495,6 +507,7 @@ export default function FullScreenAlarmScreen() {
 
       setDoses((prev) => prev.map((d) => ({ ...d, status: 'taken' as const })));
       setCompletedAction('taken');
+      await nativeAlarmService.setLockScreenOverlap(false);
       await nativeAlarmService.stopAlarm();
       setTimeout(() => {
         router.replace('/(tabs)/home');

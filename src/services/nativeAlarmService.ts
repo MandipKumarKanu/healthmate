@@ -174,6 +174,7 @@ interface NativeAlarmModuleInterface {
   canUseFullScreenIntent(): Promise<boolean>;
   openFullScreenIntentSettings(): Promise<boolean>;
   getDeviceManufacturer(): Promise<string>;
+  setLockScreenOverlap?(enabled: boolean): Promise<boolean>;
 }
 
 function getAlarmModule(): NativeAlarmModuleInterface | undefined {
@@ -564,6 +565,23 @@ export const nativeAlarmService = {
     } catch (e) {
       console.warn('nativeAlarmService.getDeviceManufacturer failed:', e);
       return 'unknown';
+    }
+  },
+
+  /**
+   * Dynamically enables or disables displaying the app window over the lock screen.
+   * Called strictly by the alarm screen (`/alarm`) so that ONLY the ringing alarm
+   * can overlap the lock screen. All other app screens remain secure behind the lock screen.
+   */
+  async setLockScreenOverlap(enabled: boolean): Promise<boolean> {
+    if (Platform.OS !== 'android') return true;
+    const alarmModule = getAlarmModule();
+    if (!alarmModule?.setLockScreenOverlap) return false;
+    try {
+      return await alarmModule.setLockScreenOverlap(enabled);
+    } catch (e) {
+      console.warn('nativeAlarmService.setLockScreenOverlap failed:', e);
+      return false;
     }
   },
 };

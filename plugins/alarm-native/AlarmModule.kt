@@ -474,6 +474,44 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
         reactContext.startService(stopIntent)
     }
 
+    @ReactMethod
+    fun setLockScreenOverlap(enabled: Boolean, promise: Promise) {
+        reactContext.currentActivity?.runOnUiThread {
+            try {
+                val activity = reactContext.currentActivity
+                if (activity != null) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                        activity.setShowWhenLocked(enabled)
+                        activity.setTurnScreenOn(enabled)
+                    }
+                    if (enabled) {
+                        @Suppress("DEPRECATION")
+                        activity.window?.addFlags(
+                            android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                            android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+                            android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                        )
+                    } else {
+                        @Suppress("DEPRECATION")
+                        activity.window?.clearFlags(
+                            android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                            android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+                            android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+                            android.view.WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+                        )
+                        val keyguardManager = activity.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+                        if (keyguardManager?.isKeyguardLocked == true) {
+                            activity.moveTaskToBack(true)
+                        }
+                    }
+                }
+                promise.resolve(true)
+            } catch (e: Exception) {
+                promise.resolve(false)
+            }
+        } ?: promise.resolve(false)
+    }
+
     private fun clearActivityLockFlags() {
         reactContext.currentActivity?.runOnUiThread {
             try {
@@ -481,8 +519,19 @@ class AlarmModule(private val reactContext: ReactApplicationContext) : ReactCont
                 if (activity != null) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
                         activity.setShowWhenLocked(false)
+                        activity.setTurnScreenOn(false)
                     }
-                    activity.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    @Suppress("DEPRECATION")
+                    activity.window?.clearFlags(
+                        android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                        android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+                        android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+                        android.view.WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+                    )
+                    val keyguardManager = activity.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+                    if (keyguardManager?.isKeyguardLocked == true) {
+                        activity.moveTaskToBack(true)
+                    }
                 }
             } catch (_: Exception) {}
         }
