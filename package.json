@@ -1,6 +1,6 @@
 {
   "name": "healthmate",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "main": "expo-router/entry",
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
