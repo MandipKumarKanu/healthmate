@@ -2,8 +2,15 @@ import { Platform } from 'react-native';
 import { File, Paths } from 'expo-file-system';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import { getDatabase, resetDatabase } from '../database/client';
+import { getDatabase, withTransaction } from '../database/client';
 import { migrationManager } from '../database/migrationManager';
+import { RECURRENCE_TYPES } from '../types';
+import {
+  getScanImageBackupAsset,
+  isManagedScanImageUri,
+  restoreScanImageBackupAsset,
+  ScanImageBackupAsset,
+} from './scanImageStorage';
 
 /**
  * HealthMate — JSON backup / restore service
@@ -18,7 +25,7 @@ import { migrationManager } from '../database/migrationManager';
  */
 
 export const BACKUP_FORMAT = 'healthmate-backup';
-export const BACKUP_FORMAT_VERSION = 1;
+export const BACKUP_FORMAT_VERSION = 2;
 
 /** Tables in restore order: dependencies (medicines) precede children. */
 const TABLES = [
@@ -42,6 +49,9 @@ export interface BackupPayload {
   schemaVersion: number;
   exportedAt: string;
   tables: Record<BackupTable, Record<string, unknown>[]>;
+  assets?: {
+    scanImages: ScanImageBackupAsset[];
+  };
 }
 
 export interface BackupSummary {
@@ -155,10 +165,17 @@ export const backupService = {
    */
   createBackupJson(): string {
     const tables = {} as BackupPayload['tables'];
+    const scanImageAssets = new Map<string, ScanImageBackupAsset>();
     let rowCount = 0;
     for (const table of TABLES) {
       const rows = readTable(table);
       tables[table] = rows;
+      if (table === 'scan_history') {
+        for (const row of rows) {
+          const asset = getScanImageBackupAsset(String(row.image_uri ?? ''));
+          if (asset) scanImageAssets.set(asset.key, asset);
+        }
+      }
       rowCount += rows.length;
     }
 
@@ -168,6 +185,7 @@ export const backupService = {
       schemaVersion: migrationManager.getCurrentVersion(getDatabase()),
       exportedAt: new Date().toISOString(),
       tables,
+      assets: { scanImages: [...scanImageAssets.values()] },
     };
     void rowCount;
     return JSON.stringify(payload, null, 2);
@@ -236,6 +254,19 @@ export const backupService = {
       }
     }
 
+    const rawAssets = data.assets;
+    const scanImages =
+      typeof rawAssets === 'object' && rawAssets !== null && Array.isArray((rawAssets as any).scanImages)
+        ? (rawAssets as any).scanImages.filter(
+            (asset: unknown): asset is ScanImageBackupAsset =>
+              typeof asset === 'object' &&
+              asset !== null &&
+              typeof (asset as any).key === 'string' &&
+              typeof (asset as any).extension === 'string' &&
+              typeof (asset as any).base64 === 'string',
+          )
+        : [];
+
     return {
       ok: true,
       payload: {
@@ -244,6 +275,7 @@ export const backupService = {
         schemaVersion: Number(data.schemaVersion) || 3,
         exportedAt: typeof data.exportedAt === 'string' ? data.exportedAt : '',
         tables,
+        assets: { scanImages },
       },
     };
   },
@@ -253,7 +285,8 @@ export const backupService = {
    */
   validateBackupRows(payload: BackupPayload): { valid: boolean; error?: string } {
     const medIds = new Set<string>();
-    const schedIds = new Set<string>();
+    const scheduleIds = new Set<string>();
+    const validRecurrences = new Set<string>(RECURRENCE_TYPES);
 
     if (payload.tables.medicines) {
       for (const row of payload.tables.medicines) {
@@ -263,12 +296,14 @@ export const backupService = {
         if (!row.name || typeof row.name !== 'string') {
           return { valid: false, error: `Medicine "${row.id}" has missing name.` };
         }
+        if (medIds.has(row.id)) {
+          return { valid: false, error: `Duplicate medicine id "${row.id}".` };
+        }
         medIds.add(row.id);
       }
     }
 
     if (payload.tables.schedules) {
-      const validRecurrences = ['daily', 'specific_days', 'interval', 'as_needed', 'weekly', 'monthly'];
       for (const row of payload.tables.schedules) {
         if (!row.id || typeof row.id !== 'string') {
           return { valid: false, error: 'Schedule record has invalid or missing id.' };
@@ -276,25 +311,43 @@ export const backupService = {
         if (!row.medicine_id || typeof row.medicine_id !== 'string') {
           return { valid: false, error: `Schedule "${row.id}" has missing medicine_id.` };
         }
-        if (medIds.size > 0 && !medIds.has(row.medicine_id)) {
+        if (!medIds.has(row.medicine_id)) {
           return {
             valid: false,
             error: `Schedule "${row.id}" references non-existent medicine "${row.medicine_id}".`,
           };
         }
-        if (row.recurrence && !validRecurrences.includes(String(row.recurrence))) {
+        if (row.recurrence && !validRecurrences.has(String(row.recurrence))) {
           return {
             valid: false,
             error: `Schedule "${row.id}" has unsupported recurrence "${String(row.recurrence)}".`,
           };
         }
-        schedIds.add(row.id);
+        if (scheduleIds.has(row.id)) {
+          return { valid: false, error: `Duplicate schedule id "${row.id}".` };
+        }
+        scheduleIds.add(row.id);
       }
     }
 
     if (payload.tables.schedule_history) {
       for (const row of payload.tables.schedule_history) {
-        if (row.id) schedIds.add(String(row.id));
+        if (!row.id || typeof row.id !== 'string') {
+          return { valid: false, error: 'Schedule history record has invalid or missing id.' };
+        }
+        if (!row.schedule_id || typeof row.schedule_id !== 'string') {
+          return { valid: false, error: `Schedule history "${row.id}" has missing schedule_id.` };
+        }
+        if (!row.medicine_id || typeof row.medicine_id !== 'string' || !medIds.has(row.medicine_id)) {
+          return { valid: false, error: `Schedule history "${row.id}" references an unknown medicine.` };
+        }
+        if (row.recurrence && !validRecurrences.has(String(row.recurrence))) {
+          return {
+            valid: false,
+            error: `Schedule history "${row.id}" has unsupported recurrence "${String(row.recurrence)}".`,
+          };
+        }
+        scheduleIds.add(row.schedule_id);
       }
     }
 
@@ -310,10 +363,43 @@ export const backupService = {
             error: `Adherence log "${row.id}" has invalid status "${String(row.status)}".`,
           };
         }
-        if (row.medicine_id && medIds.size > 0 && !medIds.has(String(row.medicine_id))) {
+        if (row.medicine_id && !medIds.has(String(row.medicine_id))) {
           return {
             valid: false,
             error: `Adherence log "${row.id}" references unknown medicine "${row.medicine_id}".`,
+          };
+        }
+        if (row.schedule_id && !scheduleIds.has(String(row.schedule_id))) {
+          return {
+            valid: false,
+            error: `Adherence log "${row.id}" references unknown schedule "${String(row.schedule_id)}".`,
+          };
+        }
+      }
+    }
+
+    if (payload.tables.refill_reminders) {
+      for (const row of payload.tables.refill_reminders) {
+        if (row.medicine_id && !medIds.has(String(row.medicine_id))) {
+          return {
+            valid: false,
+            error: `Refill reminder "${String(row.id ?? '')}" references unknown medicine.`,
+          };
+        }
+      }
+    }
+
+    if (payload.tables.ai_messages) {
+      const conversationIds = new Set(
+        (payload.tables.ai_conversations ?? [])
+          .map((row) => (typeof row.id === 'string' ? row.id : null))
+          .filter((id): id is string => Boolean(id)),
+      );
+      for (const row of payload.tables.ai_messages) {
+        if (row.conversation_id && !conversationIds.has(String(row.conversation_id))) {
+          return {
+            valid: false,
+            error: `AI message "${String(row.id ?? '')}" references an unknown conversation.`,
           };
         }
       }
@@ -323,70 +409,85 @@ export const backupService = {
   },
 
   /**
-   * Restores a validated payload: wipe → rebuild schema → re-insert rows.
-   * If any error occurs during restoration, it automatically rolls back
-   * to preserve previous user data, preventing partial database destruction.
+   * Restores a validated payload atomically while keeping the current schema.
+   * Embedded scan assets are written first and their URIs are remapped into
+   * the restored scan-history rows.
    */
   restoreFromBackup(payload: BackupPayload): { restored: number } {
-    // 1. Comprehensive pre-validation before altering existing data
     const validation = this.validateBackupRows(payload);
     if (!validation.valid) {
       throw new Error(`Backup validation failed: ${validation.error}`);
     }
 
-    // 2. Snapshot current state for rollback protection
-    const previousSnapshot = this.createBackupJson();
+    const restoredAssetUris = new Map<string, string>();
+    const createdAssetUris: string[] = [];
 
-    // 3. Attempt restoration
     try {
-      resetDatabase(); // Drops all data and re-runs migrations (schema v3).
-
-      const db = getDatabase();
-      let restored = 0;
-
-      for (const table of TABLES) {
-        const rows = payload.tables[table];
-        if (!rows || rows.length === 0) continue;
-
-        const columns = TABLE_COLUMNS[table];
-        const placeholders = columns.map(() => '?').join(', ');
-        const insertSql = `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders});`;
-
-        for (const row of rows) {
-          db.runSync(
-            insertSql,
-            columns.map((col) => row[col] ?? null),
-          );
-          restored++;
-        }
+      for (const [index, asset] of (payload.assets?.scanImages ?? []).entries()) {
+        const restoredUri = restoreScanImageBackupAsset(asset, index);
+        if (!restoredUri) throw new Error(`Could not restore scan image asset "${asset.key}".`);
+        restoredAssetUris.set(asset.key, restoredUri);
+        createdAssetUris.push(restoredUri);
       }
+
+      const restored = withTransaction(() => {
+        const db = getDatabase();
+        let rowCount = 0;
+
+        // Delete children before parents while preserving the migrated schema.
+        for (const table of [
+          'ai_messages',
+          'ai_conversations',
+          'scan_history',
+          'refill_reminders',
+          'adherence_logs',
+          'schedule_history',
+          'schedules',
+          'medicines',
+          'preferences',
+          'profiles',
+        ]) {
+          db.runSync(`DELETE FROM ${table};`);
+        }
+
+        for (const table of TABLES) {
+          const rows = payload.tables[table];
+          if (!rows || rows.length === 0) continue;
+
+          const columns = TABLE_COLUMNS[table];
+          const placeholders = columns.map(() => '?').join(', ');
+          const insertSql = `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders});`;
+
+          for (const row of rows) {
+            const values = columns.map((col) => {
+              if (table === 'scan_history' && col === 'image_uri') {
+                const originalUri = typeof row[col] === 'string' ? row[col] : '';
+                if (isManagedScanImageUri(originalUri)) {
+                  const key = originalUri.split(/[?#]/)[0].split('/').pop() || '';
+                  return restoredAssetUris.get(key) ?? null;
+                }
+              }
+              return row[col] ?? null;
+            });
+            db.runSync(insertSql, values);
+            rowCount++;
+          }
+        }
+
+        return rowCount;
+      });
 
       return { restored };
     } catch (restoreError) {
-      // Automatic rollback to previous snapshot on failure
-      console.warn('Restoration failed midway, rolling back to previous state:', restoreError);
-      try {
-        const previousParsed = this.parseBackup(previousSnapshot);
-        if (previousParsed.ok) {
-          resetDatabase();
-          const db = getDatabase();
-          for (const table of TABLES) {
-            const rows = previousParsed.payload.tables[table];
-            if (!rows || rows.length === 0) continue;
-            const columns = TABLE_COLUMNS[table];
-            const placeholders = columns.map(() => '?').join(', ');
-            const insertSql = `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders});`;
-            for (const row of rows) {
-              db.runSync(
-                insertSql,
-                columns.map((col) => row[col] ?? null),
-              );
-            }
-          }
+      for (const uri of createdAssetUris) {
+        try {
+          const file = new File(uri);
+          if (file.exists) file.delete();
+        } catch {
+          // Startup orphan cleanup will remove an asset if immediate deletion fails.
         }
-      } catch (rollbackError) {
-        console.error('Fatal rollback error:', rollbackError);
       }
+      console.warn('Restoration failed; database transaction rolled back:', restoreError);
       throw restoreError;
     }
   },

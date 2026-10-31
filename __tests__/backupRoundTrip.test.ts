@@ -200,4 +200,30 @@ describe('JSON backup round-trip', () => {
     // AI conversations table exists and is empty
     expect(aiRepository.getConversations()).toEqual([]);
   });
+
+  it('accepts all supported recurrence values during validation', () => {
+    const payload: any = {
+      format: 'healthmate-backup',
+      formatVersion: 2,
+      schemaVersion: 3,
+      exportedAt: new Date().toISOString(),
+      tables: {
+        medicines: [{ id: 'med_recurrence', name: 'Recurrence Medicine' }],
+        schedules: [
+          {
+            id: 'sched_once',
+            medicine_id: 'med_recurrence',
+            recurrence: 'once',
+          },
+          {
+            id: 'sched_custom',
+            medicine_id: 'med_recurrence',
+            recurrence: 'custom',
+          },
+        ],
+      },
+    };
+
+    expect(backupService.validateBackupRows(payload)).toEqual({ valid: true });
+  });
 });

@@ -55,7 +55,11 @@ export default function CalendarScreen() {
         onPress: () =>
           router.push({
             pathname: '/reminders/create',
-            params: { medicineId: dose.medicineId, date: selectedDate },
+            params: {
+              medicineId: dose.medicineId,
+              scheduleId: dose.scheduleId,
+              date: selectedDate,
+            },
           }),
       },
       {

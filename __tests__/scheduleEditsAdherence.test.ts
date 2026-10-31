@@ -113,6 +113,35 @@ describe('Dose history and schedule edits', () => {
     expect(scheduleRepository.getAll().filter((s) => s.id === scheduleId)).toHaveLength(1);
   });
 
+  it('returns multiple active schedules for the same medicine on one date', () => {
+    const base = {
+      medicineId: 'med_test_1',
+      recurrence: 'daily' as const,
+      startDate: '2026-10-01',
+      enabled: true,
+      notificationsEnabled: false,
+      createdAt: '2026-10-01T00:00:00.000Z',
+      updatedAt: '2026-10-01T00:00:00.000Z',
+    };
+
+    scheduleRepository.save({
+      ...base,
+      id: 'sched_morning',
+      times: [{ id: 'morning', time: '08:00', amount: '1 capsule' }],
+    });
+    scheduleRepository.save({
+      ...base,
+      id: 'sched_evening',
+      times: [{ id: 'evening', time: '20:00', amount: '1 capsule' }],
+    });
+
+    const schedules = scheduleRepository.getSchedulesForDate('2026-10-15');
+    expect(schedules.map((schedule) => schedule.id).sort()).toEqual([
+      'sched_evening',
+      'sched_morning',
+    ]);
+  });
+
   it('preserves historical doses when a dose is deleted from the schedule', () => {
     const scheduleId = 'sched_amox_del';
     const initialSchedule: ReminderSchedule = {

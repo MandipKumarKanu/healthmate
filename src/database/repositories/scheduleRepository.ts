@@ -144,22 +144,23 @@ export const scheduleRepository = {
     const histSchedules = histRows.map(mapHistoryRowToSchedule);
 
     const result: ReminderSchedule[] = [];
-    const coveredMedicineIds = new Set<string>();
+    const activeMedicineIds = new Set<string>();
 
     // 1. If an active schedule is in effect and due on this date, use it
     for (const active of activeSchedules) {
       if (isScheduleDueOnDate(active, date)) {
         result.push(active);
-        coveredMedicineIds.add(active.medicineId);
+        activeMedicineIds.add(active.medicineId);
       }
     }
 
     // 2. For medicines not covered by an active schedule on this date, check historical versions
     for (const hist of histSchedules) {
-      if (coveredMedicineIds.has(hist.medicineId)) continue;
+      // An active schedule supersedes historical versions for the same
+      // medicine, but multiple active schedules must remain visible.
+      if (activeMedicineIds.has(hist.medicineId)) continue;
       if (isScheduleDueOnDate(hist, date)) {
         result.push(hist);
-        coveredMedicineIds.add(hist.medicineId);
       }
     }
 

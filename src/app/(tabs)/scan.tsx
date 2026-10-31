@@ -328,7 +328,10 @@ export default function ScanScreen() {
           batchNumber: result.extracted.batchNumber || undefined,
           expiryDate: result.extracted.expiryDate || undefined,
           rawText: result.rawText,
-          imageUri: stableImageUri ?? frontCroppedUri,
+          // Keep the history row durable. saveScanImage() deliberately returns
+          // undefined on copy failure because cache/content-provider URIs can
+          // disappear after the scan completes.
+          imageUri: stableImageUri,
         });
       } catch (historyErr) {
         console.warn('Auto-save scan to history failed:', historyErr);
@@ -398,8 +401,8 @@ export default function ScanScreen() {
       return;
     }
 
-    // Persist stable image copy
-    const stableImageUri = await saveScanImage(frontCroppedUri || undefined);
+    // The analysis step already owns a durable history copy. Do not create a
+    // second unreferenced file when saving the medicine to the cabinet.
 
     const newMed = addMedicine({
       id: `med_${Date.now()}`,

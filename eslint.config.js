@@ -15,4 +15,12 @@ module.exports = defineConfig([
     },
     ignores: ['dist/*', 'node_modules/*'],
   },
+  {
+    files: ['__tests__/**/*.js'],
+    languageOptions: {
+      globals: {
+        jest: 'readonly',
+      },
+    },
+  },
 ]);

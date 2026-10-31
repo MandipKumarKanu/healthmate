@@ -651,6 +651,42 @@ class InMemoryDemonstrationDatabase implements ISQLiteDatabase {
       return { changes, lastInsertRowId: 0 };
     }
 
+    if (clean === 'DELETE FROM SCHEDULE_HISTORY;' || clean === 'DELETE FROM SCHEDULE_HISTORY') {
+      const changes = this.scheduleHistory.size;
+      this.scheduleHistory.clear();
+      return { changes, lastInsertRowId: 0 };
+    }
+
+    if (clean === 'DELETE FROM ADHERENCE_LOGS;' || clean === 'DELETE FROM ADHERENCE_LOGS') {
+      const changes = this.adherenceLogs.size;
+      this.adherenceLogs.clear();
+      return { changes, lastInsertRowId: 0 };
+    }
+
+    if (clean === 'DELETE FROM SCHEDULES;' || clean === 'DELETE FROM SCHEDULES') {
+      const changes = this.schedules.size;
+      this.schedules.clear();
+      return { changes, lastInsertRowId: 0 };
+    }
+
+    if (clean === 'DELETE FROM REFILL_REMINDERS;' || clean === 'DELETE FROM REFILL_REMINDERS') {
+      const changes = this.refillReminders.size;
+      this.refillReminders.clear();
+      return { changes, lastInsertRowId: 0 };
+    }
+
+    if (clean === 'DELETE FROM MEDICINES;' || clean === 'DELETE FROM MEDICINES') {
+      const changes = this.medicines.size;
+      this.medicines.clear();
+      return { changes, lastInsertRowId: 0 };
+    }
+
+    if (clean === 'DELETE FROM PROFILES;' || clean === 'DELETE FROM PROFILES') {
+      const changes = this.profiles.size;
+      this.profiles.clear();
+      return { changes, lastInsertRowId: 0 };
+    }
+
     if (guardIsEnabled()) {
       throw new Error(
         `[InMemoryDemonstrationDatabase] Unsupported runSync statement: ${query.trim().slice(0, 160)}`,

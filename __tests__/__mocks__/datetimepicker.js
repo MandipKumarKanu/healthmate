@@ -1,5 +1,3 @@
-const React = require('react');
-
 const DateTimePicker = (props) => null;
 DateTimePicker.displayName = 'DateTimePicker';
 

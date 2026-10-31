@@ -84,10 +84,9 @@ class ImageEnhancerModule : Module() {
   /** Largest power-of-two sample size whose long edge stays <= maxDimension. */
   private fun computeSampleSize(width: Int, height: Int): Int {
     var sampleSize = 1
-    var longEdge = max(width, height)
-    while (longEdge / 2 >= maxDimension) {
+    val longEdge = max(width, height)
+    while (longEdge / sampleSize > maxDimension) {
       sampleSize *= 2
-      longEdge /= 2
     }
     return sampleSize
   }

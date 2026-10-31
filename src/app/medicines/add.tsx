@@ -40,6 +40,7 @@ export default function AddMedicineScreen() {
   const [instructions, setInstructions] = useState('');
   const [currentStock, setCurrentStock] = useState('');
   const [refillThreshold, setRefillThreshold] = useState('');
+  const [unitDosage, setUnitDosage] = useState('');
 
   useEffect(() => {
     if (params.editId) {
@@ -58,6 +59,7 @@ export default function AddMedicineScreen() {
         setRefillThreshold(
           existing.refillThreshold != null ? String(existing.refillThreshold) : '',
         );
+        setUnitDosage(existing.unitDosage || '');
       }
     }
   }, [params.editId]);
@@ -67,14 +69,26 @@ export default function AddMedicineScreen() {
   const parseOptionalInt = (value: string): number | undefined => {
     const trimmed = value.trim();
     if (!trimmed) return undefined;
-    const parsed = Number.parseInt(trimmed, 10);
-    return Number.isNaN(parsed) ? undefined : Math.max(0, parsed);
+    const parsed = Number(trimmed);
+    return Number.isInteger(parsed) && parsed >= 0 ? parsed : undefined;
+  };
+
+  const hasInvalidStockValue = (value: string): boolean => {
+    const trimmed = value.trim();
+    if (!trimmed) return false;
+    const parsed = Number(trimmed);
+    return !Number.isInteger(parsed) || parsed < 0;
   };
 
   const handleSave = () => {
     const trimmedName = name.trim();
     if (!trimmedName) {
       Alert.alert('Validation Error', 'Please enter a medicine name.');
+      return;
+    }
+
+    if (hasInvalidStockValue(currentStock) || hasInvalidStockValue(refillThreshold)) {
+      Alert.alert('Validation Error', 'Inventory and refill values must be whole numbers of zero or more.');
       return;
     }
 
@@ -93,6 +107,7 @@ export default function AddMedicineScreen() {
         },
         currentInventory: parseOptionalInt(currentStock),
         refillThreshold: parseOptionalInt(refillThreshold),
+        unitDosage: unitDosage.trim() || undefined,
       });
 
       Alert.alert('Success', `${trimmedName} updated successfully!`, [
@@ -117,6 +132,7 @@ export default function AddMedicineScreen() {
         isSample: false,
         currentInventory: parseOptionalInt(currentStock),
         refillThreshold: parseOptionalInt(refillThreshold),
+        unitDosage: unitDosage.trim() || undefined,
       });
 
       Alert.alert('Success', `${newMed.name} added to your cabinet!`, [
@@ -249,6 +265,16 @@ export default function AddMedicineScreen() {
             value={currentStock}
             onChangeText={setCurrentStock}
             keyboardType="number-pad"
+          />
+
+          <Text style={styles.inputLabel}>Stock unit</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="e.g. tablets, capsules, ml"
+            placeholderTextColor={Colors.textTertiary}
+            value={unitDosage}
+            onChangeText={setUnitDosage}
+            autoCapitalize="none"
           />
 
           <View style={styles.divider} />

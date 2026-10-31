@@ -21,6 +21,7 @@ function joinUris(...uris) {
 function initMockState(initial = {}) {
   state.files = new Set(initial.files ?? []);
   state.dirs = new Set(initial.dirs ?? ['file:///mock-documents', 'file:///mock-cache']);
+  state.fileContents = new Map(initial.fileContents ?? []);
   return state;
 }
 
@@ -94,6 +95,17 @@ class MockFile {
 
   async bytes() {
     return new Uint8Array(0);
+  }
+
+  base64Sync() {
+    return state.fileContents?.get(this.uri) ?? '';
+  }
+
+  writeSync(content) {
+    if (!state.fileContents) state.fileContents = new Map();
+    state.fileContents.set(this.uri, typeof content === 'string' ? content : String(content));
+    includeDirAncestors(this.uri.substring(0, this.uri.lastIndexOf('/')));
+    state.files.add(this.uri);
   }
 
   async write(content) {

@@ -25,7 +25,7 @@ import { requireNativeModule } from 'expo';
 import type { ImageManipulatorContext } from 'expo-image-manipulator';
 import { SaveFormat } from 'expo-image-manipulator';
 // Local Expo module: native grayscale + contrast normalization (Kotlin/Swift).
-import ImageEnhancerModule from '../../modules/image-enhancer';
+import { getImageEnhancerModule } from '../../modules/image-enhancer';
 
 /**
  * The singleton native module emission. The package's TypeScript types expose
@@ -162,7 +162,7 @@ function resolveImageEnhancer(): ImageEnhancerNativeModule | null {
   try {
     // Enhance only when the native module was bundled with the app (dev/preview
     // builds after the module was added); never throws past this point.
-    const mod = ImageEnhancerModule as unknown as ImageEnhancerNativeModule;
+    const mod = getImageEnhancerModule() as unknown as ImageEnhancerNativeModule | null;
     if (typeof mod?.enhanceAsync === 'function') {
       imageEnhancerModule = mod;
     }

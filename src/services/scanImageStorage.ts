@@ -15,6 +15,12 @@ import { getDatabase } from '../database/client';
 
 const SCAN_IMAGE_DIR_NAME = 'scan-images';
 
+export interface ScanImageBackupAsset {
+  key: string;
+  extension: string;
+  base64: string;
+}
+
 export function getScanImageDirectory(): Directory {
   return new Directory(Paths.document, SCAN_IMAGE_DIR_NAME);
 }
@@ -34,6 +40,48 @@ function uriBaseName(uri: string): string {
 function extensionFor(source: File): string {
   const ext = source.extension.replace('.', '').toLowerCase();
   return /^[a-z0-9]{1,8}$/.test(ext) ? ext : 'jpg';
+}
+
+/** Returns a portable, content-bearing backup asset for a managed scan image. */
+export function getScanImageBackupAsset(imageUri?: string | null): ScanImageBackupAsset | undefined {
+  if (!imageUri || !isManagedScanImageUri(imageUri)) return undefined;
+
+  try {
+    const source = new File(imageUri);
+    if (!source.exists || typeof source.base64Sync !== 'function') return undefined;
+    const base64 = source.base64Sync();
+    if (!base64) return undefined;
+    return {
+      key: uriBaseName(imageUri),
+      extension: extensionFor(source),
+      base64,
+    };
+  } catch (error) {
+    console.warn('getScanImageBackupAsset failed:', error);
+    return undefined;
+  }
+}
+
+/** Restores one embedded scan image and returns its new device-local URI. */
+export function restoreScanImageBackupAsset(
+  asset: ScanImageBackupAsset,
+  index: number,
+): string | undefined {
+  try {
+    if (!asset.key || !asset.base64) return undefined;
+    const extension = /^[a-z0-9]{1,8}$/i.test(asset.extension) ? asset.extension : 'jpg';
+    const dir = getScanImageDirectory();
+    if (!dir.exists) dir.create({ intermediates: true, idempotent: true });
+    const destination = new File(
+      dir,
+      `scan_restore_${Date.now()}_${index}_${Math.floor(Math.random() * 1_000_000)}.${extension}`,
+    );
+    destination.writeSync(asset.base64, { encoding: 'base64' });
+    return destination.uri;
+  } catch (error) {
+    console.warn('restoreScanImageBackupAsset failed:', error);
+    return undefined;
+  }
 }
 
 /**

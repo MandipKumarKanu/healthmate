@@ -5,6 +5,8 @@ import { profileRepository } from '../src/database/repositories/profileRepositor
 import { medicineRepository } from '../src/database/repositories/medicineRepository';
 import { scheduleRepository } from '../src/database/repositories/scheduleRepository';
 import { adherenceRepository } from '../src/database/repositories/adherenceRepository';
+import { scanHistoryRepository } from '../src/database/repositories/scanHistoryRepository';
+import { isManagedScanImageUri } from '../src/services/scanImageStorage';
 import { File } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
@@ -106,6 +108,29 @@ describe('Backup file export & restore', () => {
     expect(result.summary.scheduleCount).toBe(1);
 
     __setMockPickedFile(null);
+  });
+
+  it('embeds managed scan images and restores them to local storage', async () => {
+    const sourceImage = new File('file:///mock-documents/scan-images/scan_asset.jpg');
+    await sourceImage.write('encoded-image-content');
+    scanHistoryRepository.add({
+      medicineName: 'Amoxicillin',
+      imageUri: sourceImage.uri,
+    });
+
+    const json = backupService.createBackupJson();
+    const parsed = backupService.parseBackup(json);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.payload.assets?.scanImages).toHaveLength(1);
+
+    resetDatabase();
+    backupService.restoreFromBackup(parsed.payload);
+
+    const restoredImageUri = scanHistoryRepository.getAll()[0]?.imageUri;
+    expect(isManagedScanImageUri(restoredImageUri)).toBe(true);
+    expect(restoredImageUri).not.toBe(sourceImage.uri);
+    expect(restoredImageUri ? new File(restoredImageUri).exists : false).toBe(true);
   });
 
   it('handles canceled file picking gracefully', async () => {

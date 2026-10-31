@@ -5,7 +5,10 @@
  * label photos taken in low light. Imported by `src/services/imagePreProcessing.ts`,
  * which owns the graceful no-native fallback.
  */
-import ImageEnhancerModule, { EnhancedImage } from './src/ImageEnhancerModule';
+import ImageEnhancerModule, {
+  EnhancedImage,
+  getImageEnhancerModule,
+} from './src/ImageEnhancerModule';
 
-export { EnhancedImage };
+export { EnhancedImage, getImageEnhancerModule };
 export default ImageEnhancerModule;

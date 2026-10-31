@@ -159,7 +159,7 @@ export default function ProfileScreen() {
     }
     if (ageInput.trim()) {
       const pAge = Number(ageInput.trim());
-      if (isNaN(pAge) || pAge < 1 || pAge > 120) {
+      if (isNaN(pAge) || !Number.isInteger(pAge) || pAge < 1 || pAge > 120) {
         errors.age = 'Age must be 1-120';
       }
     }
@@ -167,12 +167,20 @@ export default function ProfileScreen() {
       const pHeight = Number(heightInput.trim());
       if (isNaN(pHeight) || pHeight <= 0) {
         errors.height = 'Invalid height';
+      } else if (unitSystemInput === 'metric' && (pHeight < 30 || pHeight > 300)) {
+        errors.height = 'Height should be 30–300 cm';
+      } else if (unitSystemInput === 'imperial' && (pHeight < 1 || pHeight > 9)) {
+        errors.height = 'Height should be 1–9 ft';
       }
     }
     if (weightInput.trim()) {
       const pWeight = Number(weightInput.trim());
       if (isNaN(pWeight) || pWeight <= 0) {
         errors.weight = 'Invalid weight';
+      } else if (unitSystemInput === 'metric' && (pWeight < 1 || pWeight > 500)) {
+        errors.weight = 'Weight should be 1–500 kg';
+      } else if (unitSystemInput === 'imperial' && (pWeight < 2 || pWeight > 1000)) {
+        errors.weight = 'Weight should be 2–1000 lb';
       }
     }
     if (Object.keys(errors).length > 0) {
@@ -194,7 +202,7 @@ export default function ProfileScreen() {
   const handleResetData = async () => {
     try {
       await notificationService.cancelAll();
-      resetAllData();
+      await resetAllData();
       setShowResetConfirm(false);
       Alert.alert(
         'Reset Complete',
@@ -209,7 +217,7 @@ export default function ProfileScreen() {
   const handleClearAllData = async () => {
     try {
       await notificationService.cancelAll();
-      clearAllData();
+      await clearAllData();
       setShowClearConfirm(false);
       Alert.alert(
         'Data Cleared',
@@ -608,7 +616,7 @@ export default function ProfileScreen() {
                 maxHeight: isKeyboardVisible
                   ? Math.min(260, SCREEN_HEIGHT - keyboardHeight - 170)
                   : 440,
-                flexShrink: 1,
+                flexGrow: 0,
               }}
               contentContainerStyle={{
                 paddingBottom: isKeyboardVisible ? 30 : 10,
@@ -619,7 +627,7 @@ export default function ProfileScreen() {
               onScroll={handleModalScroll}
               scrollEventThrottle={16}
             >
-              <View style={{ flexGrow: 1 }} onFocusCapture={handleModalFocusCapture}>
+              <View onFocusCapture={handleModalFocusCapture}>
                   {/* Full Name */}
                   <View style={styles.modalFieldGroup}>
                     <Text style={styles.modalFieldLabel}>Full Name *</Text>
@@ -1009,8 +1017,8 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     padding: Spacing.xl,
     width: '100%',
-    maxHeight: '100%',
-    flexShrink: 1,
+    maxWidth: 440,
+    maxHeight: '90%',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.18,

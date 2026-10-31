@@ -233,7 +233,7 @@ export function ConnectGeminiModal({
             onScroll={onScroll}
             scrollEventThrottle={16}
           >
-            <View style={{ flexGrow: 1 }} onFocusCapture={handleFocusCapture}>
+            <View onFocusCapture={handleFocusCapture}>
                 {showCelebration ? (
                   /* Celebration View (MCQ Choice 4) */
                   <View style={styles.celebrationContainer}>
@@ -467,10 +467,11 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   card: {
+    width: '100%',
+    maxWidth: 420,
     backgroundColor: Colors.cardBackground,
     borderRadius: Radius.card,
-    maxHeight: '100%',
-    flexShrink: 1,
+    maxHeight: '90%',
     padding: Spacing.lg,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
@@ -511,7 +512,7 @@ const styles = StyleSheet.create({
     padding: Spacing.xs,
   },
   modalScrollView: {
-    flexShrink: 1,
+    flexGrow: 0,
   },
   scrollContent: {
     paddingTop: Spacing.xs,

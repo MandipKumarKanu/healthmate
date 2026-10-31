@@ -1,7 +1,8 @@
 export type DosageForm =
   'tablet' | 'capsule' | 'softgel' | 'eye_drop' | 'syrup' | 'injection' | 'cream' | 'other';
 
-export type RecurrenceType = 'daily' | 'weekly' | 'monthly' | 'custom' | 'once';
+export const RECURRENCE_TYPES = ['daily', 'weekly', 'monthly', 'custom', 'once'] as const;
+export type RecurrenceType = (typeof RECURRENCE_TYPES)[number];
 
 export type DoseStatus = 'taken' | 'missed' | 'skipped' | 'upcoming';
 

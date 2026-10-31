@@ -58,7 +58,11 @@ export default function SetReminderScreen() {
   const router = useRouter();
   const { keyboardHeight, isKeyboardVisible } = useKeyboardHeight();
   const SCREEN_HEIGHT = Dimensions.get('window').height;
-  const { medicineId, date } = useLocalSearchParams<{ medicineId?: string; date?: string }>();
+  const { medicineId, scheduleId: routeScheduleId, date } = useLocalSearchParams<{
+    medicineId?: string;
+    scheduleId?: string;
+    date?: string;
+  }>();
   const { saveSchedule } = useReminderStore();
   const selectedDate = useAppStore((state) => state.selectedDate);
 
@@ -76,6 +80,7 @@ export default function SetReminderScreen() {
   const [editingTimes, setEditingTimes] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveProgress, setSaveProgress] = useState('');
+  const [editingScheduleId, setEditingScheduleId] = useState<string | undefined>(routeScheduleId);
 
   // Time picker state and snap wheels for quick, precise minute selection.
   const [pickerTarget, setPickerTarget] = useState<{ id: string | 'new'; date: Date } | null>(null);
@@ -123,9 +128,14 @@ export default function SetReminderScreen() {
   );
 
   useEffect(() => {
-    if (medicineId) {
-      const existingSched = scheduleRepository.getByMedicineId(medicineId);
+    if (medicineId || routeScheduleId) {
+      const existingSched = routeScheduleId
+        ? scheduleRepository.getById(routeScheduleId)
+        : medicineId
+          ? scheduleRepository.getByMedicineId(medicineId)
+          : null;
       if (existingSched) {
+        setEditingScheduleId(existingSched.id);
         setRecurrence(existingSched.recurrence);
         setTimes(
           existingSched.times.map((t) => ({
@@ -139,7 +149,7 @@ export default function SetReminderScreen() {
         setNotificationsEnabled(existingSched.notificationsEnabled);
       }
     }
-  }, [medicineId]);
+  }, [medicineId, routeScheduleId]);
 
   const getNextSuggestedTime = (): string => {
     const commonPresets = ['08:00', '12:00', '14:00', '18:00', '20:00', '22:00'];
@@ -337,7 +347,9 @@ export default function SetReminderScreen() {
       setSaveProgress(
         canNotify ? 'Saving schedule and preparing alarms…' : 'Saving reminder schedule…',
       );
-      const existingSchedule = scheduleRepository.getByMedicineId(selectedMed.id);
+      const existingSchedule = editingScheduleId
+        ? scheduleRepository.getById(editingScheduleId)
+        : scheduleRepository.getByMedicineId(selectedMed.id);
       const scheduleId = existingSchedule?.id ?? `sched_${selectedMed.id}`;
       const now = new Date().toISOString();
 
@@ -374,7 +386,7 @@ export default function SetReminderScreen() {
           notification_permission:
             'Your schedule is saved, but notification permission is currently denied. Allow HealthMate to send notifications in Android Settings → Apps → HealthMate → Notifications, then edit and re-save this schedule to arm reminders.',
           exact_alarm:
-            'Your schedule is saved, but exact alarm access was not granted. Reminders will use inexact fallbacks and timing may not be precise. To ensure zero-latency exact alarms, allow “Alarms & reminders” in Android Settings → Apps → HealthMate → Alarms & reminders.',
+            'Your schedule is saved, but exact alarm access was not granted. HealthMate cannot arm reliable alarm reminders until you allow “Alarms & reminders” in Android Settings → Apps → HealthMate → Alarms & reminders.',
           internal:
             'Your schedule is saved, but at least one alarm could not be scheduled (internal or network error). Try re-saving this schedule; if it keeps failing, check your connection and device storage.',
         };
@@ -949,7 +961,7 @@ export default function SetReminderScreen() {
                     style={styles.medModalAddBtn}
                     onPress={() => {
                       setIsMedModalVisible(false);
-                      router.push('/medicines/create');
+                      router.push('/medicines/add');
                     }}
                     activeOpacity={0.8}
                   >
@@ -983,6 +995,7 @@ export default function SetReminderScreen() {
                           setModalSearch('');
 
                           const existingSched = scheduleRepository.getByMedicineId(med.id);
+                          setEditingScheduleId(existingSched?.id);
                           if (existingSched) {
                             setRecurrence(existingSched.recurrence);
                             setTimes(
@@ -1564,8 +1577,8 @@ const styles = StyleSheet.create({
   },
   medModalContainer: {
     width: '100%',
-    maxHeight: '100%',
-    flexShrink: 1,
+    maxWidth: 420,
+    maxHeight: '90%',
     backgroundColor: Colors.cardBackground,
     borderRadius: Radius.card,
     borderWidth: 1,
@@ -1671,6 +1684,7 @@ const styles = StyleSheet.create({
   },
   medModalList: {
     maxHeight: 380,
+    flexGrow: 0,
   },
   medModalItem: {
     flexDirection: 'row',

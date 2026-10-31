@@ -1,4 +1,4 @@
-const { withGradleProperties } = require('@expo/config-plugins');
+const { withAppBuildGradle, withGradleProperties } = require('@expo/config-plugins');
 
 /**
  * Removes size dead-weight from the Android build. `expo prebuild --clean`
@@ -54,4 +54,48 @@ function withReleaseOptimization(config, options = {}) {
   });
 }
 
-module.exports = withReleaseOptimization;
+/**
+ * Configure release builds to use an explicit production keystore. The
+ * keystore path/passwords are read only from CI/local build environment or
+ * Gradle properties and are never committed to the repository. If the
+ * keystore is not configured, release assembly fails rather than silently
+ * producing a debug-signed artifact.
+ */
+function withProductionSigning(config) {
+  return withAppBuildGradle(config, (config) => {
+    let contents = config.modResults.contents;
+    if (!contents.includes('healthmateRelease')) {
+      const signingConfig = `
+    signingConfigs {
+        healthmateRelease {
+            def releaseStoreFile = System.getenv('HEALTHMATE_RELEASE_STORE_FILE') ?: findProperty('HEALTHMATE_RELEASE_STORE_FILE')
+            def releaseStorePassword = System.getenv('HEALTHMATE_RELEASE_STORE_PASSWORD') ?: findProperty('HEALTHMATE_RELEASE_STORE_PASSWORD') ?: ''
+            def releaseKeyAlias = System.getenv('HEALTHMATE_RELEASE_KEY_ALIAS') ?: findProperty('HEALTHMATE_RELEASE_KEY_ALIAS') ?: ''
+            def releaseKeyPassword = System.getenv('HEALTHMATE_RELEASE_KEY_PASSWORD') ?: findProperty('HEALTHMATE_RELEASE_KEY_PASSWORD') ?: ''
+            // Keep debug builds usable, but make a release build fail clearly
+            // when production signing has not been configured.
+            storeFile file(releaseStoreFile ?: '\$rootDir/.missing-healthmate-release.keystore')
+            storePassword releaseStorePassword
+            keyAlias releaseKeyAlias
+            keyPassword releaseKeyPassword
+        }
+    }
+`;
+      contents = contents.replace(/\n\s*buildTypes\s*\{/,
+        `\n${signingConfig}\n    buildTypes {`);
+    }
+
+    contents = contents.replace(
+      /(buildTypes\s*\{[\s\S]*?release\s*\{[\s\S]*?)signingConfig\s+signingConfigs\.debug/,
+      '$1signingConfig signingConfigs.healthmateRelease',
+    );
+
+    config.modResults.contents = contents;
+    return config;
+  });
+}
+
+module.exports = (config, options = {}) => {
+  config = withReleaseOptimization(config, options);
+  return withProductionSigning(config);
+};
