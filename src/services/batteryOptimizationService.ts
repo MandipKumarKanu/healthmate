@@ -1,5 +1,7 @@
 import { Platform, Linking } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { nativeAlarmService } from './nativeAlarmService';
+import type { NativeRecoveryReport } from './nativeAlarmService';
 
 export interface OEMStep {
   title: string;
@@ -16,12 +18,14 @@ export interface OEMGuide {
 }
 
 export interface ReliabilityStatus {
+  notificationPermission: boolean;
   isIgnoringBatteryOptimizations: boolean;
   canScheduleExactAlarms: boolean;
   manufacturer: string;
   detectedOemId: string;
   androidVersion?: number;
   isOptimal: boolean;
+  lastRecoveryReport: NativeRecoveryReport | null;
 }
 
 export const OEM_GUIDES: OEMGuide[] = [
@@ -176,46 +180,61 @@ export const batteryOptimizationService = {
   async getReliabilityStatus(): Promise<ReliabilityStatus> {
     if (Platform.OS !== 'android') {
       return {
+        notificationPermission: true,
         isIgnoringBatteryOptimizations: true,
         canScheduleExactAlarms: true,
         manufacturer: 'apple_or_web',
         detectedOemId: 'stock',
         isOptimal: true,
+        lastRecoveryReport: null,
       };
     }
 
     try {
-      const [isIgnoring, canExact, mfr] = await Promise.all([
-        nativeAlarmService.isIgnoringBatteryOptimizations(),
-        nativeAlarmService.canScheduleExactAlarms(),
-        nativeAlarmService.getDeviceManufacturer(),
-      ]);
+      const [notificationPermission, isIgnoring, canExact, mfr, lastRecoveryReport] =
+        await Promise.all([
+          Notifications.getPermissionsAsync().then(
+            (permission) => Boolean(permission.granted || permission.status === 'granted'),
+          ),
+          nativeAlarmService.isIgnoringBatteryOptimizations(),
+          nativeAlarmService.canScheduleExactAlarms(),
+          nativeAlarmService.getDeviceManufacturer(),
+          nativeAlarmService.getLastRecoveryReport(),
+        ]);
 
       const detectedOemId = mapManufacturerToOemId(mfr);
-      const isOptimal = isIgnoring && canExact;
+      const isOptimal = notificationPermission && isIgnoring && canExact;
       const androidVersion =
         typeof Platform.Version === 'number'
           ? Platform.Version
           : parseInt(String(Platform.Version), 10) || 0;
 
       return {
+        notificationPermission,
         isIgnoringBatteryOptimizations: isIgnoring,
         canScheduleExactAlarms: canExact,
         manufacturer: mfr,
         detectedOemId,
         androidVersion,
         isOptimal,
+        lastRecoveryReport,
       };
     } catch (e) {
       console.warn('getReliabilityStatus failed:', e);
       return {
+        notificationPermission: false,
         isIgnoringBatteryOptimizations: false,
         canScheduleExactAlarms: false,
         manufacturer: 'unknown',
         detectedOemId: 'stock',
         isOptimal: false,
+        lastRecoveryReport: null,
       };
     }
+  },
+
+  async triggerRecovery(): Promise<NativeRecoveryReport | null> {
+    return nativeAlarmService.triggerRecovery();
   },
 
   async requestIgnoreBatteryOptimizations(): Promise<boolean> {

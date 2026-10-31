@@ -103,9 +103,10 @@ export function AlarmReliabilityCard() {
     guides[0];
 
   const isAndroid = Platform.OS === 'android';
+  const isNotificationOptimal = status?.notificationPermission ?? true;
   const isBatteryOptimal = status?.isIgnoringBatteryOptimizations ?? true;
   const isExactOptimal = status?.canScheduleExactAlarms ?? true;
-  const isOverallOptimal = isBatteryOptimal && isExactOptimal;
+  const isOverallOptimal = isNotificationOptimal && isBatteryOptimal && isExactOptimal;
 
   return (
     <View style={styles.container}>
@@ -167,14 +168,52 @@ export function AlarmReliabilityCard() {
           >
             {isOverallOptimal
               ? 'Reliability status: Unrestricted & Exact Alarms Active'
+              : !isNotificationOptimal
+                ? 'Notifications are blocked — reminders cannot be delivered'
               : !isExactOptimal
-                ? 'Exact scheduling unavailable — reminder timing may not be precise'
+                ? 'Exact scheduling unavailable — enable Alarms & Reminders'
                 : 'Attention: Device battery restrictions may delay or kill alarms'}
           </Text>
         </View>
 
         {/* Detailed Status Items */}
         <View style={styles.statusList}>
+          {/* Item 0: Notification Permission */}
+          <View style={styles.statusItem}>
+            <View style={styles.itemHeaderRow}>
+              <View style={styles.itemLabelGroup}>
+                <Ionicons
+                  name="notifications-outline"
+                  size={18}
+                  color={isNotificationOptimal ? Colors.success : Colors.warning}
+                />
+                <Text style={styles.itemTitle}>Notification Permission</Text>
+              </View>
+              <View
+                style={[
+                  styles.statusPill,
+                  isNotificationOptimal ? styles.pillOptimal : styles.pillRestricted,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.statusPillText,
+                    isNotificationOptimal ? styles.pillOptimalText : styles.pillRestrictedText,
+                  ]}
+                >
+                  {isNotificationOptimal ? 'Allowed' : 'Blocked'}
+                </Text>
+              </View>
+            </View>
+            <Text style={styles.itemDescription}>
+              {isNotificationOptimal
+                ? 'HealthMate can display medication reminder notifications.'
+                : 'Enable notifications so medication reminders can be shown.'}
+            </Text>
+          </View>
+
+          <View style={styles.divider} />
+
           {/* Item 1: Battery Optimization */}
           <View style={styles.statusItem}>
             <View style={styles.itemHeaderRow}>
@@ -252,7 +291,7 @@ export function AlarmReliabilityCard() {
                     isExactOptimal ? styles.pillOptimalText : styles.pillRestrictedText,
                   ]}
                 >
-                  {isExactOptimal ? 'Exact (Precise)' : 'Inexact Fallback'}
+                  {isExactOptimal ? 'Exact (Precise)' : 'Unavailable'}
                 </Text>
               </View>
             </View>
@@ -260,7 +299,7 @@ export function AlarmReliabilityCard() {
             <Text style={styles.itemDescription}>
               {isExactOptimal
                 ? 'Exact alarm hardware triggers are enabled for zero-latency, on-time reminders.'
-                : 'Exact alarm access is denied. Alarms use inexact battery-saving fallbacks, so reminder timing may be delayed or imprecise.'}
+                : 'Exact alarm access is denied. New reminders remain blocked until Alarms & Reminders is enabled.'}
             </Text>
 
             {!isExactOptimal && isAndroid && (

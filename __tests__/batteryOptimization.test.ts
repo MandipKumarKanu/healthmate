@@ -6,6 +6,7 @@ import {
 } from '../src/services/batteryOptimizationService';
 import { nativeAlarmService } from '../src/services/nativeAlarmService';
 import { NativeModules, Platform } from 'react-native';
+import * as Notifications from 'expo-notifications';
 
 describe('Battery Optimization & Alarm Reliability', () => {
   beforeEach(() => {
@@ -93,9 +94,11 @@ describe('Battery Optimization & Alarm Reliability', () => {
 
       expect(status.isIgnoringBatteryOptimizations).toBe(true);
       expect(status.canScheduleExactAlarms).toBe(true);
+      expect(status.notificationPermission).toBe(true);
       expect(status.isOptimal).toBe(true);
       expect(status.manufacturer).toBe('samsung');
       expect(status.detectedOemId).toBe('samsung');
+      expect(status.lastRecoveryReport).toBeNull();
     });
 
     it('returns non-optimal when battery optimization is NOT ignored', async () => {
@@ -122,6 +125,21 @@ describe('Battery Optimization & Alarm Reliability', () => {
       expect(status.canScheduleExactAlarms).toBe(false);
       expect(status.isOptimal).toBe(false);
       expect(status.detectedOemId).toBe('stock');
+    });
+
+    it('returns non-optimal when notification permission is revoked', async () => {
+      (Notifications.getPermissionsAsync as any).mockResolvedValueOnce({
+        status: 'denied',
+        granted: false,
+      });
+      (NativeModules.AlarmModule.isIgnoringBatteryOptimizations as any).mockResolvedValue(true);
+      (NativeModules.AlarmModule.canScheduleExactAlarms as any).mockResolvedValue(true);
+      (NativeModules.AlarmModule.getDeviceManufacturer as any).mockResolvedValue('google');
+
+      const status = await batteryOptimizationService.getReliabilityStatus();
+
+      expect(status.notificationPermission).toBe(false);
+      expect(status.isOptimal).toBe(false);
     });
   });
 

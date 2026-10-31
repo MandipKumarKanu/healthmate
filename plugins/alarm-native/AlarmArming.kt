@@ -458,6 +458,36 @@ object AlarmArming {
         return cal.timeInMillis
     }
 
+    /** Next monthly occurrence, clamping month-end dates (31 -> 30/29/28). */
+    fun nextMonthlyOccurrenceMillis(time: String, startDate: String, nowMillis: Long): Long? {
+        val match = Regex("^([01]\\d|2[0-3]):([0-5]\\d)$").find(time) ?: return null
+        val hour = match.groupValues[1].toInt()
+        val minute = match.groupValues[2].toInt()
+
+        val startParts = startDate.split("-")
+        if (startParts.size != 3) return null
+        val startDay = startParts[2].toIntOrNull() ?: return null
+        if (startDay !in 1..31) return null
+
+        val cal = Calendar.getInstance().apply {
+            timeInMillis = nowMillis
+            set(Calendar.DAY_OF_MONTH, 1)
+            set(Calendar.HOUR_OF_DAY, hour)
+            set(Calendar.MINUTE, minute)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+
+        repeat(24) {
+            val lastDay = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+            cal.set(Calendar.DAY_OF_MONTH, minOf(startDay, lastDay))
+            if (cal.timeInMillis > nowMillis + 60_000L) return cal.timeInMillis
+            cal.add(Calendar.MONTH, 1)
+            cal.set(Calendar.DAY_OF_MONTH, 1)
+        }
+        return null
+    }
+
     /**
      * Called when the OS delivers a dose alarm. Drops the fired trigger from the
      * stored chain and re-arms the next one. When the chain is exhausted and the
@@ -633,6 +663,7 @@ object AlarmArming {
                         val synthesized = when (entry.recurrence) {
                             "daily" -> nextDailyOccurrenceMillis(entry.time, now)
                             "weekly" -> nextWeeklyOccurrenceMillis(entry.time, entry.startDate, now)
+                            "monthly" -> nextMonthlyOccurrenceMillis(entry.time, entry.startDate, now)
                             else -> null
                         }
                         if (synthesized != null && isWithinScheduleDates(entry, synthesized)) {

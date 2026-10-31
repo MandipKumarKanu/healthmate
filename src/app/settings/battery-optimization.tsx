@@ -23,6 +23,7 @@ import {
   ReliabilityStatus,
   OEMGuide,
 } from '../../services/batteryOptimizationService';
+import { notificationService } from '../../services/notificationService';
 
 export default function BatteryOptimizationScreen() {
   const router = useRouter();
@@ -113,6 +114,28 @@ export default function BatteryOptimizationScreen() {
     }
   };
 
+  const handleRecoveryCheck = async () => {
+    setActionLoading('recovery');
+    try {
+      const report = await batteryOptimizationService.triggerRecovery();
+      await notificationService.reconcileScheduledReminders();
+      await checkStatus();
+      Alert.alert(
+        'Recovery check complete',
+        report
+          ? `${report.recoveredCount} alarm entries re-armed, ${report.expiredCount} expired, ${report.failedCount + report.malformedCount} needing attention.`
+          : 'Native recovery is unavailable in this build. Notification reconciliation still completed.',
+      );
+    } catch (e) {
+      Alert.alert(
+        'Recovery unavailable',
+        'HealthMate could not run the native recovery check. Reopen the app after restoring alarm permissions.',
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const guides = batteryOptimizationService.getGuides();
   const activeGuide = guides.find((g) => g.id === selectedOemId) || guides[guides.length - 1];
 
@@ -170,6 +193,18 @@ export default function BatteryOptimizationScreen() {
               <View style={styles.checksList}>
                 <View style={styles.checkItem}>
                   <Ionicons
+                    name={status?.notificationPermission ? 'checkmark-circle' : 'close-circle'}
+                    size={18}
+                    color={status?.notificationPermission ? Colors.success : '#EF4444'}
+                  />
+                  <Text style={styles.checkItemText}>
+                    Notification Permission:{' '}
+                    {status?.notificationPermission ? 'Allowed' : 'Blocked'}
+                  </Text>
+                </View>
+
+                <View style={styles.checkItem}>
+                  <Ionicons
                     name={
                       status?.isIgnoringBatteryOptimizations ? 'checkmark-circle' : 'close-circle'
                     }
@@ -194,7 +229,7 @@ export default function BatteryOptimizationScreen() {
                     Alarm Precision & Exact Alarms:{' '}
                     {status?.canScheduleExactAlarms
                       ? 'Exact (Precise timing)'
-                      : 'Inexact Fallback (Timing may be delayed)'}
+                      : 'Unavailable (Enable Alarms & Reminders)'}
                   </Text>
                 </View>
               </View>
@@ -262,6 +297,53 @@ export default function BatteryOptimizationScreen() {
                 </View>
               </View>
             </>
+          )}
+        </AppCard>
+
+        {/* Native Recovery Diagnostics */}
+        <AppCard style={styles.recoveryCard}>
+          <View style={styles.recoveryHeaderRow}>
+            <View style={styles.recoveryTitleGroup}>
+              <MaterialCommunityIcons name="backup-restore" size={20} color={Colors.primary} />
+              <Text style={styles.recoveryTitle}>Alarm Recovery Diagnostics</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.recoveryAction}
+              onPress={handleRecoveryCheck}
+              disabled={actionLoading === 'recovery'}
+              accessibilityLabel="Run alarm recovery check"
+            >
+              {actionLoading === 'recovery' ? (
+                <ActivityIndicator size="small" color={Colors.primary} />
+              ) : (
+                <Text style={styles.recoveryActionText}>Run check</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.recoveryDescription}>
+            Re-arms stored native alarms after reboot, app updates, or restored permissions, then
+            reconciles notification schedules.
+          </Text>
+
+          {status?.lastRecoveryReport ? (
+            <View style={styles.recoverySummary}>
+              <Text style={styles.recoverySummaryTitle}>Last recovery result</Text>
+              <Text style={styles.recoverySummaryText}>
+                {status.lastRecoveryReport.recoveredCount} re-armed ·{' '}
+                {status.lastRecoveryReport.expiredCount} expired ·{' '}
+                {status.lastRecoveryReport.failedCount + status.lastRecoveryReport.malformedCount}{' '}
+                needing attention
+              </Text>
+              <Text style={styles.recoveryTimestamp}>
+                {new Date(status.lastRecoveryReport.timestamp).toLocaleString()}
+              </Text>
+            </View>
+          ) : (
+            <Text style={styles.recoveryEmptyText}>
+              No native recovery report is available yet. Run a check after changing system alarm
+              permissions.
+            </Text>
           )}
         </AppCard>
 
@@ -357,6 +439,71 @@ const styles = StyleSheet.create({
   statusCard: {
     marginBottom: 20,
     padding: 16,
+  },
+  recoveryCard: {
+    marginBottom: 20,
+    padding: 16,
+  },
+  recoveryHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
+  },
+  recoveryTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    flex: 1,
+  },
+  recoveryTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  recoveryAction: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.primaryLight,
+  },
+  recoveryActionText: {
+    color: Colors.primary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  recoveryDescription: {
+    marginTop: Spacing.sm,
+    color: '#64748B',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  recoverySummary: {
+    marginTop: Spacing.md,
+    padding: Spacing.sm,
+    borderRadius: Radius.md,
+    backgroundColor: '#F1F5F9',
+  },
+  recoverySummaryTitle: {
+    color: '#0F172A',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  recoverySummaryText: {
+    marginTop: 3,
+    color: '#334155',
+    fontSize: 12,
+  },
+  recoveryTimestamp: {
+    marginTop: 3,
+    color: '#64748B',
+    fontSize: 11,
+  },
+  recoveryEmptyText: {
+    marginTop: Spacing.md,
+    color: '#64748B',
+    fontSize: 12,
+    lineHeight: 17,
   },
   statusHeaderRow: {
     flexDirection: 'row',
