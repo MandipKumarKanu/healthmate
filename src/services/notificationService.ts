@@ -498,8 +498,9 @@ export const notificationService = {
   },
 
   /**
-   * Ask for notification display permission and Android's exact-alarm access.
-   * A notification permission grant alone does not guarantee on-time alarms.
+   * Ask for notification display permission and Android's alarm access.
+   * A notification permission grant alone does not guarantee that an alarm
+   * can open the full-screen alarm UI on Android 14+.
    */
   async requestPermissions(): Promise<boolean> {
     try {
@@ -528,6 +529,13 @@ export const notificationService = {
           exactGranted = await nativeAlarmService.canScheduleExactAlarms();
         }
         if (!exactGranted) return false;
+
+        // Android 14+ can revoke USE_FULL_SCREEN_INTENT independently of
+        // notification permission. Without it, Android intentionally downgrades
+        // the alarm to a heads-up notification, which is the symptom users see
+        // when the alarm screen only appears after tapping the notification.
+        const fullScreenGranted = await nativeAlarmService.canUseFullScreenIntent();
+        if (!fullScreenGranted) return false;
       }
 
       return true;
@@ -546,7 +554,10 @@ export const notificationService = {
 
       // Authoritative check via AlarmManager.canScheduleExactAlarms().
       // Do not assume permission is granted because an Expo API is absent.
-      return await nativeAlarmService.canScheduleExactAlarms();
+      const exactAlarm = await nativeAlarmService.canScheduleExactAlarms();
+      if (!exactAlarm) return false;
+
+      return await nativeAlarmService.canUseFullScreenIntent();
     } catch {
       return false;
     }
@@ -560,19 +571,22 @@ export const notificationService = {
   async diagnoseAlarmAccess(): Promise<{
     notificationPermission: boolean;
     exactAlarm: boolean;
+    fullScreenIntent: boolean;
   }> {
     try {
       const status = await Notifications.getPermissionsAsync();
       const notificationPermission = Boolean(status.granted || status.status === 'granted');
       let exactAlarm = true; // No exact-alarm concept outside Android.
+      let fullScreenIntent = true; // No Android full-screen intent permission on iOS/web.
       if (Platform.OS === 'android') {
         // Authoritative check: AlarmManager.canScheduleExactAlarms()
         // Do not assume permission is granted because an Expo API is absent.
         exactAlarm = await nativeAlarmService.canScheduleExactAlarms();
+        fullScreenIntent = await nativeAlarmService.canUseFullScreenIntent();
       }
-      return { notificationPermission, exactAlarm };
+      return { notificationPermission, exactAlarm, fullScreenIntent };
     } catch {
-      return { notificationPermission: false, exactAlarm: false };
+      return { notificationPermission: false, exactAlarm: false, fullScreenIntent: false };
     }
   },
 

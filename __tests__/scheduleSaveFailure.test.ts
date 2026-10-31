@@ -55,6 +55,7 @@ function mockPermissions(granted: boolean, exactAlarmGranted: boolean = true): v
     status: exactAlarmGranted ? 'granted' : 'denied',
   });
   (NativeModules.AlarmModule.canScheduleExactAlarms as any).mockResolvedValue(exactAlarmGranted);
+  (NativeModules.AlarmModule.canUseFullScreenIntent as any).mockResolvedValue(true);
 }
 
 describe('saveSchedule failure classification', () => {
@@ -91,6 +92,17 @@ describe('saveSchedule failure classification', () => {
 
     expect(result.saved).toBe(true);
     expect(result.alarmFailure).toBe('exact_alarm');
+    expect(await Notifications.getAllScheduledNotificationsAsync()).toHaveLength(0);
+  });
+
+  it('reports full_screen_intent when Android would only show a notification', async () => {
+    mockPermissions(true, true);
+    (NativeModules.AlarmModule.canUseFullScreenIntent as any).mockResolvedValue(false);
+
+    const result = await useReminderStore.getState().saveSchedule(makeSchedule());
+
+    expect(result.saved).toBe(true);
+    expect(result.alarmFailure).toBe('full_screen_intent');
     expect(await Notifications.getAllScheduledNotificationsAsync()).toHaveLength(0);
   });
 

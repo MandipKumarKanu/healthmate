@@ -21,6 +21,7 @@ export interface ReliabilityStatus {
   notificationPermission: boolean;
   isIgnoringBatteryOptimizations: boolean;
   canScheduleExactAlarms: boolean;
+  canUseFullScreenIntent: boolean;
   manufacturer: string;
   detectedOemId: string;
   androidVersion?: number;
@@ -183,6 +184,7 @@ export const batteryOptimizationService = {
         notificationPermission: true,
         isIgnoringBatteryOptimizations: true,
         canScheduleExactAlarms: true,
+        canUseFullScreenIntent: true,
         manufacturer: 'apple_or_web',
         detectedOemId: 'stock',
         isOptimal: true,
@@ -191,19 +193,27 @@ export const batteryOptimizationService = {
     }
 
     try {
-      const [notificationPermission, isIgnoring, canExact, mfr, lastRecoveryReport] =
+      const [
+        notificationPermission,
+        isIgnoring,
+        canExact,
+        canFullScreen,
+        mfr,
+        lastRecoveryReport,
+      ] =
         await Promise.all([
           Notifications.getPermissionsAsync().then(
             (permission) => Boolean(permission.granted || permission.status === 'granted'),
           ),
           nativeAlarmService.isIgnoringBatteryOptimizations(),
           nativeAlarmService.canScheduleExactAlarms(),
+          nativeAlarmService.canUseFullScreenIntent(),
           nativeAlarmService.getDeviceManufacturer(),
           nativeAlarmService.getLastRecoveryReport(),
         ]);
 
       const detectedOemId = mapManufacturerToOemId(mfr);
-      const isOptimal = notificationPermission && isIgnoring && canExact;
+      const isOptimal = notificationPermission && isIgnoring && canExact && canFullScreen;
       const androidVersion =
         typeof Platform.Version === 'number'
           ? Platform.Version
@@ -213,6 +223,7 @@ export const batteryOptimizationService = {
         notificationPermission,
         isIgnoringBatteryOptimizations: isIgnoring,
         canScheduleExactAlarms: canExact,
+        canUseFullScreenIntent: canFullScreen,
         manufacturer: mfr,
         detectedOemId,
         androidVersion,
@@ -225,6 +236,7 @@ export const batteryOptimizationService = {
         notificationPermission: false,
         isIgnoringBatteryOptimizations: false,
         canScheduleExactAlarms: false,
+        canUseFullScreenIntent: false,
         manufacturer: 'unknown',
         detectedOemId: 'stock',
         isOptimal: false,
@@ -251,6 +263,16 @@ export const batteryOptimizationService = {
     if (Platform.OS !== 'android') return true;
     try {
       return await nativeAlarmService.openExactAlarmSettings();
+    } catch {
+      await Linking.openSettings();
+      return false;
+    }
+  },
+
+  async openFullScreenIntentSettings(): Promise<boolean> {
+    if (Platform.OS !== 'android') return true;
+    try {
+      return await nativeAlarmService.openFullScreenIntentSettings();
     } catch {
       await Linking.openSettings();
       return false;

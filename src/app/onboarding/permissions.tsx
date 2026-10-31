@@ -46,6 +46,8 @@ export default function OnboardingPermissionsScreen() {
 
   const [notificationStatus, setNotificationStatus] = useState<PermissionStatus>('not_determined');
   const [exactAlarmStatus, setExactAlarmStatus] = useState<PermissionStatus>('not_determined');
+  const [fullScreenIntentStatus, setFullScreenIntentStatus] =
+    useState<PermissionStatus>('not_determined');
   const [batteryStatus, setBatteryStatus] = useState<PermissionStatus>('not_determined');
   const [cameraStatus, setCameraStatus] = useState<PermissionStatus>('not_determined');
   const [photoStatus, setPhotoStatus] = useState<PermissionStatus>('not_determined');
@@ -81,7 +83,19 @@ export default function OnboardingPermissionsScreen() {
       setExactAlarmStatus('granted'); // Implicitly supported on iOS
     }
 
-    // 3. Alarm reliability / Battery optimization exemption (Android)
+    // 3. Full-screen alarm UI access (Android 14+)
+    if (Platform.OS === 'android') {
+      try {
+        const canUseFullScreenIntent = await nativeAlarmService.canUseFullScreenIntent();
+        setFullScreenIntentStatus(canUseFullScreenIntent ? 'granted' : 'needs_settings');
+      } catch {
+        setFullScreenIntentStatus('needs_settings');
+      }
+    } else {
+      setFullScreenIntentStatus('granted');
+    }
+
+    // 4. Alarm reliability / Battery optimization exemption (Android)
     if (Platform.OS === 'android') {
       try {
         const rel = await batteryOptimizationService.getReliabilityStatus();
@@ -93,7 +107,7 @@ export default function OnboardingPermissionsScreen() {
       setBatteryStatus('granted');
     }
 
-    // 3. Camera access (Optional)
+    // 5. Camera access (Optional)
     try {
       const cam = await Camera.getCameraPermissionsAsync();
       if (cam.granted || cam.status === 'granted') {
@@ -109,7 +123,7 @@ export default function OnboardingPermissionsScreen() {
       setCameraStatus('unavailable');
     }
 
-    // 4. Photos and media (Optional)
+    // 6. Photos and media (Optional)
     try {
       const photos = await ImagePicker.getMediaLibraryPermissionsAsync();
       if (photos.granted || photos.status === 'granted') {
@@ -206,6 +220,34 @@ export default function OnboardingPermissionsScreen() {
     setLoadingKey('exact');
     try {
       await nativeAlarmService.openExactAlarmSettings();
+    } catch {
+      Linking.openSettings();
+    } finally {
+      setLoadingKey(null);
+    }
+  };
+
+  const handleToggleFullScreenIntent = async () => {
+    if (Platform.OS !== 'android') {
+      Alert.alert(
+        'Full-screen alarms',
+        'Full-screen alarm presentation is managed by the operating system on this device.',
+      );
+      return;
+    }
+
+    if (fullScreenIntentStatus === 'granted') {
+      Alert.alert(
+        'Already Allowed',
+        'HealthMate can open the alarm screen when a medicine reminder rings.',
+      );
+      return;
+    }
+
+    setLoadingKey('fullScreen');
+    try {
+      await nativeAlarmService.openFullScreenIntentSettings();
+      setTimeout(checkAllPermissions, 1200);
     } catch {
       Linking.openSettings();
     } finally {
@@ -485,7 +527,63 @@ export default function OnboardingPermissionsScreen() {
             </View>
           </TouchableOpacity>
 
-          {/* 3. Alarm Reliability / Battery Exemption (Recommended) */}
+          {/* 3. Full-screen Alarm UI (Required for direct alarm screen launch) */}
+          <TouchableOpacity
+            style={[styles.card, fullScreenIntentStatus === 'granted' && styles.cardGranted]}
+            onPress={handleToggleFullScreenIntent}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel="Full-screen alarm screen permission, required"
+          >
+            <View
+              style={[
+                styles.iconBox,
+                fullScreenIntentStatus === 'granted'
+                  ? styles.iconBoxGranted
+                  : styles.iconBoxPrimary,
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="fullscreen"
+                size={22}
+                color={fullScreenIntentStatus === 'granted' ? Colors.successDark : Colors.primary}
+              />
+            </View>
+
+            <View style={styles.cardContent}>
+              <View style={styles.cardHeaderLine}>
+                <Text style={styles.cardTitle}>Full-screen alarm screen</Text>
+                <View style={[styles.priorityBadge, styles.priorityRequired]}>
+                  <Text style={[styles.priorityBadgeText, styles.priorityRequiredText]}>
+                    Required
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={styles.cardDescription}>
+                Open the alarm screen automatically when a dose is due instead of only showing a
+                notification.
+              </Text>
+
+              <View style={styles.statusRow}>
+                {loadingKey === 'fullScreen' ? (
+                  <ActivityIndicator size="small" color={Colors.primary} />
+                ) : fullScreenIntentStatus === 'granted' ? (
+                  <View style={styles.statusPillAllowed}>
+                    <Ionicons name="checkmark-circle" size={15} color={Colors.successDark} />
+                    <Text style={styles.statusPillAllowedText}>Allowed</Text>
+                  </View>
+                ) : (
+                  <View style={styles.statusPillSettings}>
+                    <Ionicons name="open-outline" size={13} color={Colors.primary} />
+                    <Text style={styles.statusPillActionText}>Open Settings</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          </TouchableOpacity>
+
+          {/* 4. Alarm Reliability / Battery Exemption (Recommended) */}
           <TouchableOpacity
             style={[styles.card, batteryStatus === 'granted' && styles.cardGranted]}
             onPress={handleToggleBatteryOptimization}

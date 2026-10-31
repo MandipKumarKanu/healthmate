@@ -6,10 +6,10 @@ export const Colors = {
   primary: '#0788F5',
   primaryLight: '#E8F4FF',
   primaryDark: '#056ACC',
-  alarmBackground: '#F3F8FF',
-  alarmSurfaceTint: '#F0F6FF',
-  alarmMutedBlue: '#71809A',
-  alarmBorder: '#E3ECF8',
+  alarmBackground: '#F0F6FE',
+  alarmSurfaceTint: '#F8FAFC',
+  alarmMutedBlue: '#64748B',
+  alarmBorder: '#E2E8F0',
 
   // Text
   textPrimary: '#111116',

@@ -4,6 +4,7 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import org.json.JSONArray
 import org.json.JSONObject
@@ -331,7 +332,33 @@ object AlarmArming {
         val key = alarmKey(scheduleId, time)
         val pendingIntent = pendingIntentFor(context, key, intent)
 
-        val showIntent = Intent(context, com.healthmate.app.MainActivity::class.java)
+        val showIntent = Intent(
+            Intent.ACTION_VIEW,
+            Uri.parse(
+                "healthmate://alarm?scheduleId=" + Uri.encode(scheduleId) +
+                "&medicineName=" + Uri.encode(medicineName) +
+                "&amount=" + Uri.encode(amount) +
+                "&time=" + Uri.encode(time) +
+                "&label=" + Uri.encode(label) +
+                "&instanceId=" + Uri.encode(sourceInstanceId ?: triggerAtMillis.toString()) +
+                "&sourceScheduleId=" + Uri.encode(sourceScheduleId ?: "")
+            ),
+            context,
+            com.healthmate.app.MainActivity::class.java
+        ).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra(AlarmService.EXTRA_SCHEDULE_ID, scheduleId)
+            putExtra(AlarmService.EXTRA_MEDICINE_NAME, medicineName)
+            putExtra(AlarmService.EXTRA_AMOUNT, amount)
+            putExtra(AlarmService.EXTRA_TIME, time)
+            putExtra(AlarmService.EXTRA_LABEL, label)
+            putExtra(AlarmService.EXTRA_TRIGGER_AT_MILLIS, triggerAtMillis)
+            putExtra(AlarmService.EXTRA_SOURCE_SCHEDULE_ID, sourceScheduleId ?: "")
+            putExtra(AlarmService.EXTRA_SOURCE_INSTANCE_ID, sourceInstanceId ?: triggerAtMillis.toString())
+            putExtra("is_alarm_intent", true)
+        }
         val showPendingIntent = PendingIntent.getActivity(
             context,
             key.hashCode(),

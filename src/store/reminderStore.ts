@@ -12,10 +12,15 @@ import { getTodayDateString } from '../database/seed';
  * Named, user-facing reasons a schedule could not arm its alarms.
  * `notification_permission`: OS notification permission is denied.
  * `exact_alarm`: Android exact-alarm ("Alarms & reminders") access is denied.
+ * `full_screen_intent`: Android cannot open the alarm UI automatically.
  * `internal`: permission state looks fine, but scheduling still failed
  *   (runtime, storage or network failure inside the scheduling path).
  */
-export type ScheduleAlarmFailure = 'notification_permission' | 'exact_alarm' | 'internal';
+export type ScheduleAlarmFailure =
+  | 'notification_permission'
+  | 'exact_alarm'
+  | 'full_screen_intent'
+  | 'internal';
 
 export interface ScheduleSaveResult {
   /** The schedule row (and the visible date refresh) persisted successfully. */
@@ -73,7 +78,9 @@ export async function armScheduleAlarms(
       ? 'notification_permission'
       : !diagnosis.exactAlarm
         ? 'exact_alarm'
-        : 'internal';
+        : !diagnosis.fullScreenIntent
+          ? 'full_screen_intent'
+          : 'internal';
     return { armed: false, alarmFailure };
   }
 

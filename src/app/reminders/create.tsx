@@ -387,6 +387,8 @@ export default function SetReminderScreen() {
             'Your schedule is saved, but notification permission is currently denied. Allow HealthMate to send notifications in Android Settings → Apps → HealthMate → Notifications, then edit and re-save this schedule to arm reminders.',
           exact_alarm:
             'Your schedule is saved, but exact alarm access was not granted. HealthMate cannot arm reliable alarm reminders until you allow “Alarms & reminders” in Android Settings → Apps → HealthMate → Alarms & reminders.',
+          full_screen_intent:
+            'Your schedule is saved, but Android is blocking full-screen alarm screens. Allow HealthMate to use full-screen notifications in Android Settings, then edit and re-save this schedule so the alarm screen can open automatically.',
           internal:
             'Your schedule is saved, but at least one alarm could not be scheduled (internal or network error). Try re-saving this schedule; if it keeps failing, check your connection and device storage.',
         };

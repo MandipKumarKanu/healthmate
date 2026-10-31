@@ -78,6 +78,16 @@ export function AlarmReliabilityCard() {
     }
   };
 
+  const handleOpenFullScreenIntent = async () => {
+    setActionLoading('fullScreen');
+    try {
+      await batteryOptimizationService.openFullScreenIntentSettings();
+      setTimeout(checkStatus, 1200);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleOpenOemSettings = async () => {
     setActionLoading('oem');
     try {
@@ -106,7 +116,9 @@ export function AlarmReliabilityCard() {
   const isNotificationOptimal = status?.notificationPermission ?? true;
   const isBatteryOptimal = status?.isIgnoringBatteryOptimizations ?? true;
   const isExactOptimal = status?.canScheduleExactAlarms ?? true;
-  const isOverallOptimal = isNotificationOptimal && isBatteryOptimal && isExactOptimal;
+  const isFullScreenOptimal = status?.canUseFullScreenIntent ?? true;
+  const isOverallOptimal =
+    isNotificationOptimal && isBatteryOptimal && isExactOptimal && isFullScreenOptimal;
 
   return (
     <View style={styles.container}>
@@ -260,6 +272,62 @@ export function AlarmReliabilityCard() {
                   <>
                     <Feather name="zap" size={14} color={Colors.textInverse} />
                     <Text style={styles.actionButtonText}>Disable Battery Restrictions</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.divider} />
+
+          {/* Item 3: Full-screen Alarm UI Permission */}
+          <View style={styles.statusItem}>
+            <View style={styles.itemHeaderRow}>
+              <View style={styles.itemLabelGroup}>
+                <MaterialCommunityIcons
+                  name="fullscreen"
+                  size={18}
+                  color={isFullScreenOptimal ? Colors.success : Colors.warning}
+                />
+                <Text style={styles.itemTitle}>Full-screen Alarm UI</Text>
+              </View>
+              <View
+                style={[
+                  styles.statusPill,
+                  isFullScreenOptimal ? styles.pillOptimal : styles.pillRestricted,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.statusPillText,
+                    isFullScreenOptimal ? styles.pillOptimalText : styles.pillRestrictedText,
+                  ]}
+                >
+                  {isFullScreenOptimal ? 'Allowed' : 'Blocked'}
+                </Text>
+              </View>
+            </View>
+
+            <Text style={styles.itemDescription}>
+              {isFullScreenOptimal
+                ? 'The alarm screen can open automatically when a dose is due.'
+                : 'Android is downgrading alarms to notifications. Allow full-screen alarms so the dose screen opens automatically.'}
+            </Text>
+
+            {!isFullScreenOptimal && isAndroid && (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.actionButtonSecondary]}
+                onPress={handleOpenFullScreenIntent}
+                disabled={actionLoading === 'fullScreen'}
+              >
+                {actionLoading === 'fullScreen' ? (
+                  <ActivityIndicator size="small" color={Colors.primary} />
+                ) : (
+                  <>
+                    <Ionicons name="scan-outline" size={14} color={Colors.primary} />
+                    <Text style={[styles.actionButtonText, styles.actionButtonTextSecondary]}>
+                      Allow Full-screen Alarms
+                    </Text>
                   </>
                 )}
               </TouchableOpacity>

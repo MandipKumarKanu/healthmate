@@ -54,6 +54,7 @@ describe('Authoritative Exact-Alarm Permission & Safe Reconciliation', () => {
     (Notifications as any).__clearScheduledNotifications();
     medicineRepository.create(createTestMedicine());
     (NativeModules.AlarmModule.canScheduleExactAlarms as any).mockResolvedValue(true);
+    (NativeModules.AlarmModule.canUseFullScreenIntent as any).mockResolvedValue(true);
     (Notifications.getPermissionsAsync as any).mockResolvedValue({
       granted: true,
       status: 'granted',
@@ -113,6 +114,18 @@ describe('Authoritative Exact-Alarm Permission & Safe Reconciliation', () => {
       } finally {
         (NativeModules as any).AlarmModule = originalModule;
       }
+    });
+
+    it('requires full-screen intent access for reliable Android alarm presentation', async () => {
+      (NativeModules.AlarmModule.canScheduleExactAlarms as any).mockResolvedValue(true);
+      (NativeModules.AlarmModule.canUseFullScreenIntent as any).mockResolvedValue(false);
+
+      expect(await notificationService.hasReliableAlarmAccess()).toBe(false);
+
+      const diagnosis = await notificationService.diagnoseAlarmAccess();
+      expect(diagnosis.notificationPermission).toBe(true);
+      expect(diagnosis.exactAlarm).toBe(true);
+      expect(diagnosis.fullScreenIntent).toBe(false);
     });
 
     it('represents denied exact-alarm permission distinctly from notification permission', async () => {

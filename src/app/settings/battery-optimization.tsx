@@ -89,6 +89,21 @@ export default function BatteryOptimizationScreen() {
     }
   };
 
+  const handleOpenFullScreenIntent = async () => {
+    setActionLoading('fullScreen');
+    try {
+      await batteryOptimizationService.openFullScreenIntentSettings();
+      setTimeout(checkStatus, 1200);
+    } catch (e) {
+      Alert.alert(
+        'Settings Unavailable',
+        'Could not open full-screen alarm settings directly. Please allow HealthMate to use full-screen notifications in device settings.',
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleOpenOemSettings = async () => {
     setActionLoading('oem');
     try {
@@ -232,6 +247,18 @@ export default function BatteryOptimizationScreen() {
                       : 'Unavailable (Enable Alarms & Reminders)'}
                   </Text>
                 </View>
+
+                <View style={styles.checkItem}>
+                  <Ionicons
+                    name={status?.canUseFullScreenIntent ? 'checkmark-circle' : 'close-circle'}
+                    size={18}
+                    color={status?.canUseFullScreenIntent ? Colors.success : '#EF4444'}
+                  />
+                  <Text style={styles.checkItemText}>
+                    Full-screen Alarm UI:{' '}
+                    {status?.canUseFullScreenIntent ? 'Allowed' : 'Blocked (enable in settings)'}
+                  </Text>
+                </View>
               </View>
 
               {/* Quick Action Deep-Links */}
@@ -269,6 +296,24 @@ export default function BatteryOptimizationScreen() {
                       <>
                         <Ionicons name="alarm-outline" size={16} color={Colors.primary} />
                         <Text style={styles.actionBtnSecondaryText}>Allow Exact Alarms</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
+
+                {!status?.canUseFullScreenIntent && (
+                  <TouchableOpacity
+                    style={styles.actionBtnSecondary}
+                    onPress={handleOpenFullScreenIntent}
+                    disabled={actionLoading === 'fullScreen'}
+                    activeOpacity={0.8}
+                  >
+                    {actionLoading === 'fullScreen' ? (
+                      <ActivityIndicator size="small" color={Colors.primary} />
+                    ) : (
+                      <>
+                        <Ionicons name="scan-outline" size={16} color={Colors.primary} />
+                        <Text style={styles.actionBtnSecondaryText}>Allow Full-screen Alarms</Text>
                       </>
                     )}
                   </TouchableOpacity>
