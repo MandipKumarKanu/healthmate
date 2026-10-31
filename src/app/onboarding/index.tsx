@@ -6,6 +6,8 @@ import { Colors } from '../../theme/colors';
 import { Radius, Spacing } from '../../theme/tokens';
 import { AppScreen } from '../../components/ui/AppScreen';
 import { useAppStore } from '../../store/appStore';
+import SplashIconImage from '../../../assets/images/splash-icon.png';
+import MedicationHeroImage from '../../../assets/images/medication_routine_hero.png';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -30,7 +32,7 @@ export default function OnboardingWelcomeScreen() {
         <View style={styles.topHeader}>
           <View style={styles.appIcon}>
             <Image
-              source={require('../../../assets/images/splash-icon.png')}
+              source={SplashIconImage}
               style={styles.logoImage}
               resizeMode="contain"
               accessibilityLabel="HealthMate Logo"
@@ -42,7 +44,7 @@ export default function OnboardingWelcomeScreen() {
         {/* Central 3D Hero Graphic */}
         <View style={styles.graphicContainer}>
           <Image
-            source={require('../../../assets/images/medication_routine_hero.png')}
+            source={MedicationHeroImage}
             style={styles.heroImage}
             resizeMode="contain"
             accessibilityLabel="Medication routine illustration"

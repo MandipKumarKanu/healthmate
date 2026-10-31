@@ -20,6 +20,7 @@ import { Radius, Spacing } from '../../theme/tokens';
 import { useAppStore } from '../../store/appStore';
 import { GenderOption, UnitSystem } from '../../types';
 import { useKeyboardAwareScroll } from '../../hooks/useKeyboardAwareScroll';
+import ProfileClipboardImage from '../../../assets/images/profile_clipboard.png';
 
 const GENDER_OPTIONS: { label: string; value: GenderOption }[] = [
   { label: 'Male', value: 'Male' },
@@ -253,7 +254,7 @@ export default function OnboardingProfileScreen() {
               </View>
 
               <Image
-                source={require('../../../assets/images/profile_clipboard.png')}
+                source={ProfileClipboardImage}
                 style={styles.clipboardImage}
                 resizeMode="contain"
                 accessibilityLabel="Profile illustration"
