@@ -6,7 +6,6 @@ import {
   Animated,
   Vibration,
   Platform,
-  useColorScheme,
   TouchableOpacity,
   ScrollView,
   BackHandler,
@@ -81,7 +80,7 @@ function resolveDoseItem(
     }
   }
 
-  const id = `${sId || mId || mName}_${dTime || '00:00'}_${instanceId || ''}`;
+  const id = `${sId || mId || mName.toLowerCase().trim()}_${dTime || '00:00'}`;
 
   return {
     id,
@@ -100,8 +99,6 @@ function resolveDoseItem(
 
 export default function FullScreenAlarmScreen() {
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
 
   const params = useLocalSearchParams<{
     scheduleId?: string;
@@ -163,7 +160,7 @@ export default function FullScreenAlarmScreen() {
     };
   }, []);
 
-  // Discover and aggregate simultaneous doses
+  // Discover and aggregate simultaneous doses — strictly deduplicating by schedule and medicine
   useEffect(() => {
     let isMounted = true;
 
@@ -175,8 +172,22 @@ export default function FullScreenAlarmScreen() {
         String(now.getDate()).padStart(2, '0'),
       ].join('-');
 
-      const doseMap = new Map<string, ActiveDoseItem>();
-      doseMap.set(initialDose.id, initialDose);
+      const doseList: ActiveDoseItem[] = [initialDose];
+
+      const isDuplicate = (cand: ActiveDoseItem) => {
+        return doseList.some((d) => {
+          if (cand.scheduleId && d.scheduleId && cand.scheduleId === d.scheduleId) {
+            return true;
+          }
+          if (
+            cand.medicineName.toLowerCase().trim() === d.medicineName.toLowerCase().trim() &&
+            cand.doseTime === d.doseTime
+          ) {
+            return true;
+          }
+          return false;
+        });
+      };
 
       // 1. Fetch from active native alarms (AlarmService ringing alarms)
       try {
@@ -191,8 +202,8 @@ export default function FullScreenAlarmScreen() {
             na.label,
             na.instanceId,
           );
-          if (!doseMap.has(item.id)) {
-            doseMap.set(item.id, item);
+          if (!isDuplicate(item)) {
+            doseList.push(item);
           }
         }
       } catch (_e) {}
@@ -216,8 +227,8 @@ export default function FullScreenAlarmScreen() {
                 undefined,
                 undefined,
               );
-              if (!doseMap.has(item.id)) {
-                doseMap.set(item.id, item);
+              if (!isDuplicate(item)) {
+                doseList.push(item);
               }
             }
           }
@@ -225,7 +236,7 @@ export default function FullScreenAlarmScreen() {
       }
 
       if (isMounted) {
-        setDoses(Array.from(doseMap.values()));
+        setDoses(doseList);
       }
     }
 
@@ -554,27 +565,26 @@ export default function FullScreenAlarmScreen() {
         day: 'numeric',
         year: 'numeric',
       })
-    : 'Apr 22, 2026';
+    : 'Started recently';
 
+  // App Theme: Consistent with HealthMate theme
   const themeColors = {
-    bg: isDark ? '#0B111E' : '#F0F6FE',
-    card: isDark ? '#151E2E' : '#FFFFFF',
-    innerPanel: isDark ? '#1C2638' : '#F8FAFC',
-    divider: isDark ? '#26344A' : '#EDF2F7',
-    tipBg: isDark ? '#13233A' : '#EFF6FF',
-    tipText: isDark ? '#7DD3FC' : '#0369A1',
-    textPrimary: isDark ? '#F8FAFC' : '#0F172A',
-    textSecondary: isDark ? '#94A3B8' : '#64748B',
-    border: isDark ? '#243044' : '#E2E8F0',
-    glowRing: isDark ? 'rgba(7, 136, 245, 0.25)' : '#E0F2FE',
-    skipBg: isDark ? '#2A1720' : '#FFF1F2',
-    skipBorder: isDark ? '#3D202D' : '#FFE4E6',
-    haloColor: isDark ? 'rgba(7, 136, 245, 0.15)' : 'rgba(7, 136, 245, 0.08)',
+    bg: Colors.background, // #F2F1F7
+    card: Colors.cardBackground, // #FFFFFF
+    innerPanel: Colors.cardBackgroundSecondary, // #F8F8FC
+    divider: Colors.divider, // #E4E3E8
+    textPrimary: Colors.textPrimary, // #111116
+    textSecondary: '#64748B',
+    border: Colors.border, // #ECEBF0
+    glowRing: Colors.primaryLight, // #E8F4FF
+    skipBg: Colors.errorLight, // #FEECEE
+    skipBorder: '#FCD7DA',
+    haloColor: 'rgba(7, 136, 245, 0.08)',
   };
 
   return (
     <View style={[styles.container, { backgroundColor: themeColors.bg }]}>
-      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <StatusBar style="dark" />
       <SafeAreaView style={styles.safeArea}>
         <ScrollView
           style={styles.scroll}
@@ -615,7 +625,7 @@ export default function FullScreenAlarmScreen() {
             </Text>
           </View>
 
-          {/* Simultaneous Doses Pill Selector (when multiple alarms fire together) */}
+          {/* Simultaneous Doses Pill Selector (ONLY when multiple unique doses are due) */}
           {doses.length > 1 && (
             <View style={styles.simultaneousSection}>
               <ScrollView
@@ -654,7 +664,7 @@ export default function FullScreenAlarmScreen() {
                                 ? 'close-circle'
                                 : 'medical-outline'
                         }
-                        size={15}
+                        size={14}
                         color={
                           isTaken
                             ? Colors.success
@@ -688,7 +698,7 @@ export default function FullScreenAlarmScreen() {
               <View style={styles.pillIconBox}>
                 <MaterialCommunityIcons
                   name="pill"
-                  size={24}
+                  size={22}
                   color={Colors.primary}
                   style={styles.pillIcon}
                 />
@@ -699,28 +709,28 @@ export default function FullScreenAlarmScreen() {
                   style={[styles.medicineName, { color: themeColors.textPrimary }]}
                   numberOfLines={1}
                 >
-                  {currentDose?.medicineName || 'Metformin'}
+                  {currentDose?.medicineName || 'Medication'}
                 </Text>
                 <Text
                   style={[styles.medicineAmount, { color: themeColors.textSecondary }]}
                   numberOfLines={1}
                 >
-                  {currentDose?.amount || '500 mg · 1 tablet'}
+                  {currentDose?.amount || '1 tablet'}
                 </Text>
               </View>
 
               <View style={styles.doseBadge}>
                 <Text style={styles.doseBadgeText}>
-                  {currentDose?.doseLabel || 'Morning Dose'}
+                  {currentDose?.doseLabel || 'Scheduled'}
                 </Text>
               </View>
             </View>
 
-            {/* Inner Details Container */}
+            {/* Inner Details Container: 2 Clean Rows */}
             <View style={[styles.detailsPanel, { backgroundColor: themeColors.innerPanel }]}>
               {/* Row 1: Recurrence */}
               <View style={styles.detailRow}>
-                <Ionicons name="calendar-outline" size={18} color={themeColors.textSecondary} />
+                <Ionicons name="calendar-outline" size={17} color={themeColors.textSecondary} />
                 <View style={styles.detailCopy}>
                   <Text style={[styles.detailTitle, { color: themeColors.textPrimary }]}>
                     {recurrenceLabel}
@@ -735,7 +745,7 @@ export default function FullScreenAlarmScreen() {
 
               {/* Row 2: Instructions */}
               <View style={styles.detailRow}>
-                <Ionicons name="document-text-outline" size={18} color={themeColors.textSecondary} />
+                <Ionicons name="document-text-outline" size={17} color={themeColors.textSecondary} />
                 <View style={styles.detailCopy}>
                   <Text style={[styles.detailTitle, { color: themeColors.textPrimary }]}>
                     Take {doseInstruction}
@@ -745,41 +755,14 @@ export default function FullScreenAlarmScreen() {
                   </Text>
                 </View>
               </View>
-
-              <View style={[styles.detailDivider, { backgroundColor: themeColors.divider }]} />
-
-              {/* Row 3: Schedule notice */}
-              <View style={styles.detailRow}>
-                <Ionicons
-                  name="information-circle-outline"
-                  size={19}
-                  color={themeColors.textSecondary}
-                />
-                <View style={styles.detailCopy}>
-                  <Text style={[styles.detailTitle, { color: themeColors.textPrimary }]}>
-                    From your saved schedule
-                  </Text>
-                  <Text style={[styles.detailSubtitle, { color: themeColors.textSecondary }]}>
-                    Follow your doctor’s instructions
-                  </Text>
-                </View>
-              </View>
             </View>
-          </View>
-
-          {/* Routine Consistency Tip Banner */}
-          <View style={[styles.tipBanner, { backgroundColor: themeColors.tipBg }]}>
-            <Ionicons name="sparkles" size={17} color={Colors.primary} />
-            <Text style={[styles.tipBannerText, { color: themeColors.tipText }]}>
-              Keeping your routine consistent helps you stay on track.
-            </Text>
           </View>
 
           {/* Feedback & Error Alerts */}
           {toastMessage && (
-            <View style={[styles.feedbackBanner, { backgroundColor: themeColors.tipBg }]}>
+            <View style={[styles.feedbackBanner, { backgroundColor: Colors.primaryLight }]}>
               <Ionicons name="information-circle-outline" size={18} color={Colors.primary} />
-              <Text style={[styles.feedbackText, { color: themeColors.tipText }]}>
+              <Text style={[styles.feedbackText, { color: Colors.primaryDark }]}>
                 {toastMessage}
               </Text>
             </View>
@@ -830,7 +813,7 @@ export default function FullScreenAlarmScreen() {
               <View
                 style={[
                   styles.sideActionCircle,
-                  { backgroundColor: themeColors.card, borderColor: themeColors.divider },
+                  { backgroundColor: themeColors.card, borderColor: themeColors.border },
                 ]}
               >
                 <MaterialCommunityIcons
@@ -862,7 +845,7 @@ export default function FullScreenAlarmScreen() {
                     { transform: [{ scale: chimeScale }] },
                   ]}
                 >
-                  <Ionicons name="checkmark" size={36} color="#FFFFFF" />
+                  <Ionicons name="checkmark" size={34} color="#FFFFFF" />
                 </Animated.View>
               </View>
               <Text style={[styles.primaryActionTitle, { color: themeColors.textPrimary }]}>
@@ -898,7 +881,7 @@ export default function FullScreenAlarmScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Take All Button (Only when multiple simultaneous doses are active) */}
+          {/* Take All Button (Only when multiple unique simultaneous doses are active) */}
           {pendingDoses.length > 1 && (
             <TouchableOpacity
               testID="take-all-button"
@@ -910,23 +893,23 @@ export default function FullScreenAlarmScreen() {
               accessibilityState={{ disabled: isProcessing }}
               activeOpacity={0.8}
             >
-              <Ionicons name="checkmark-done" size={18} color={Colors.primary} />
+              <Ionicons name="checkmark-done" size={17} color={Colors.primary} />
               <Text style={styles.takeAllButtonText}>
                 Mark all {pendingDoses.length} doses as taken
               </Text>
             </TouchableOpacity>
           )}
 
-          {/* Next Medicine Preview Bar */}
+          {/* Next Medicine Preview Bar (Fits neatly within screen height) */}
           {nextDose && (
             <View
               style={[
                 styles.nextCard,
-                { backgroundColor: themeColors.card, borderColor: themeColors.divider },
+                { backgroundColor: themeColors.card, borderColor: themeColors.border },
               ]}
             >
               <View style={styles.nextIconBox}>
-                <Ionicons name="document-text-outline" size={18} color={Colors.primary} />
+                <Ionicons name="document-text-outline" size={16} color={Colors.primary} />
               </View>
               <View style={styles.nextCopy}>
                 <Text style={[styles.nextTitle, { color: themeColors.textPrimary }]}>
@@ -936,7 +919,7 @@ export default function FullScreenAlarmScreen() {
                   {nextDose.doseTime || '08:00'} · {nextDose.amount || '1 dose'}
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color={themeColors.textSecondary} />
+              <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
             </View>
           )}
         </ScrollView>
@@ -958,8 +941,8 @@ const styles = StyleSheet.create({
   content: {
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 28,
+    paddingTop: 8,
+    paddingBottom: 20,
   },
 
   // ---------------------------------------------------------------------------
@@ -969,32 +952,32 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 8,
-    paddingBottom: 12,
+    paddingTop: 4,
+    paddingBottom: 8,
     position: 'relative',
     overflow: 'hidden',
   },
   timeHaloLarge: {
     position: 'absolute',
-    width: 320,
-    height: 320,
-    borderRadius: 160,
+    width: 280,
+    height: 280,
+    borderRadius: 140,
     borderWidth: 1,
-    top: -30,
+    top: -24,
   },
   timeHaloSmall: {
     position: 'absolute',
-    width: 230,
-    height: 230,
-    borderRadius: 115,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
     borderWidth: 1,
-    top: 15,
+    top: 16,
   },
   screenTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '500',
     letterSpacing: 0.2,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   scheduledTimeRow: {
     flexDirection: 'row',
@@ -1002,50 +985,50 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   scheduledTime: {
-    fontSize: 58,
+    fontSize: 54,
     fontWeight: '800',
     letterSpacing: -1.5,
     fontVariant: ['tabular-nums'],
-    lineHeight: 68,
+    lineHeight: 62,
   },
   timeRaysLeft: {
     justifyContent: 'space-between',
-    height: 36,
+    height: 34,
     alignItems: 'flex-end',
-    width: 20,
-    marginRight: 12,
+    width: 18,
+    marginRight: 10,
   },
   timeRaysRight: {
     justifyContent: 'space-between',
-    height: 36,
+    height: 34,
     alignItems: 'flex-start',
-    width: 20,
-    marginLeft: 12,
+    width: 18,
+    marginLeft: 10,
   },
   timeRay: {
     height: 3,
     backgroundColor: '#0788F5',
     borderRadius: 2,
   },
-  timeRayTopLeft: { width: 13, transform: [{ rotate: '-35deg' }] },
-  timeRayMidLeft: { width: 16, transform: [{ rotate: '0deg' }] },
-  timeRayBotLeft: { width: 13, transform: [{ rotate: '35deg' }] },
-  timeRayTopRight: { width: 13, transform: [{ rotate: '35deg' }] },
-  timeRayMidRight: { width: 16, transform: [{ rotate: '0deg' }] },
-  timeRayBotRight: { width: 13, transform: [{ rotate: '-35deg' }] },
+  timeRayTopLeft: { width: 12, transform: [{ rotate: '-35deg' }] },
+  timeRayMidLeft: { width: 15, transform: [{ rotate: '0deg' }] },
+  timeRayBotLeft: { width: 12, transform: [{ rotate: '35deg' }] },
+  timeRayTopRight: { width: 12, transform: [{ rotate: '35deg' }] },
+  timeRayMidRight: { width: 15, transform: [{ rotate: '0deg' }] },
+  timeRayBotRight: { width: 12, transform: [{ rotate: '-35deg' }] },
   timeSubtitle: {
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '400',
-    marginTop: 4,
+    marginTop: 3,
   },
 
   // ---------------------------------------------------------------------------
-  // Simultaneous Doses
+  // Simultaneous Doses (Only when multiple unique doses exist)
   // ---------------------------------------------------------------------------
   simultaneousSection: {
     width: '100%',
-    marginBottom: 10,
-    marginTop: 4,
+    marginBottom: 8,
+    marginTop: 2,
     alignItems: 'center',
   },
   dosePillRow: {
@@ -1054,7 +1037,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   dosePill: {
-    minHeight: 36,
+    minHeight: 34,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -1063,19 +1046,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   dosePillText: {
-    fontSize: 12.5,
+    fontSize: 12,
     fontWeight: '600',
-    maxWidth: 140,
+    maxWidth: 130,
   },
 
   // ---------------------------------------------------------------------------
-  // Main Medicine Card
+  // Main Medicine Card (Compact)
   // ---------------------------------------------------------------------------
   medicineCard: {
     width: '100%',
-    borderRadius: 24,
-    padding: 18,
-    marginTop: 6,
+    borderRadius: 20,
+    padding: 16,
+    marginTop: 4,
     ...Shadows.card,
   },
   cardHeader: {
@@ -1083,10 +1066,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   pillIconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: '#EFF6FF',
+    width: 44,
+    height: 44,
+    borderRadius: 13,
+    backgroundColor: Colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1095,112 +1078,92 @@ const styles = StyleSheet.create({
   },
   cardHeading: {
     flex: 1,
-    marginLeft: 14,
-    paddingRight: 8,
+    marginLeft: 12,
+    paddingRight: 6,
   },
   medicineName: {
-    fontSize: 19,
+    fontSize: 18,
     fontWeight: '700',
     letterSpacing: -0.2,
   },
   medicineAmount: {
-    fontSize: 13.5,
+    fontSize: 13,
     fontWeight: '400',
-    marginTop: 2,
+    marginTop: 1,
   },
   doseBadge: {
-    backgroundColor: '#EFF6FF',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    backgroundColor: Colors.primaryLight,
+    borderRadius: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
   },
   doseBadgeText: {
-    color: '#0284C7',
+    color: Colors.primary,
     fontSize: 11.5,
     fontWeight: '600',
   },
 
   // ---------------------------------------------------------------------------
-  // Inner Details Panel
+  // Inner Details Panel (2 Rows)
   // ---------------------------------------------------------------------------
   detailsPanel: {
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    marginTop: 14,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    marginTop: 10,
   },
   detailRow: {
-    minHeight: 48,
+    minHeight: 42,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingVertical: 4,
   },
   detailCopy: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: 10,
   },
   detailTitle: {
-    fontSize: 13.5,
+    fontSize: 13,
     fontWeight: '600',
   },
   detailSubtitle: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '400',
     marginTop: 1,
   },
   detailDivider: {
     height: 1,
-    marginLeft: 30,
+    marginLeft: 27,
   },
 
   // ---------------------------------------------------------------------------
-  // Tip Banner
-  // ---------------------------------------------------------------------------
-  tipBanner: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginTop: 12,
-  },
-  tipBannerText: {
-    flex: 1,
-    fontSize: 12.5,
-    lineHeight: 18,
-    fontWeight: '500',
-  },
-
-  // ---------------------------------------------------------------------------
-  // Action Buttons
+  // Action Buttons (Compact Sizing)
   // ---------------------------------------------------------------------------
   actionsRow: {
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    marginTop: 22,
-    paddingHorizontal: 8,
+    marginTop: 16,
+    paddingHorizontal: 6,
   },
   sideAction: {
     alignItems: 'center',
-    width: 80,
+    width: 76,
   },
   sideActionCircle: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     ...Shadows.subtle,
   },
   actionTitle: {
-    fontSize: 13.5,
+    fontSize: 13,
     fontWeight: '700',
-    marginTop: 8,
+    marginTop: 6,
   },
   actionSubtitle: {
     fontSize: 11,
@@ -1208,87 +1171,87 @@ const styles = StyleSheet.create({
   },
   primaryAction: {
     alignItems: 'center',
-    width: 116,
+    width: 108,
   },
   primaryActionRing: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
+    width: 82,
+    height: 82,
+    borderRadius: 41,
     alignItems: 'center',
     justifyContent: 'center',
   },
   primaryActionCircle: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+    width: 62,
+    height: 62,
+    borderRadius: 31,
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     ...Shadows.floating,
-    elevation: 6,
+    elevation: 5,
   },
   primaryActionTitle: {
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '700',
-    marginTop: 8,
+    marginTop: 6,
     textAlign: 'center',
   },
 
   // ---------------------------------------------------------------------------
-  // Take All (Multiple Doses)
+  // Take All (Multiple Unique Doses Only)
   // ---------------------------------------------------------------------------
   takeAllButton: {
     width: '100%',
-    minHeight: 44,
+    minHeight: 40,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
     borderRadius: Radius.pill,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: Colors.primaryLight,
     borderWidth: 1,
     borderColor: '#BAE6FD',
-    marginTop: 14,
+    marginTop: 12,
   },
   takeAllButtonText: {
-    color: '#0284C7',
-    fontSize: 13,
+    color: Colors.primaryDark,
+    fontSize: 12.5,
     fontWeight: '700',
   },
 
   // ---------------------------------------------------------------------------
-  // Next Medicine Preview Card
+  // Next Medicine Preview Card (Compact)
   // ---------------------------------------------------------------------------
   nextCard: {
     width: '100%',
-    minHeight: 64,
+    minHeight: 56,
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginTop: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 14,
     ...Shadows.subtle,
   },
   nextIconBox: {
-    width: 32,
-    height: 32,
+    width: 30,
+    height: 30,
     borderRadius: 8,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: Colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
   nextCopy: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: 10,
   },
   nextTitle: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '600',
   },
   nextSubtitle: {
-    fontSize: 11.5,
+    fontSize: 11,
     marginTop: 1,
   },
 
@@ -1300,15 +1263,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginTop: 10,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 8,
   },
   feedbackText: {
     flex: 1,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 12.5,
+    lineHeight: 17,
     fontWeight: '500',
   },
   completedBanner: {
@@ -1317,8 +1280,8 @@ const styles = StyleSheet.create({
   completedText: {
     flex: 1,
     color: Colors.successDark,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 12.5,
+    lineHeight: 17,
     fontWeight: '700',
   },
   errorBanner: {
@@ -1327,16 +1290,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     backgroundColor: Colors.errorLight,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginTop: 10,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 8,
   },
   errorText: {
     flex: 1,
     color: Colors.errorDark,
-    fontSize: 12.5,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 16,
     fontWeight: '600',
   },
 });
