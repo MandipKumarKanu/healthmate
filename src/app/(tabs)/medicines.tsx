@@ -59,7 +59,7 @@ export default function MedicinesScreen() {
           <TextInput
             style={styles.searchInput}
             placeholder="Name or ingredient"
-            placeholderTextColor={Colors.textTertiary}
+            placeholderTextColor="#64748B"
             value={searchQuery}
             onChangeText={setSearchQuery}
             clearButtonMode="while-editing"

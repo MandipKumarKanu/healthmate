@@ -31,7 +31,7 @@ export function AppInput({
         {leftIcon ? <View style={styles.leftIcon}>{leftIcon}</View> : null}
         <TextInput
           style={[styles.input, style]}
-          placeholderTextColor={Colors.textTertiary}
+          placeholderTextColor={props.placeholderTextColor ?? '#64748B'}
           value={value}
           {...props}
         />

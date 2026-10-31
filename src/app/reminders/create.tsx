@@ -520,7 +520,7 @@ export default function SetReminderScreen() {
                       )
                     }
                     placeholder="Dose name (e.g. Morning)"
-                    placeholderTextColor={Colors.textTertiary}
+                    placeholderTextColor="#64748B"
                     accessibilityLabel={`Dose name for ${t.time}`}
                   />
                 ) : (
@@ -535,7 +535,7 @@ export default function SetReminderScreen() {
                       value={t.amount}
                       onChangeText={(val) => handleDoseAmountChange(t.id, val)}
                       placeholder="e.g. 1 tablet"
-                      placeholderTextColor={Colors.textTertiary}
+                      placeholderTextColor="#64748B"
                       accessibilityLabel={`Dose amount for ${t.label || t.time}`}
                     />
                   </View>
@@ -624,7 +624,7 @@ export default function SetReminderScreen() {
             value={amount}
             onChangeText={handleGlobalAmountChange}
             placeholder="e.g. 1 tablet, 2 drops, 5 ml"
-            placeholderTextColor={Colors.textTertiary}
+            placeholderTextColor="#64748B"
             accessibilityLabel="Default dose amount"
           />
           {amountError ? (
@@ -868,7 +868,7 @@ export default function SetReminderScreen() {
       >
         <View style={styles.medModalOverlay}>
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             style={styles.medModalKeyboardContainer}
           >
             <View style={styles.medModalContainer}>

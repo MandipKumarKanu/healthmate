@@ -342,7 +342,7 @@ export default function AIAssistantScreen() {
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 60 : 36}
         style={styles.keyboardContainer}
       >
         <ScrollView
@@ -416,13 +416,13 @@ export default function AIAssistantScreen() {
         <View
           style={[
             styles.inputBar,
-            { paddingBottom: isKeyboardVisible ? 10 : Math.max(10, insets.bottom) },
+            { paddingBottom: isKeyboardVisible ? 14 : Math.max(12, insets.bottom) },
           ]}
         >
           <TextInput
             style={styles.chatInput}
             placeholder="Ask about a medication label..."
-            placeholderTextColor={Colors.textTertiary}
+            placeholderTextColor="#64748B"
             value={inputText}
             onChangeText={setInputText}
             returnKeyType="send"

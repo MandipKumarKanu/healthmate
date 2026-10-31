@@ -22,6 +22,7 @@ import { AppScreen } from '../../components/ui/AppScreen';
 import { Colors } from '../../theme/colors';
 import { Radius, Spacing } from '../../theme/tokens';
 import { nativeAlarmService } from '../../services/nativeAlarmService';
+import { batteryOptimizationService } from '../../services/batteryOptimizationService';
 
 type PermissionStatus = 'granted' | 'denied' | 'needs_settings' | 'not_determined' | 'unavailable';
 
@@ -45,6 +46,7 @@ export default function OnboardingPermissionsScreen() {
 
   const [notificationStatus, setNotificationStatus] = useState<PermissionStatus>('not_determined');
   const [exactAlarmStatus, setExactAlarmStatus] = useState<PermissionStatus>('not_determined');
+  const [batteryStatus, setBatteryStatus] = useState<PermissionStatus>('not_determined');
   const [cameraStatus, setCameraStatus] = useState<PermissionStatus>('not_determined');
   const [photoStatus, setPhotoStatus] = useState<PermissionStatus>('not_determined');
 
@@ -77,6 +79,18 @@ export default function OnboardingPermissionsScreen() {
       }
     } else {
       setExactAlarmStatus('granted'); // Implicitly supported on iOS
+    }
+
+    // 3. Alarm reliability / Battery optimization exemption (Android)
+    if (Platform.OS === 'android') {
+      try {
+        const rel = await batteryOptimizationService.getReliabilityStatus();
+        setBatteryStatus(rel.isIgnoringBatteryOptimizations ? 'granted' : 'not_determined');
+      } catch {
+        setBatteryStatus('not_determined');
+      }
+    } else {
+      setBatteryStatus('granted');
     }
 
     // 3. Camera access (Optional)
@@ -194,6 +208,42 @@ export default function OnboardingPermissionsScreen() {
       await nativeAlarmService.openExactAlarmSettings();
     } catch {
       Linking.openSettings();
+    } finally {
+      setLoadingKey(null);
+    }
+  };
+
+  const handleToggleBatteryOptimization = async () => {
+    if (Platform.OS !== 'android') {
+      Alert.alert(
+        'Alarm Reliability',
+        'iOS manages background dose alarms natively without battery kill restrictions.',
+      );
+      return;
+    }
+
+    if (batteryStatus === 'granted') {
+      Alert.alert(
+        'Already Optimized',
+        'HealthMate is exempt from battery saver restrictions, ensuring high-reliability alarms.',
+        [
+          {
+            text: 'OEM Guide',
+            onPress: () => router.push('/settings/battery-optimization' as any),
+          },
+          { text: 'OK', style: 'default' },
+        ],
+      );
+      return;
+    }
+
+    setLoadingKey('battery');
+    try {
+      await batteryOptimizationService.requestIgnoreBatteryOptimizations();
+      setTimeout(checkAllPermissions, 1500);
+    } catch (error) {
+      console.warn('Battery exemption request error:', error);
+      router.push('/settings/battery-optimization' as any);
     } finally {
       setLoadingKey(null);
     }
@@ -435,17 +485,57 @@ export default function OnboardingPermissionsScreen() {
             </View>
           </TouchableOpacity>
 
-          {/* Battery Optimization Guide Link */}
+          {/* 3. Alarm Reliability / Battery Exemption (Recommended) */}
           <TouchableOpacity
-            style={styles.batteryGuideRow}
-            onPress={() => router.push('/settings/battery-optimization' as any)}
-            activeOpacity={0.7}
+            style={[styles.card, batteryStatus === 'granted' && styles.cardGranted]}
+            onPress={handleToggleBatteryOptimization}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel="Alarm reliability and battery optimization, recommended"
           >
-            <MaterialCommunityIcons name="battery-heart-variant" size={18} color={Colors.primary} />
-            <Text style={styles.batteryGuideText}>
-              Optimize Alarm Reliability (OEM Battery Guide)
-            </Text>
-            <Ionicons name="chevron-forward" size={15} color="#94A3B8" />
+            <View
+              style={[
+                styles.iconBox,
+                batteryStatus === 'granted' ? styles.iconBoxGranted : styles.iconBoxPrimary,
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="battery-heart-variant"
+                size={22}
+                color={batteryStatus === 'granted' ? Colors.successDark : Colors.primary}
+              />
+            </View>
+
+            <View style={styles.cardContent}>
+              <View style={styles.cardHeaderLine}>
+                <Text style={styles.cardTitle}>Alarm reliability</Text>
+                <View style={[styles.priorityBadge, styles.priorityRecommended]}>
+                  <Text style={[styles.priorityBadgeText, styles.priorityRecommendedText]}>
+                    Recommended
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={styles.cardDescription}>
+                Exempt HealthMate from battery restrictions so background alarms fire without OS delays.
+              </Text>
+
+              <View style={styles.statusRow}>
+                {loadingKey === 'battery' ? (
+                  <ActivityIndicator size="small" color={Colors.primary} />
+                ) : batteryStatus === 'granted' ? (
+                  <View style={styles.statusPillAllowed}>
+                    <Ionicons name="checkmark-circle" size={15} color={Colors.successDark} />
+                    <Text style={styles.statusPillAllowedText}>Allowed</Text>
+                  </View>
+                ) : (
+                  <View style={styles.statusPillSettings}>
+                    <Ionicons name="shield-checkmark-outline" size={13} color={Colors.primary} />
+                    <Text style={styles.statusPillActionText}>Optimize Reliability</Text>
+                  </View>
+                )}
+              </View>
+            </View>
           </TouchableOpacity>
 
           {/* 3. Camera Access (Optional) */}

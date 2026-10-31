@@ -324,6 +324,7 @@ export function InteractiveCropView({
                 style={styles.gridContainer}
                 onStartShouldSetResponder={() => true}
                 onMoveShouldSetResponder={() => true}
+                onResponderTerminationRequest={() => false}
                 onResponderGrant={handleGrant}
                 onResponderMove={(e) => handleMove('body', e)}
               >
@@ -347,6 +348,7 @@ export function InteractiveCropView({
                 ]}
                 onStartShouldSetResponder={() => true}
                 onMoveShouldSetResponder={() => true}
+                onResponderTerminationRequest={() => false}
                 onResponderGrant={handleGrant}
                 onResponderMove={(e) => handleMove('tl', e)}
               >
@@ -359,6 +361,7 @@ export function InteractiveCropView({
                 ]}
                 onStartShouldSetResponder={() => true}
                 onMoveShouldSetResponder={() => true}
+                onResponderTerminationRequest={() => false}
                 onResponderGrant={handleGrant}
                 onResponderMove={(e) => handleMove('tr', e)}
               >
@@ -371,6 +374,7 @@ export function InteractiveCropView({
                 ]}
                 onStartShouldSetResponder={() => true}
                 onMoveShouldSetResponder={() => true}
+                onResponderTerminationRequest={() => false}
                 onResponderGrant={handleGrant}
                 onResponderMove={(e) => handleMove('bl', e)}
               >
@@ -383,6 +387,7 @@ export function InteractiveCropView({
                 ]}
                 onStartShouldSetResponder={() => true}
                 onMoveShouldSetResponder={() => true}
+                onResponderTerminationRequest={() => false}
                 onResponderGrant={handleGrant}
                 onResponderMove={(e) => handleMove('br', e)}
               >
@@ -390,6 +395,14 @@ export function InteractiveCropView({
               </View>
             </View>
           </>
+        )}
+
+        {/* Enhance Mode Active Badge */}
+        {enhance && (
+          <View style={styles.enhanceActiveBadge} pointerEvents="none">
+            <MaterialCommunityIcons name="auto-fix" size={13} color="#FFFFFF" />
+            <Text style={styles.enhanceActiveBadgeText}>Contrast & Low-light Boost Active</Text>
+          </View>
         )}
       </View>
 
@@ -627,5 +640,27 @@ const styles = StyleSheet.create({
   },
   doneButtonWrapper: {
     flex: 1,
+  },
+  enhanceActiveBadge: {
+    position: 'absolute',
+    top: 12,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(7, 136, 245, 0.90)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: Radius.pill,
+    gap: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  enhanceActiveBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

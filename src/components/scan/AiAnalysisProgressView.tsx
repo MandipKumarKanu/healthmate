@@ -3,12 +3,14 @@ import {
   StyleSheet,
   View,
   Text,
+  Image,
   Animated,
   ActivityIndicator,
   TouchableOpacity,
   Easing,
 } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
+import AndroidIconMonochrome from '../../../assets/images/android-icon-monochrome.png';
 import { Colors } from '../../theme/colors';
 import { Radius, Spacing, Typography } from '../../theme/tokens';
 import { ScanStage } from '../../services/ocrRecognition';
@@ -37,23 +39,29 @@ export function AiAnalysisProgressView({
   onRetry,
   onManualEntry,
 }: AiAnalysisProgressViewProps) {
-  // Pulse animation for AI glowing orb
+  // Pulse animation for central core aura
   const [pulseAnim] = useState(() => new Animated.Value(1));
-  const [glowAnim] = useState(() => new Animated.Value(0.4));
+  const [glowAnim] = useState(() => new Animated.Value(0.45));
+
+  // 3D Orbital Revolving Animations
+  const [orbitAnim1] = useState(() => new Animated.Value(0));
+  const [orbitAnim2] = useState(() => new Animated.Value(0));
+  const [orbitAnim3] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
+    // Breathing aura
     const pulseLoop = Animated.loop(
       Animated.sequence([
         Animated.parallel([
           Animated.timing(pulseAnim, {
-            toValue: 1.12,
-            duration: 1200,
+            toValue: 1.08,
+            duration: 1400,
             easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
           Animated.timing(glowAnim, {
-            toValue: 0.85,
-            duration: 1200,
+            toValue: 0.9,
+            duration: 1400,
             easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
@@ -61,13 +69,13 @@ export function AiAnalysisProgressView({
         Animated.parallel([
           Animated.timing(pulseAnim, {
             toValue: 1,
-            duration: 1200,
+            duration: 1400,
             easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
           Animated.timing(glowAnim, {
-            toValue: 0.4,
-            duration: 1200,
+            toValue: 0.45,
+            duration: 1400,
             easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
@@ -75,9 +83,64 @@ export function AiAnalysisProgressView({
       ]),
     );
 
+    // Orbit 1: Primary blob (fast forward)
+    const orbitLoop1 = Animated.loop(
+      Animated.timing(orbitAnim1, {
+        toValue: 1,
+        duration: 3200,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+
+    // Orbit 2: Green/emerald blob (counter-clockwise)
+    const orbitLoop2 = Animated.loop(
+      Animated.timing(orbitAnim2, {
+        toValue: 1,
+        duration: 4400,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+
+    // Orbit 3: Amber/cyan particle (inclined)
+    const orbitLoop3 = Animated.loop(
+      Animated.timing(orbitAnim3, {
+        toValue: 1,
+        duration: 5600,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+
     pulseLoop.start();
-    return () => pulseLoop.stop();
-  }, [pulseAnim, glowAnim]);
+    orbitLoop1.start();
+    orbitLoop2.start();
+    orbitLoop3.start();
+
+    return () => {
+      pulseLoop.stop();
+      orbitLoop1.stop();
+      orbitLoop2.stop();
+      orbitLoop3.stop();
+    };
+  }, [pulseAnim, glowAnim, orbitAnim1, orbitAnim2, orbitAnim3]);
+
+  // Rotations for 3D orbital blobs
+  const spin1 = orbitAnim1.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  const spin2 = orbitAnim2.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['360deg', '0deg'],
+  });
+
+  const spin3 = orbitAnim3.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
 
   // Define steps
   const steps: StageStep[] = [
@@ -145,8 +208,9 @@ export function AiAnalysisProgressView({
 
   return (
     <View style={styles.container}>
-      {/* Centered Glowing AI Orb */}
-      <View style={styles.orbContainer}>
+      {/* 3D Revolving Orbital System */}
+      <View style={styles.orbitStage}>
+        {/* Ambient Pulsing Backlight */}
         <Animated.View
           style={[
             styles.glowOuter,
@@ -156,9 +220,49 @@ export function AiAnalysisProgressView({
             },
           ]}
         />
-        <View style={styles.orbInner}>
-          <Ionicons name="sparkles" size={38} color="#FFFFFF" />
+
+        {/* Orbit Track 1: Tilted Ellipse (-28deg) with primary blob */}
+        <View style={[styles.orbitTrack, styles.orbitTrack1]} pointerEvents="none">
+          <View style={styles.orbitRing1} />
+          <Animated.View style={[styles.orbitArm, { transform: [{ rotate: spin1 }] }]}>
+            <View style={styles.blob1} />
+          </Animated.View>
         </View>
+
+        {/* Orbit Track 2: Counter-tilted Ellipse (+34deg) with emerald blob */}
+        <View style={[styles.orbitTrack, styles.orbitTrack2]} pointerEvents="none">
+          <View style={styles.orbitRing2} />
+          <Animated.View style={[styles.orbitArm, { transform: [{ rotate: spin2 }] }]}>
+            <View style={styles.blob2} />
+          </Animated.View>
+        </View>
+
+        {/* Orbit Track 3: Steeper Ellipse (+76deg) with cyan micro-blob */}
+        <View style={[styles.orbitTrack, styles.orbitTrack3]} pointerEvents="none">
+          <View style={styles.orbitRing3} />
+          <Animated.View style={[styles.orbitArm, { transform: [{ rotate: spin3 }] }]}>
+            <View style={styles.blob3} />
+          </Animated.View>
+        </View>
+
+        {/* Central Core: Dark Capsule with Monochrome App Icon */}
+        <Animated.View
+          style={[
+            styles.coreContainer,
+            {
+              transform: [{ scale: pulseAnim }],
+            },
+          ]}
+        >
+          <View style={styles.coreInner}>
+            <Image
+              source={AndroidIconMonochrome}
+              style={styles.monochromeIcon}
+              resizeMode="contain"
+              accessibilityLabel="HealthMate AI"
+            />
+          </View>
+        </Animated.View>
       </View>
 
       <Text style={styles.title}>Analysing with HealthMate AI</Text>
@@ -258,32 +362,130 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: Spacing.md,
   },
-  orbContainer: {
-    width: 100,
-    height: 100,
+  orbitStage: {
+    width: 190,
+    height: 190,
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: Spacing.lg,
+    marginVertical: Spacing.md,
   },
   glowOuter: {
     position: 'absolute',
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
     backgroundColor: Colors.primaryLight,
   },
-  orbInner: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: Colors.primary,
+  orbitTrack: {
+    position: 'absolute',
+    width: 170,
+    height: 170,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
+  },
+  orbitTrack1: {
+    transform: [{ rotate: '-28deg' }, { scaleY: 0.44 }],
+  },
+  orbitTrack2: {
+    transform: [{ rotate: '34deg' }, { scaleY: 0.44 }],
+  },
+  orbitTrack3: {
+    transform: [{ rotate: '78deg' }, { scaleY: 0.38 }],
+  },
+  orbitRing1: {
+    position: 'absolute',
+    width: 156,
+    height: 156,
+    borderRadius: 78,
+    borderWidth: 1.5,
+    borderColor: 'rgba(7, 136, 245, 0.28)',
+    borderStyle: 'dashed',
+  },
+  orbitRing2: {
+    position: 'absolute',
+    width: 164,
+    height: 164,
+    borderRadius: 82,
+    borderWidth: 1.5,
+    borderColor: 'rgba(50, 195, 106, 0.28)',
+  },
+  orbitRing3: {
+    position: 'absolute',
+    width: 172,
+    height: 172,
+    borderRadius: 86,
+    borderWidth: 1.2,
+    borderColor: 'rgba(56, 189, 248, 0.22)',
+  },
+  orbitArm: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
+  blob1: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#0788F5',
+    shadowColor: '#0788F5',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
     shadowRadius: 10,
+    elevation: 8,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  blob2: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#32C36A',
+    shadowColor: '#32C36A',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 8,
+    elevation: 7,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  blob3: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#38BDF8',
+    shadowColor: '#38BDF8',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
     elevation: 6,
+  },
+  coreContainer: {
+    width: 82,
+    height: 82,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  coreInner: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: '#0F172A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2.5,
+    borderColor: Colors.primary,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 10,
+  },
+  monochromeIcon: {
+    width: 46,
+    height: 46,
+    tintColor: '#FFFFFF',
   },
   title: {
     ...Typography.heading2,

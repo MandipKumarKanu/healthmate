@@ -46,6 +46,7 @@ export default function ProfileScreen() {
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [nameInput, setNameInput] = useState(profile?.name || 'Alex');
+  const [emailInput, setEmailInput] = useState(profile?.email || '');
   const [ageInput, setAgeInput] = useState(profile?.age ? String(profile.age) : '');
   const [genderInput, setGenderInput] = useState<GenderOption | null>(
     (profile?.gender as GenderOption) || null,
@@ -57,6 +58,7 @@ export default function ProfileScreen() {
   );
   const [editErrors, setEditErrors] = useState<{
     name?: string;
+    email?: string;
     age?: string;
     height?: string;
     weight?: string;
@@ -129,6 +131,7 @@ export default function ProfileScreen() {
 
   const openEditModal = () => {
     setNameInput(profile?.name || '');
+    setEmailInput(profile?.email || '');
     setAgeInput(profile?.age ? String(profile.age) : '');
     setGenderInput((profile?.gender as GenderOption) || null);
     setHeightInput(profile?.height ? String(profile.height) : '');
@@ -145,6 +148,10 @@ export default function ProfileScreen() {
       return;
     }
     const errors: typeof editErrors = {};
+    const trimmedEmail = emailInput.trim();
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      errors.email = 'Please enter a valid email address';
+    }
     if (ageInput.trim()) {
       const pAge = Number(ageInput.trim());
       if (isNaN(pAge) || pAge < 1 || pAge > 120) {
@@ -169,6 +176,7 @@ export default function ProfileScreen() {
     }
 
     updateProfile(trimmed, {
+      email: trimmedEmail || undefined,
       age: ageInput.trim() ? Number(ageInput.trim()) : undefined,
       gender: genderInput || undefined,
       height: heightInput.trim() ? Number(heightInput.trim()) : undefined,
@@ -231,7 +239,7 @@ export default function ProfileScreen() {
 
           <View style={styles.profileDetails}>
             <Text style={styles.profileName}>{userName}</Text>
-            <Text style={styles.profileEmail}>{profile?.email || 'alex.m@example.com'}</Text>
+            <Text style={styles.profileEmail}>{profile?.email || 'No email set'}</Text>
             <Text style={styles.profileBadge}>HealthMate member since April 2026</Text>
           </View>
         </AppCard>
@@ -239,12 +247,23 @@ export default function ProfileScreen() {
         {/* Section: Personal Information */}
         <SectionHeader title="Personal Information" />
         <AppCard style={styles.settingsGroup}>
-          <TouchableOpacity style={styles.settingRow} onPress={openEditModal}>
+          <TouchableOpacity style={styles.settingRow} onPress={openEditModal} activeOpacity={0.7}>
             <View style={styles.settingIconContainer}>
               <Feather name="user" size={18} color={Colors.primary} />
             </View>
             <Text style={styles.settingLabel}>Your Name</Text>
             <Text style={styles.settingValue}>{userName}</Text>
+            <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
+          </TouchableOpacity>
+
+          <View style={styles.rowDivider} />
+
+          <TouchableOpacity style={styles.settingRow} onPress={openEditModal} activeOpacity={0.7}>
+            <View style={styles.settingIconContainer}>
+              <Feather name="mail" size={18} color={Colors.primary} />
+            </View>
+            <Text style={styles.settingLabel}>Email</Text>
+            <Text style={styles.settingValue}>{profile?.email || 'Not set'}</Text>
             <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
           </TouchableOpacity>
 
@@ -550,16 +569,16 @@ export default function ProfileScreen() {
       <Modal visible={isEditingProfile} transparent animationType="fade" statusBarTranslucent>
         <View style={styles.modalOverlay}>
           <KeyboardAvoidingView
-            // Android already resizes this modal window. Avoid applying "height" which double-shrinks the card.
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={{ width: '100%', maxWidth: 420, maxHeight: '100%', flexShrink: 1 }}
+            // Android already handles window soft-input resize; avoid applying "height" which double-shrinks the dialog.
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={{ width: '100%', maxWidth: 440, maxHeight: '90%', flexShrink: 1 }}
           >
             <View style={styles.profileModalCard}>
               <Text style={styles.modalTitle}>Edit Profile</Text>
 
               <ScrollView
                 ref={editModalScrollRef}
-                style={{ maxHeight: 380, flexShrink: 1 }}
+                style={{ maxHeight: 440, flexShrink: 1 }}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
                 keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
@@ -582,9 +601,34 @@ export default function ProfileScreen() {
                         if (editErrors.name) setEditErrors((p) => ({ ...p, name: undefined }));
                       }}
                       placeholder="Full name"
+                      placeholderTextColor="#64748B"
                     />
                     {editErrors.name ? (
                       <Text style={styles.errorText}>{editErrors.name}</Text>
+                    ) : null}
+                  </View>
+
+                  {/* Email Address */}
+                  <View style={styles.modalFieldGroup}>
+                    <Text style={styles.modalFieldLabel}>Email Address (optional)</Text>
+                    <TextInput
+                      style={[
+                        styles.modalInputBox,
+                        editErrors.email ? styles.inputErrorBorder : null,
+                      ]}
+                      value={emailInput}
+                      onChangeText={(t) => {
+                        setEmailInput(t);
+                        if (editErrors.email) setEditErrors((p) => ({ ...p, email: undefined }));
+                      }}
+                      placeholder="e.g. alex@example.com"
+                      placeholderTextColor="#64748B"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                    {editErrors.email ? (
+                      <Text style={styles.errorText}>{editErrors.email}</Text>
                     ) : null}
                   </View>
 
@@ -602,6 +646,7 @@ export default function ProfileScreen() {
                         if (editErrors.age) setEditErrors((p) => ({ ...p, age: undefined }));
                       }}
                       placeholder="e.g. 25"
+                      placeholderTextColor="#64748B"
                       keyboardType="number-pad"
                       maxLength={3}
                     />
@@ -654,6 +699,7 @@ export default function ProfileScreen() {
                             setEditErrors((p) => ({ ...p, height: undefined }));
                         }}
                         placeholder={unitSystemInput === 'metric' ? 'e.g. 170' : 'e.g. 5.8'}
+                        placeholderTextColor="#64748B"
                         keyboardType="numeric"
                       />
                       {editErrors.height ? (
@@ -677,6 +723,7 @@ export default function ProfileScreen() {
                             setEditErrors((p) => ({ ...p, weight: undefined }));
                         }}
                         placeholder={unitSystemInput === 'metric' ? 'e.g. 65' : 'e.g. 145'}
+                        placeholderTextColor="#64748B"
                         keyboardType="numeric"
                       />
                       {editErrors.weight ? (

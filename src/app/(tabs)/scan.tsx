@@ -42,7 +42,7 @@ import { ConnectGeminiModal } from '../../components/ai/ConnectGeminiModal';
 import { InteractiveCropView } from '../../components/scan/InteractiveCropView';
 import { AiAnalysisProgressView } from '../../components/scan/AiAnalysisProgressView';
 
-type ScanFlowStep = 'capture' | 'crop' | 'add_back' | 'review' | 'analyzing' | 'result';
+type ScanFlowStep = 'capture' | 'crop' | 'review' | 'analyzing' | 'result';
 type TargetSide = 'front' | 'back';
 
 export default function ScanScreen() {
@@ -61,9 +61,8 @@ export default function ScanScreen() {
   const [currentStep, setCurrentStep] = useState<ScanFlowStep>('capture');
   const [targetSide, setTargetSide] = useState<TargetSide>('front');
 
-  // Camera settings
+  // Camera settings (back camera only for clear medication label photography)
   const [flashMode, setFlashMode] = useState<'off' | 'on' | 'auto'>('off');
-  const [facing, setFacing] = useState<'back' | 'front'>('back');
 
   // Multi-side image assets (original preserved, cropped stored separately)
   const [frontOriginalUri, setFrontOriginalUri] = useState<string | null>(null);
@@ -122,10 +121,6 @@ export default function ScanScreen() {
 
   const toggleFlash = () => {
     setFlashMode((prev) => (prev === 'off' ? 'on' : prev === 'on' ? 'auto' : 'off'));
-  };
-
-  const toggleCameraFacing = () => {
-    setFacing((prev) => (prev === 'back' ? 'front' : 'back'));
   };
 
   // ---------------------------------------------------------------------------
@@ -196,23 +191,20 @@ export default function ScanScreen() {
       const cropResult = await cropAndAdjustImage(sourceUri, options);
       if (targetSide === 'front') {
         setFrontCroppedUri(cropResult.uri);
-        // After cropping front, guide user to optional back image step
-        setCurrentStep('add_back');
       } else {
         setBackCroppedUri(cropResult.uri);
-        // After cropping back, go directly to review
-        setCurrentStep('review');
       }
+      // After cropping either front or back, go straight to review packaging
+      setCurrentStep('review');
     } catch (err) {
       console.warn('Crop adjustment failed:', err);
       // Fallback: use source URI
       if (targetSide === 'front') {
         setFrontCroppedUri(sourceUri);
-        setCurrentStep('add_back');
       } else {
         setBackCroppedUri(sourceUri);
-        setCurrentStep('review');
       }
+      setCurrentStep('review');
     }
   };
 
@@ -220,18 +212,26 @@ export default function ScanScreen() {
     if (targetSide === 'front') {
       setFrontOriginalUri(null);
       setFrontCroppedUri(null);
+      setCurrentStep('capture');
     } else {
       setBackOriginalUri(null);
       setBackCroppedUri(null);
+      setCurrentStep('review');
     }
-    setCurrentStep('capture');
   };
 
   // ---------------------------------------------------------------------------
-  // Step 3 & 4: Add Back & Review Handlers
+  // Step 3: Review Handlers (Add/Edit Back, Edit Front, Retake)
   // ---------------------------------------------------------------------------
   const handleStartCaptureBack = () => {
     setTargetSide('back');
+    setCurrentStep('capture');
+  };
+
+  const handleRetakeFront = () => {
+    setFrontOriginalUri(null);
+    setFrontCroppedUri(null);
+    setTargetSide('front');
     setCurrentStep('capture');
   };
 
@@ -436,7 +436,10 @@ export default function ScanScreen() {
   // Render sub-views based on active step
   // ---------------------------------------------------------------------------
   return (
-    <AppScreen scrollable contentContainerStyle={styles.scrollContent}>
+    <AppScreen
+      scrollable={currentStep !== 'crop'}
+      contentContainerStyle={styles.scrollContent}
+    >
       {/* Header */}
       <AppHeader
         title={
@@ -444,13 +447,11 @@ export default function ScanScreen() {
             ? 'Scan Medicine'
             : currentStep === 'crop'
               ? 'Crop & Adjust'
-              : currentStep === 'add_back'
-                ? 'Add Back Image'
-                : currentStep === 'review'
-                  ? 'Review Packaging'
-                  : currentStep === 'analyzing'
-                    ? 'Analysing'
-                    : 'Scan Result'
+              : currentStep === 'review'
+                ? 'Review Packaging'
+                : currentStep === 'analyzing'
+                  ? 'Analysing'
+                  : 'Scan Result'
         }
         subtitle={
           currentStep === 'capture'
@@ -459,23 +460,26 @@ export default function ScanScreen() {
               : 'Capture back of package (optional)'
             : currentStep === 'crop'
               ? 'Adjust crop rectangle and orientation'
-              : currentStep === 'add_back'
-                ? 'Optionally add the back side for salt & batch details'
-                : currentStep === 'review'
-                  ? 'Confirm images before starting OCR & AI analysis'
-                  : currentStep === 'analyzing'
-                    ? 'Reading packaging with Cloud OCR & Gemini'
-                    : 'Review and verify extracted details'
+              : currentStep === 'review'
+                ? 'Confirm packaging images before AI analysis'
+                : currentStep === 'analyzing'
+                  ? 'Reading packaging with Cloud OCR & Gemini'
+                  : 'Review and verify extracted details'
         }
         brandText="HealthMate AI"
         onBackPress={
           currentStep !== 'capture'
             ? () => {
-                if (currentStep === 'crop') setCurrentStep('capture');
-                else if (currentStep === 'add_back') setCurrentStep('crop');
-                else if (currentStep === 'review') setCurrentStep('add_back');
-                else if (currentStep === 'result') handleResetAll();
-                else if (currentStep === 'analyzing') setCurrentStep('review');
+                if (currentStep === 'crop') {
+                  if (targetSide === 'back') setCurrentStep('review');
+                  else setCurrentStep('capture');
+                } else if (currentStep === 'review') {
+                  setCurrentStep('capture');
+                } else if (currentStep === 'result') {
+                  handleResetAll();
+                } else if (currentStep === 'analyzing') {
+                  setCurrentStep('review');
+                }
               }
             : undefined
         }
@@ -499,9 +503,9 @@ export default function ScanScreen() {
                 <Text style={styles.historyHeaderText}>History</Text>
               </TouchableOpacity>
             </View>
-          ) : currentStep === 'add_back' ? (
-            <TouchableOpacity onPress={() => setCurrentStep('review')} activeOpacity={0.7}>
-              <Text style={styles.headerSkipText}>Skip</Text>
+          ) : currentStep === 'review' ? (
+            <TouchableOpacity onPress={handleResetAll} activeOpacity={0.7}>
+              <Text style={styles.headerSkipText}>Reset</Text>
             </TouchableOpacity>
           ) : currentStep === 'result' ? (
             <TouchableOpacity onPress={handleResetAll} activeOpacity={0.7}>
@@ -597,7 +601,7 @@ export default function ScanScreen() {
                   <CameraView
                     ref={cameraRef}
                     style={styles.cameraView}
-                    facing={facing}
+                    facing="back"
                     flash={flashMode}
                   >
                     {/* Camera Overlay with Frame and Guidance */}
@@ -640,6 +644,7 @@ export default function ScanScreen() {
                     style={styles.controlCircleBtn}
                     onPress={() => handlePickFromGallery(targetSide)}
                     activeOpacity={0.7}
+                    accessibilityLabel="Choose photo from gallery"
                   >
                     <Ionicons name="images-outline" size={24} color={Colors.primary} />
                   </TouchableOpacity>
@@ -649,6 +654,7 @@ export default function ScanScreen() {
                     style={styles.shutterButton}
                     onPress={handleCapturePhoto}
                     activeOpacity={0.8}
+                    accessibilityLabel="Capture medicine photo"
                   >
                     <View style={styles.shutterInner} />
                   </TouchableOpacity>
@@ -658,6 +664,7 @@ export default function ScanScreen() {
                     style={styles.controlCircleBtn}
                     onPress={toggleFlash}
                     activeOpacity={0.7}
+                    accessibilityLabel="Toggle camera flash"
                   >
                     <Ionicons
                       name={
@@ -670,15 +677,6 @@ export default function ScanScreen() {
                       size={22}
                       color={flashMode === 'off' ? Colors.textSecondary : Colors.warning}
                     />
-                  </TouchableOpacity>
-
-                  {/* Camera Facing Flip */}
-                  <TouchableOpacity
-                    style={styles.controlCircleBtn}
-                    onPress={toggleCameraFacing}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="camera-reverse-outline" size={24} color={Colors.textSecondary} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -696,35 +694,44 @@ export default function ScanScreen() {
           />
         )}
 
-        {/* STEP 3: ADD BACK IMAGE SCREEN (OPTIONAL) */}
-        {currentStep === 'add_back' && (
+        {/* STEP 3: REVIEW PACKAGING SCREEN (WITH OPTIONAL BACK SIDE) */}
+        {currentStep === 'review' && (
           <View style={styles.flowSection}>
-            {/* Informative Benefit Banner */}
-            <View style={styles.benefitBanner}>
-              <Ionicons name="information-circle-outline" size={20} color={Colors.primary} />
-              <Text style={styles.benefitBannerText}>
-                Adding the back side helps identify composition, manufacturer, batch details, and
-                other medicine information.
+            <View style={styles.reviewBanner}>
+              <Ionicons name="shield-checkmark-outline" size={20} color={Colors.primary} />
+              <Text style={styles.reviewBannerText}>
+                Review captured packaging photos. Processing front and back sides in parallel extracts
+                complete salt composition, dosage, manufacturer, and batch details.
               </Text>
             </View>
 
-            {/* Front Image Card (Cropped) */}
+            {/* Front Image Card (Main) */}
             <AppCard style={styles.sideCard}>
               <View style={styles.sideCardHeader}>
                 <View style={styles.sideBadgeRow}>
                   <View style={styles.sideCheckDot}>
                     <Feather name="check" size={12} color="#FFFFFF" />
                   </View>
-                  <Text style={styles.sideCardTitle}>Front Image</Text>
+                  <Text style={styles.sideCardTitle}>Front Side (Main)</Text>
                 </View>
-                <TouchableOpacity
-                  style={styles.sideActionBtn}
-                  onPress={handleEditFrontCrop}
-                  activeOpacity={0.7}
-                >
-                  <Feather name="crop" size={14} color={Colors.primary} />
-                  <Text style={styles.sideActionBtnText}>Edit</Text>
-                </TouchableOpacity>
+                <View style={styles.backActionsGroup}>
+                  <TouchableOpacity
+                    style={styles.sideActionBtn}
+                    onPress={handleEditFrontCrop}
+                    activeOpacity={0.7}
+                  >
+                    <Feather name="crop" size={14} color={Colors.primary} />
+                    <Text style={styles.sideActionBtnText}>Edit</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.sideActionBtn, { marginLeft: 8 }]}
+                    onPress={handleRetakeFront}
+                    activeOpacity={0.7}
+                  >
+                    <Feather name="refresh-cw" size={13} color={Colors.textSecondary} />
+                    <Text style={[styles.sideActionBtnText, { color: Colors.textSecondary }]}>Retake</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {frontCroppedUri && (
@@ -742,7 +749,12 @@ export default function ScanScreen() {
             <AppCard style={styles.sideCard}>
               <View style={styles.sideCardHeader}>
                 <View style={styles.sideBadgeRow}>
-                  <Text style={styles.sideCardTitle}>Back Image</Text>
+                  {backCroppedUri ? (
+                    <View style={styles.sideCheckDot}>
+                      <Feather name="check" size={12} color="#FFFFFF" />
+                    </View>
+                  ) : null}
+                  <Text style={styles.sideCardTitle}>Back Side</Text>
                   <View style={styles.optionalBadge}>
                     <Text style={styles.optionalBadgeText}>Optional</Text>
                   </View>
@@ -812,86 +824,6 @@ export default function ScanScreen() {
               )}
             </AppCard>
 
-            {/* Bottom Actions */}
-            <View style={styles.addBackFooter}>
-              <AppButton
-                title={backCroppedUri ? 'Continue to Analysis' : 'Continue with Front Only'}
-                onPress={() => setCurrentStep('review')}
-                variant="primary"
-                size="lg"
-                icon={<Feather name="arrow-right" size={18} color="#FFFFFF" />}
-              />
-            </View>
-          </View>
-        )}
-
-        {/* STEP 4: REVIEW SCREEN BEFORE ANALYSIS */}
-        {currentStep === 'review' && (
-          <View style={styles.flowSection}>
-            <View style={styles.reviewBanner}>
-              <Ionicons name="shield-checkmark-outline" size={20} color={Colors.primary} />
-              <Text style={styles.reviewBannerText}>
-                Confirm images to send to Cloud OCR & HealthMate AI. Both sides are processed
-                concurrently for maximum accuracy.
-              </Text>
-            </View>
-
-            {/* Images Grid */}
-            <View style={styles.reviewImagesGrid}>
-              {/* Front Review Box */}
-              <View style={styles.reviewBox}>
-                <View style={styles.reviewBoxHeader}>
-                  <Text style={styles.reviewBoxTitle}>Front Side</Text>
-                  <TouchableOpacity onPress={handleEditFrontCrop} activeOpacity={0.7}>
-                    <Text style={styles.reviewBoxAction}>Edit</Text>
-                  </TouchableOpacity>
-                </View>
-                {frontCroppedUri && (
-                  <TouchableOpacity
-                    onPress={() => setPreviewImageModalUri(frontCroppedUri)}
-                    activeOpacity={0.9}
-                  >
-                    <Image source={{ uri: frontCroppedUri }} style={styles.reviewBoxImage} />
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              {/* Back Review Box */}
-              <View style={styles.reviewBox}>
-                <View style={styles.reviewBoxHeader}>
-                  <Text style={styles.reviewBoxTitle}>
-                    Back Side {backCroppedUri ? '' : '(None)'}
-                  </Text>
-                  {backCroppedUri ? (
-                    <TouchableOpacity onPress={handleEditBackCrop} activeOpacity={0.7}>
-                      <Text style={styles.reviewBoxAction}>Edit</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <TouchableOpacity onPress={handleStartCaptureBack} activeOpacity={0.7}>
-                      <Text style={styles.reviewBoxAction}>+ Add</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-                {backCroppedUri ? (
-                  <TouchableOpacity
-                    onPress={() => setPreviewImageModalUri(backCroppedUri)}
-                    activeOpacity={0.9}
-                  >
-                    <Image source={{ uri: backCroppedUri }} style={styles.reviewBoxImage} />
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.reviewBoxEmpty}
-                    onPress={handleStartCaptureBack}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="add-circle-outline" size={28} color={Colors.textTertiary} />
-                    <Text style={styles.reviewBoxEmptyText}>Add Back</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-
             {/* Primary Action Button: Analyse Medicine */}
             <View style={styles.reviewActionContainer}>
               <AppButton
@@ -906,7 +838,7 @@ export default function ScanScreen() {
                 onPress={handleResetAll}
                 activeOpacity={0.7}
               >
-                <Text style={styles.cancelScanBtnText}>Retake / Cancel</Text>
+                <Text style={styles.cancelScanBtnText}>Start Over / Reset</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1014,6 +946,7 @@ export default function ScanScreen() {
                   value={medName}
                   onChangeText={setMedName}
                   placeholder="e.g. Paracetamol Tablets IP"
+                  placeholderTextColor="#64748B"
                 />
 
                 {/* Candidate Suggestions if present */}
@@ -1059,6 +992,7 @@ export default function ScanScreen() {
                   value={medComposition}
                   onChangeText={setMedComposition}
                   placeholder="e.g. Paracetamol, Amoxicillin"
+                  placeholderTextColor="#64748B"
                 />
 
                 <View style={styles.divider} />
@@ -1069,6 +1003,7 @@ export default function ScanScreen() {
                   value={medStrength}
                   onChangeText={setMedStrength}
                   placeholder="e.g. 500 mg, 10 mg/ml"
+                  placeholderTextColor="#64748B"
                 />
 
                 <View style={styles.divider} />
@@ -1079,6 +1014,7 @@ export default function ScanScreen() {
                   value={medForm}
                   onChangeText={(val) => setMedForm(val.toLowerCase() as DosageForm)}
                   placeholder="tablet, capsule, syrup, etc."
+                  placeholderTextColor="#64748B"
                 />
 
                 <View style={styles.divider} />
@@ -1089,6 +1025,7 @@ export default function ScanScreen() {
                   value={medMfg}
                   onChangeText={setMedMfg}
                   placeholder="e.g. Cipla Ltd, Pfizer"
+                  placeholderTextColor="#64748B"
                 />
 
                 <View style={styles.divider} />
@@ -1099,6 +1036,7 @@ export default function ScanScreen() {
                   value={medExpiry}
                   onChangeText={setMedExpiry}
                   placeholder="e.g. 12/2027"
+                  placeholderTextColor="#64748B"
                 />
 
                 <View style={styles.divider} />
@@ -1109,6 +1047,7 @@ export default function ScanScreen() {
                   value={medBatch}
                   onChangeText={setMedBatch}
                   placeholder="e.g. DEMO-1234"
+                  placeholderTextColor="#64748B"
                 />
               </AppCard>
             )}

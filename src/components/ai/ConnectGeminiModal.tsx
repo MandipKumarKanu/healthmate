@@ -167,9 +167,9 @@ export function ConnectGeminiModal({
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <KeyboardAvoidingView
-          // Android already resizes this Modal window (softwareKeyboardLayoutMode:
-          // "resize"). Applying "height" here as well double-shrinks the card.
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          // Android already resizes this Modal window (softwareKeyboardLayoutMode: "resize").
+          // Avoid applying "height" which double-shrinks the card on Android.
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.keyboardContainer}
         >
           <View style={styles.card}>
@@ -339,7 +339,7 @@ export function ConnectGeminiModal({
                         <TextInput
                           style={styles.textInput}
                           placeholder="AIzaSy..."
-                          placeholderTextColor={Colors.textTertiary}
+                          placeholderTextColor="#64748B"
                           autoCapitalize="none"
                           autoCorrect={false}
                           secureTextEntry={isSecure}
