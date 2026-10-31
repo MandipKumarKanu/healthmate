@@ -1,0 +1,127 @@
+name: Android CI Build
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - main
+      - 'release/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate (lint, types, tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint
+        run: npm run lint
+
+      - name: TypeScript
+        run: npx tsc --noEmit
+
+      - name: Unit tests
+        run: npm test -- --runInBand --ci
+
+  build:
+    name: Build Android APK (${{ matrix.abi }})
+    runs-on: ubuntu-latest
+    needs: validate
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        abi:
+          - arm64-v8a
+          - armeabi-v7a
+
+    env:
+      EXPO_PUBLIC_OCR_API_URL: ${{ secrets.EXPO_PUBLIC_OCR_API_URL || secrets.OCR_API_URL }}
+      EXPO_PUBLIC_OCR_API_KEY: ${{ secrets.EXPO_PUBLIC_OCR_API_KEY || secrets.OCR_API_KEY }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Configure Environment (.env) from GitHub Secrets
+        run: |
+          touch .env
+          echo "EXPO_PUBLIC_OCR_API_URL=${EXPO_PUBLIC_OCR_API_URL}" >> .env
+          echo "EXPO_PUBLIC_OCR_API_KEY=${EXPO_PUBLIC_OCR_API_KEY}" >> .env
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Set build version numbers
+        run: |
+          BASE_CODE=$(node -p "require('./app.json').expo.android.versionCode || 1")
+          BUILD_NUM=$(( BASE_CODE + ${{ github.run_number }} ))
+          VERSION=$(node -p "require('./package.json').version || '1.0.0'")
+          echo "versionCode: $BUILD_NUM"
+          node -e "
+            const fs = require('fs');
+            const app = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+            app.expo.android.versionCode = $BUILD_NUM;
+            app.expo.ios.buildNumber = '$BUILD_NUM';
+            fs.writeFileSync('app.json', JSON.stringify(app, null, 2));
+          "
+          echo "build_num=$BUILD_NUM" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+        id: build_number
+
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Build ${{ matrix.abi }} Release APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease \
+            -PreactNativeArchitectures=${{ matrix.abi }} \
+            --no-daemon
+          APK_FILE=$(find app/build/outputs/apk/release -type f -name "*.apk" | head -n 1)
+          cp "$APK_FILE" "../healthmate-v${{ steps.build_number.outputs.version }}-${{ matrix.abi }}.apk"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: healthmate-apk-${{ matrix.abi }}
+          path: healthmate-v*.apk
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0

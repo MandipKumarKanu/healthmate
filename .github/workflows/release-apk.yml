@@ -1,0 +1,189 @@
+name: Build & Release Android APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - '[0-9]+.[0-9]+.[0-9]+*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release Tag (e.g. v1.0.0). Leave blank to use version from package.json'
+        required: false
+        type: string
+        default: ''
+      release_name:
+        description: 'Custom Release title (e.g. HealthMate Release v1.0.0). Leave blank for default'
+        required: false
+        type: string
+        default: ''
+      create_release:
+        description: 'Publish a GitHub Release with the APK attached'
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: 📱 Build ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64-v8a
+            name: 'ARM64 (Modern 64-bit Phones - Recommended)'
+            gradle_arch: 'arm64-v8a'
+          - arch: armeabi-v7a
+            name: 'ARMv7 (Older 32-bit Phones)'
+            gradle_arch: 'armeabi-v7a'
+
+    env:
+      EXPO_PUBLIC_OCR_API_URL: ${{ secrets.EXPO_PUBLIC_OCR_API_URL || secrets.OCR_API_URL }}
+      EXPO_PUBLIC_OCR_API_KEY: ${{ secrets.EXPO_PUBLIC_OCR_API_KEY || secrets.OCR_API_KEY }}
+
+    steps:
+      - name: ⬇️ Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: 📝 Configure Environment (.env) from GitHub Secrets
+        run: |
+          touch .env
+          echo "EXPO_PUBLIC_OCR_API_URL=${EXPO_PUBLIC_OCR_API_URL}" >> .env
+          echo "EXPO_PUBLIC_OCR_API_KEY=${EXPO_PUBLIC_OCR_API_KEY}" >> .env
+
+      - name: ☕ Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: 17
+
+      - name: 🐘 Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: 📦 Install Dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: 🔢 Set build version numbers
+        id: build_number
+        run: |
+          BASE_CODE=$(node -p "require('./app.json').expo.android.versionCode || 1")
+          BUILD_NUM=$(( BASE_CODE + ${{ github.run_number }} ))
+          VERSION=$(node -p "require('./package.json').version || '1.0.0'")
+          echo "versionCode: $BUILD_NUM"
+          node -e "
+            const fs = require('fs');
+            const app = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+            app.expo.android.versionCode = $BUILD_NUM;
+            app.expo.ios.buildNumber = '$BUILD_NUM';
+            fs.writeFileSync('app.json', JSON.stringify(app, null, 2));
+          "
+          echo "build_num=$BUILD_NUM" >> "$GITHUB_OUTPUT"
+
+      - name: 🛠️ Generate Native Android Project (Expo Prebuild)
+        run: |
+          rm -rf android
+          npx expo prebuild --platform android --clean --no-install
+
+      - name: 🚀 Build Release APK for ${{ matrix.name }}
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease \
+            -PversionCode=${{ steps.build_number.outputs.build_num }} \
+            -PreactNativeArchitectures=${{ matrix.gradle_arch }} \
+            --no-daemon
+
+      - name: 🔍 Locate and Package Release APK
+        id: prepare_apk
+        run: |
+          APK_FILE=$(find android/app/build/outputs/apk/release -type f -name "*.apk" | head -n 1)
+          if [ -z "$APK_FILE" ] || [ ! -f "$APK_FILE" ]; then
+            echo "❌ Error: Release APK not found in android/app/build/outputs/apk/release"
+            exit 1
+          fi
+
+          VERSION=$(node -p "require('./package.json').version || '1.0.0'")
+          OUTPUT_APK="healthmate-v${VERSION}-${{ matrix.arch }}.apk"
+
+          cp "$APK_FILE" "./$OUTPUT_APK"
+          echo "Prepared $OUTPUT_APK ($(du -h "$OUTPUT_APK" | cut -f1))"
+          echo "apk_path=$OUTPUT_APK" >> "$GITHUB_OUTPUT"
+
+      - name: 📤 Upload APK as Workflow Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: healthmate-apk-${{ matrix.arch }}
+          path: ${{ steps.prepare_apk.outputs.apk_path }}
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+  release:
+    name: 🎉 Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    if: ${{ startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.create_release) }}
+    steps:
+      - name: ⬇️ Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 📥 Download all APK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: healthmate-apk-*
+          path: release-apks
+          merge-multiple: true
+
+      - name: 🔍 List APKs to be published
+        run: |
+          ls -lh release-apks/
+
+      - name: 🏷️ Resolve Release Metadata
+        id: release_meta
+        run: |
+          VERSION=$(node -p "require('./package.json').version || '1.1.0'")
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            RESOLVED_TAG="${GITHUB_REF#refs/tags/}"
+          elif [ -n "${{ inputs.tag_name }}" ]; then
+            RESOLVED_TAG="${{ inputs.tag_name }}"
+          else
+            RESOLVED_TAG="v$VERSION"
+          fi
+
+          if [ -n "${{ inputs.release_name }}" ]; then
+            RESOLVED_NAME="${{ inputs.release_name }}"
+          else
+            RESOLVED_NAME="HealthMate Release $RESOLVED_TAG"
+          fi
+
+          echo "tag=$RESOLVED_TAG" >> "$GITHUB_OUTPUT"
+          echo "name=$RESOLVED_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: 🎉 Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_meta.outputs.tag }}
+          name: ${{ steps.release_meta.outputs.name }}
+          files: release-apks/*.apk
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

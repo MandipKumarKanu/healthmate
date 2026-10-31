@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["ImageEnhancerModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.imageenhancer.ImageEnhancerModule"]
+  }
+}
