@@ -18,7 +18,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
-import { Radius, Spacing, Typography } from '../../theme/tokens';
+import { Radius, Spacing, Typography, Shadows } from '../../theme/tokens';
 import { AppScreen } from '../../components/ui/AppScreen';
 import { AppHeader } from '../../components/ui/AppHeader';
 import { AppCard } from '../../components/ui/AppCard';
@@ -705,124 +705,135 @@ export default function ScanScreen() {
               </Text>
             </View>
 
-            {/* Front Image Card (Main) */}
-            <AppCard style={styles.sideCard}>
-              <View style={styles.sideCardHeader}>
-                <View style={styles.sideBadgeRow}>
-                  <View style={styles.sideCheckDot}>
-                    <Feather name="check" size={12} color="#FFFFFF" />
+            {/* Side-by-side Images Review Grid */}
+            <View style={styles.reviewImagesGrid}>
+              {/* Front Review Box */}
+              <View style={styles.reviewBox}>
+                <View style={styles.reviewBoxHeader}>
+                  <View style={styles.reviewTitleWithBadge}>
+                    <View style={styles.miniCheckDot}>
+                      <Feather name="check" size={10} color="#FFFFFF" />
+                    </View>
+                    <Text style={styles.reviewBoxTitle}>Front</Text>
                   </View>
-                  <Text style={styles.sideCardTitle}>Front Side (Main)</Text>
+                  <View style={styles.reviewHeaderActions}>
+                    <TouchableOpacity
+                      onPress={handleEditFrontCrop}
+                      activeOpacity={0.7}
+                      style={styles.reviewSmallActionBtn}
+                    >
+                      <Feather name="crop" size={12} color={Colors.primary} />
+                      <Text style={styles.reviewBoxAction}>Edit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={handleRetakeFront}
+                      activeOpacity={0.7}
+                      style={[styles.reviewSmallActionBtn, { marginLeft: 6 }]}
+                    >
+                      <Feather name="refresh-cw" size={11} color={Colors.textSecondary} />
+                      <Text style={[styles.reviewBoxAction, { color: Colors.textSecondary }]}>
+                        Retake
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-                <View style={styles.backActionsGroup}>
+
+                {frontCroppedUri && (
                   <TouchableOpacity
-                    style={styles.sideActionBtn}
-                    onPress={handleEditFrontCrop}
-                    activeOpacity={0.7}
+                    style={styles.reviewBoxImageContainer}
+                    onPress={() => setPreviewImageModalUri(frontCroppedUri)}
+                    activeOpacity={0.9}
                   >
-                    <Feather name="crop" size={14} color={Colors.primary} />
-                    <Text style={styles.sideActionBtnText}>Edit</Text>
+                    <Image source={{ uri: frontCroppedUri }} style={styles.reviewBoxImage} />
+                    <View style={styles.zoomBadge}>
+                      <Feather name="maximize-2" size={11} color="#FFFFFF" />
+                    </View>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.sideActionBtn, { marginLeft: 8 }]}
-                    onPress={handleRetakeFront}
-                    activeOpacity={0.7}
-                  >
-                    <Feather name="refresh-cw" size={13} color={Colors.textSecondary} />
-                    <Text style={[styles.sideActionBtnText, { color: Colors.textSecondary }]}>Retake</Text>
-                  </TouchableOpacity>
-                </View>
+                )}
               </View>
 
-              {frontCroppedUri && (
-                <TouchableOpacity
-                  style={styles.previewImageContainer}
-                  onPress={() => setPreviewImageModalUri(frontCroppedUri)}
-                  activeOpacity={0.9}
-                >
-                  <Image source={{ uri: frontCroppedUri }} style={styles.previewImageThumb} />
-                </TouchableOpacity>
-              )}
-            </AppCard>
+              {/* Back Review Box */}
+              <View style={styles.reviewBox}>
+                <View style={styles.reviewBoxHeader}>
+                  <View style={styles.reviewTitleWithBadge}>
+                    {backCroppedUri ? (
+                      <View style={styles.miniCheckDot}>
+                        <Feather name="check" size={10} color="#FFFFFF" />
+                      </View>
+                    ) : null}
+                    <Text style={styles.reviewBoxTitle}>Back</Text>
+                    {!backCroppedUri && (
+                      <View style={styles.miniOptionalBadge}>
+                        <Text style={styles.miniOptionalBadgeText}>Opt</Text>
+                      </View>
+                    )}
+                  </View>
 
-            {/* Back Image Card (Optional) */}
-            <AppCard style={styles.sideCard}>
-              <View style={styles.sideCardHeader}>
-                <View style={styles.sideBadgeRow}>
                   {backCroppedUri ? (
-                    <View style={styles.sideCheckDot}>
-                      <Feather name="check" size={12} color="#FFFFFF" />
+                    <View style={styles.reviewHeaderActions}>
+                      <TouchableOpacity
+                        onPress={handleEditBackCrop}
+                        activeOpacity={0.7}
+                        style={styles.reviewSmallActionBtn}
+                      >
+                        <Feather name="crop" size={12} color={Colors.primary} />
+                        <Text style={styles.reviewBoxAction}>Edit</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={handleRemoveBackImage}
+                        activeOpacity={0.7}
+                        style={[styles.reviewSmallActionBtn, { marginLeft: 6 }]}
+                      >
+                        <Feather name="trash-2" size={12} color={Colors.error} />
+                        <Text style={[styles.reviewBoxAction, { color: Colors.error }]}>Del</Text>
+                      </TouchableOpacity>
                     </View>
                   ) : null}
-                  <Text style={styles.sideCardTitle}>Back Side</Text>
-                  <View style={styles.optionalBadge}>
-                    <Text style={styles.optionalBadgeText}>Optional</Text>
-                  </View>
                 </View>
 
                 {backCroppedUri ? (
-                  <View style={styles.backActionsGroup}>
-                    <TouchableOpacity
-                      style={styles.sideActionBtn}
-                      onPress={handleEditBackCrop}
-                      activeOpacity={0.7}
-                    >
-                      <Feather name="crop" size={14} color={Colors.primary} />
-                      <Text style={styles.sideActionBtnText}>Edit</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.sideActionBtn, { marginLeft: 8 }]}
-                      onPress={handleRemoveBackImage}
-                      activeOpacity={0.7}
-                    >
-                      <Feather name="trash-2" size={14} color={Colors.error} />
-                      <Text style={[styles.sideActionBtnText, { color: Colors.error }]}>Remove</Text>
-                    </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.reviewBoxImageContainer}
+                    onPress={() => setPreviewImageModalUri(backCroppedUri)}
+                    activeOpacity={0.9}
+                  >
+                    <Image source={{ uri: backCroppedUri }} style={styles.reviewBoxImage} />
+                    <View style={styles.zoomBadge}>
+                      <Feather name="maximize-2" size={11} color="#FFFFFF" />
+                    </View>
+                  </TouchableOpacity>
+                ) : (
+                  <View style={styles.reviewBoxEmpty}>
+                    <MaterialCommunityIcons
+                      name="image-plus"
+                      size={28}
+                      color={Colors.primary}
+                      style={{ marginBottom: 4 }}
+                    />
+                    <Text style={styles.reviewBoxEmptyText}>Add Back</Text>
+                    <Text style={styles.reviewBoxEmptySub}>Composition & Expiry</Text>
+                    <View style={styles.reviewEmptyBtnRow}>
+                      <TouchableOpacity
+                        style={styles.reviewSmallAddBtn}
+                        onPress={handleStartCaptureBack}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="camera-outline" size={13} color="#FFFFFF" />
+                        <Text style={styles.reviewSmallAddBtnText}>Camera</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.reviewSmallGalleryBtn}
+                        onPress={() => handlePickFromGallery('back')}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="images-outline" size={13} color={Colors.primary} />
+                        <Text style={styles.reviewSmallGalleryBtnText}>Gallery</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                ) : null}
+                )}
               </View>
-
-              {backCroppedUri ? (
-                <TouchableOpacity
-                  style={styles.previewImageContainer}
-                  onPress={() => setPreviewImageModalUri(backCroppedUri)}
-                  activeOpacity={0.9}
-                >
-                  <Image source={{ uri: backCroppedUri }} style={styles.previewImageThumb} />
-                </TouchableOpacity>
-              ) : (
-                <View style={styles.addBackPlaceholder}>
-                  <MaterialCommunityIcons
-                    name="image-plus"
-                    size={36}
-                    color={Colors.primary}
-                    style={{ marginBottom: 6 }}
-                  />
-                  <Text style={styles.addBackTitle}>Add back side of medicine</Text>
-                  <Text style={styles.addBackSub}>
-                    Capture composition, manufacturer, expiry, or batch details.
-                  </Text>
-                  <View style={styles.addBackButtonsRow}>
-                    <TouchableOpacity
-                      style={styles.addBackPrimaryBtn}
-                      onPress={handleStartCaptureBack}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="camera-outline" size={16} color="#FFFFFF" />
-                      <Text style={styles.addBackPrimaryBtnText}>Take Photo</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.addBackSecondaryBtn}
-                      onPress={() => handlePickFromGallery('back')}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="images-outline" size={16} color={Colors.primary} />
-                      <Text style={styles.addBackSecondaryBtnText}>From Gallery</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-            </AppCard>
+            </View>
 
             {/* Primary Action Button: Analyse Medicine */}
             <View style={styles.reviewActionContainer}>
@@ -1688,41 +1699,93 @@ const styles = StyleSheet.create({
   reviewImagesGrid: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
   },
   reviewBox: {
     flex: 1,
     backgroundColor: Colors.cardBackground,
     borderRadius: Radius.card,
-    padding: Spacing.cardPadding,
+    padding: Spacing.sm,
     borderWidth: 1,
     borderColor: Colors.borderLight,
+    ...Shadows.card,
   },
   reviewBoxHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+    minHeight: 24,
+  },
+  reviewTitleWithBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  miniCheckDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: Colors.success,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   reviewBoxTitle: {
     fontSize: 13,
     fontWeight: '700',
     color: Colors.textPrimary,
   },
+  miniOptionalBadge: {
+    backgroundColor: '#F1F1F5',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: Radius.pill,
+  },
+  miniOptionalBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
+  reviewHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  reviewSmallActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingVertical: 2,
+    paddingHorizontal: 2,
+  },
   reviewBoxAction: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: Colors.primary,
   },
+  reviewBoxImageContainer: {
+    width: '100%',
+    height: 190,
+    borderRadius: Radius.sm,
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: '#F8F8FC',
+  },
   reviewBoxImage: {
     width: '100%',
-    height: 150,
-    borderRadius: Radius.sm,
-    backgroundColor: '#F8F8FC',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  zoomBadge: {
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    padding: 4,
+    borderRadius: 4,
   },
   reviewBoxEmpty: {
     width: '100%',
-    height: 150,
+    height: 190,
     borderWidth: 1.5,
     borderStyle: 'dashed',
     borderColor: '#D0D0DC',
@@ -1730,12 +1793,59 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FAFAFD',
+    paddingHorizontal: 6,
   },
   reviewBoxEmptyText: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    fontWeight: '600',
+    fontSize: 13,
+    color: Colors.textPrimary,
+    fontWeight: '700',
     marginTop: 4,
+  },
+  reviewBoxEmptySub: {
+    fontSize: 10,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 2,
+    marginBottom: 8,
+  },
+  reviewEmptyBtnRow: {
+    flexDirection: 'row',
+    gap: 4,
+    width: '100%',
+  },
+  reviewSmallAddBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.primary,
+    paddingVertical: 6,
+    paddingHorizontal: 2,
+    borderRadius: Radius.pill,
+    gap: 3,
+  },
+  reviewSmallAddBtnText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  reviewSmallGalleryBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingVertical: 6,
+    paddingHorizontal: 2,
+    borderRadius: Radius.pill,
+    gap: 3,
+  },
+  reviewSmallGalleryBtnText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: Colors.primary,
   },
   reviewActionContainer: {
     marginTop: Spacing.xs,
