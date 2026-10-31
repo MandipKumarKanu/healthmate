@@ -482,7 +482,10 @@ export const aiAssistantService = {
       '  "dosageForm": "One of: tablet, capsule, softgel, eye_drop, syrup, injection, cream, other",',
       '  "manufacturer": "Pharmaceutical manufacturing company (e.g. GlaxoSmithKline, Pfizer, Cipla, Sun Pharma)",',
       '  "batchNumber": "Batch or Lot number if present (e.g. B12345, Lot 982A)",',
-      '  "expiryDate": "Expiration date formatted as MM/YYYY or Month YYYY (e.g. 12/2027)"',
+      '  "expiryDate": "Expiration date formatted as MM/YYYY or Month YYYY (e.g. 12/2027)",',
+      '  "instructions": "Directions for use or storage instructions printed on packaging (e.g. Store below 25C, As directed by physician)",',
+      '  "warnings": "Prominent warnings or statutory cautions printed on packaging (e.g. Schedule H prescription drug, Keep out of reach of children)",',
+      '  "commonUses": "Primary therapeutic use or indications if explicitly printed on the packaging (e.g. Analgesic / Antipyretic, Pain Relief, Antibiotic)"',
       '}',
       '',
       'Rules:',
@@ -613,6 +616,9 @@ export const aiAssistantService = {
           manufacturer: geminiOptionalField(parsed, 'manufacturer'),
           batchNumber: geminiOptionalField(parsed, 'batchNumber'),
           expiryDate: geminiOptionalField(parsed, 'expiryDate'),
+          instructions: geminiOptionalField(parsed, 'instructions'),
+          warnings: geminiOptionalField(parsed, 'warnings'),
+          commonUses: geminiOptionalField(parsed, 'commonUses'),
           rawText: rawOcrText,
           // Gemini output helps extract fields, but its confidence is not
           // calibrated. Preserve the dictionary OCR score instead of inventing

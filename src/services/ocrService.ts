@@ -37,6 +37,12 @@ export interface ExtractedMedicineData {
   manufacturer?: string;
   batchNumber?: string;
   expiryDate?: string;
+  /** Dosage or storage instructions extracted from packaging. */
+  instructions?: string;
+  /** Cautionary warnings extracted from packaging. */
+  warnings?: string;
+  /** Therapeutic use extracted from packaging. */
+  commonUses?: string;
   /** Clean, single-spaced label lines rebuilt from the raw text. */
   lines?: string[];
   rawText: string;
