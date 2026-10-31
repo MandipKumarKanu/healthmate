@@ -3,6 +3,9 @@ const { defineConfig } = require('eslint/config');
 const expoConfig = require('eslint-config-expo/flat');
 
 module.exports = defineConfig([
+  {
+    ignores: ['dist/**', 'dist-web/**', 'node_modules/**'],
+  },
   expoConfig,
   {
     rules: {
@@ -13,7 +16,6 @@ module.exports = defineConfig([
       '@typescript-eslint/array-type': 'off',
       'import/namespace': 'off',
     },
-    ignores: ['dist/*', 'node_modules/*'],
   },
   {
     files: ['__tests__/**/*.js'],
