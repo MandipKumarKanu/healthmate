@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Image, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { Radius, Spacing } from '../../theme/tokens';
 import { AppScreen } from '../../components/ui/AppScreen';
@@ -29,7 +29,12 @@ export default function OnboardingWelcomeScreen() {
         {/* Top Header: Logo Icon & App Name */}
         <View style={styles.topHeader}>
           <View style={styles.appIcon}>
-            <MaterialCommunityIcons name="heart-pulse" size={36} color="#FFFFFF" />
+            <Image
+              source={require('../../../assets/images/splash-icon.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+              accessibilityLabel="HealthMate Logo"
+            />
           </View>
           <Text style={styles.brandTitle}>HealthMate AI</Text>
         </View>
@@ -105,6 +110,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.28,
     shadowRadius: 10,
     elevation: 6,
+  },
+  logoImage: {
+    width: 42,
+    height: 42,
   },
   brandTitle: {
     fontSize: 22,
