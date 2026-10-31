@@ -9,8 +9,9 @@ import {
   ScrollView,
   Modal,
   Pressable,
-  KeyboardAvoidingView,
   Platform,
+  Dimensions,
+  Keyboard,
 } from 'react-native';
 import { AppAlert as Alert } from '../../services/appAlert';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -37,6 +38,7 @@ import {
   formatTime12Hour,
   getTimeLabel,
 } from '../../utils/reminderValidation';
+import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
 
 const TIME_WHEEL_ITEM_HEIGHT = 48;
 const TIME_WHEEL_VIEW_HEIGHT = 144;
@@ -54,6 +56,8 @@ const MINUTE_WHEEL_SNAP_OFFSETS = Array.from(
 
 export default function SetReminderScreen() {
   const router = useRouter();
+  const { keyboardHeight, isKeyboardVisible } = useKeyboardHeight();
+  const SCREEN_HEIGHT = Dimensions.get('window').height;
   const { medicineId, date } = useLocalSearchParams<{ medicineId?: string; date?: string }>();
   const { saveSchedule } = useReminderStore();
   const selectedDate = useAppStore((state) => state.selectedDate);
@@ -866,12 +870,34 @@ export default function SetReminderScreen() {
         statusBarTranslucent
         onRequestClose={() => setIsMedModalVisible(false)}
       >
-        <View style={styles.medModalOverlay}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={styles.medModalKeyboardContainer}
+        <View
+          style={[
+            styles.medModalOverlay,
+            isKeyboardVisible && {
+              justifyContent: 'flex-end',
+              paddingBottom: keyboardHeight + 12,
+              paddingTop: 36,
+            },
+          ]}
+        >
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => {
+              if (isKeyboardVisible) {
+                Keyboard.dismiss();
+              } else {
+                setIsMedModalVisible(false);
+              }
+            }}
+          />
+          <View
+            style={[
+              styles.medModalContainer,
+              isKeyboardVisible && {
+                maxHeight: Math.max(340, SCREEN_HEIGHT - keyboardHeight - 56),
+              },
+            ]}
           >
-            <View style={styles.medModalContainer}>
               {/* Modal Header */}
               <View style={styles.medModalHeader}>
                 <View>
@@ -1015,7 +1041,6 @@ export default function SetReminderScreen() {
                 </ScrollView>
               )}
             </View>
-          </KeyboardAvoidingView>
         </View>
       </Modal>
     </AppScreen>

@@ -9,8 +9,10 @@ import {
   ActivityIndicator,
   Linking,
   ScrollView,
-  KeyboardAvoidingView,
   Platform,
+  Dimensions,
+  Pressable,
+  Keyboard,
 } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -18,6 +20,7 @@ import { Colors } from '../../theme/colors';
 import { Radius, Spacing, Typography } from '../../theme/tokens';
 import { aiAssistantService } from '../../services/aiAssistantService';
 import { useKeyboardAwareScroll } from '../../hooks/useKeyboardAwareScroll';
+import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
 
 interface ConnectGeminiModalProps {
   visible: boolean;
@@ -41,6 +44,8 @@ export function ConnectGeminiModal({
   } = useKeyboardAwareScroll({
     extraOffset: 40,
   });
+  const { keyboardHeight, isKeyboardVisible } = useKeyboardHeight();
+  const SCREEN_HEIGHT = Dimensions.get('window').height;
   const [keyDraft, setKeyDraft] = useState('');
   const [isSecure, setIsSecure] = useState(true);
   const [isLoadingKey, setIsLoadingKey] = useState(false);
@@ -165,46 +170,70 @@ export function ConnectGeminiModal({
 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <KeyboardAvoidingView
-          // Android already resizes this Modal window (softwareKeyboardLayoutMode: "resize").
-          // Avoid applying "height" which double-shrinks the card on Android.
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.keyboardContainer}
+      <View
+        style={[
+          styles.backdrop,
+          isKeyboardVisible && {
+            justifyContent: 'flex-end',
+            paddingBottom: keyboardHeight + 12,
+            paddingTop: 36,
+          },
+        ]}
+      >
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={() => {
+            if (isKeyboardVisible) {
+              Keyboard.dismiss();
+            } else {
+              onClose();
+            }
+          }}
+        />
+        <View
+          style={[
+            styles.card,
+            isKeyboardVisible && {
+              maxHeight: Math.max(340, SCREEN_HEIGHT - keyboardHeight - 56),
+            },
+          ]}
         >
-          <View style={styles.card}>
-            {/* Header */}
-            <View style={styles.headerRow}>
-              <View style={styles.headerTitleRow}>
-                <View style={styles.geminiBadge}>
-                  <Ionicons name="sparkles" size={18} color="#FFFFFF" />
-                </View>
-                <View>
-                  <Text style={styles.title}>Personal AI Setup</Text>
-                  <Text style={styles.subtitle}>Google Gemini 3.5 Flash-Lite</Text>
-                </View>
+          {/* Header */}
+          <View style={styles.headerRow}>
+            <View style={styles.headerTitleRow}>
+              <View style={styles.geminiBadge}>
+                <Ionicons name="sparkles" size={18} color="#FFFFFF" />
               </View>
-              <TouchableOpacity
-                style={styles.closeBtn}
-                onPress={onClose}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons name="close" size={20} color={Colors.textSecondary} />
-              </TouchableOpacity>
+              <View>
+                <Text style={styles.title}>Personal AI Setup</Text>
+                <Text style={styles.subtitle}>Google Gemini 3.5 Flash-Lite</Text>
+              </View>
             </View>
-
-            <ScrollView
-              ref={modalScrollRef}
-              style={styles.modalScrollView}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.scrollContent}
-              keyboardShouldPersistTaps="handled"
-              keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-              automaticallyAdjustKeyboardInsets={true}
-              onScroll={onScroll}
-              scrollEventThrottle={16}
+            <TouchableOpacity
+              style={styles.closeBtn}
+              onPress={onClose}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <View style={{ flexGrow: 1 }} onFocusCapture={handleFocusCapture}>
+              <Ionicons name="close" size={20} color={Colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            ref={modalScrollRef}
+            style={[
+              styles.modalScrollView,
+              isKeyboardVisible && {
+                maxHeight: Math.min(280, SCREEN_HEIGHT - keyboardHeight - 170),
+              },
+            ]}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+            onScroll={onScroll}
+            scrollEventThrottle={16}
+          >
+            <View style={{ flexGrow: 1 }} onFocusCapture={handleFocusCapture}>
                 {showCelebration ? (
                   /* Celebration View (MCQ Choice 4) */
                   <View style={styles.celebrationContainer}>
@@ -418,7 +447,6 @@ export function ConnectGeminiModal({
               </View>
             </ScrollView>
           </View>
-        </KeyboardAvoidingView>
       </View>
     </Modal>
   );

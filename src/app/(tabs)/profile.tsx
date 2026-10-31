@@ -8,8 +8,10 @@ import {
   TextInput,
   Modal,
   ScrollView,
-  KeyboardAvoidingView,
   Platform,
+  Dimensions,
+  Pressable,
+  Keyboard,
 } from 'react-native';
 import { AppAlert as Alert } from '../../services/appAlert';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -30,9 +32,12 @@ import { AlarmReliabilityCard } from '../../components/profile/AlarmReliabilityC
 import { aiAssistantService } from '../../services/aiAssistantService';
 import { ConnectGeminiModal } from '../../components/ai/ConnectGeminiModal';
 import { useKeyboardAwareScroll } from '../../hooks/useKeyboardAwareScroll';
+import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { keyboardHeight, isKeyboardVisible } = useKeyboardHeight();
+  const SCREEN_HEIGHT = Dimensions.get('window').height;
   const appVersion = Constants.expoConfig?.version ?? '1.4.0';
   const {
     profile,
@@ -567,26 +572,54 @@ export default function ProfileScreen() {
 
       {/* Edit Profile Modal */}
       <Modal visible={isEditingProfile} transparent animationType="fade" statusBarTranslucent>
-        <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView
-            // Android already handles window soft-input resize; avoid applying "height" which double-shrinks the dialog.
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={{ width: '100%', maxWidth: 440, maxHeight: '90%', flexShrink: 1 }}
+        <View
+          style={[
+            styles.modalOverlay,
+            isKeyboardVisible && {
+              justifyContent: 'flex-end',
+              paddingBottom: keyboardHeight + 12,
+              paddingTop: 36,
+            },
+          ]}
+        >
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => {
+              if (isKeyboardVisible) {
+                Keyboard.dismiss();
+              } else {
+                setIsEditingProfile(false);
+              }
+            }}
+          />
+          <View
+            style={[
+              styles.profileModalCard,
+              isKeyboardVisible && {
+                maxHeight: Math.max(340, SCREEN_HEIGHT - keyboardHeight - 56),
+              },
+            ]}
           >
-            <View style={styles.profileModalCard}>
-              <Text style={styles.modalTitle}>Edit Profile</Text>
+            <Text style={styles.modalTitle}>Edit Profile</Text>
 
-              <ScrollView
-                ref={editModalScrollRef}
-                style={{ maxHeight: 440, flexShrink: 1 }}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-                automaticallyAdjustKeyboardInsets={true}
-                onScroll={handleModalScroll}
-                scrollEventThrottle={16}
-              >
-                <View style={{ flexGrow: 1 }} onFocusCapture={handleModalFocusCapture}>
+            <ScrollView
+              ref={editModalScrollRef}
+              style={{
+                maxHeight: isKeyboardVisible
+                  ? Math.min(260, SCREEN_HEIGHT - keyboardHeight - 170)
+                  : 440,
+                flexShrink: 1,
+              }}
+              contentContainerStyle={{
+                paddingBottom: isKeyboardVisible ? 30 : 10,
+              }}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+              onScroll={handleModalScroll}
+              scrollEventThrottle={16}
+            >
+              <View style={{ flexGrow: 1 }} onFocusCapture={handleModalFocusCapture}>
                   {/* Full Name */}
                   <View style={styles.modalFieldGroup}>
                     <Text style={styles.modalFieldLabel}>Full Name *</Text>
@@ -790,7 +823,6 @@ export default function ProfileScreen() {
                 />
               </View>
             </View>
-          </KeyboardAvoidingView>
         </View>
       </Modal>
 
