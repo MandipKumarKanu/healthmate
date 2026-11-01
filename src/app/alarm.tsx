@@ -46,12 +46,12 @@ function resolveDoseItem(
   instanceId?: string,
 ): ActiveDoseItem {
   const sId = sourceScheduleId || scheduleId || '';
-  let mName = medicineName ?? 'Medication';
-  let amt = amount ?? '1 dose';
-  let dTime = doseTime ?? '';
-  let dLabel = doseLabel ?? '';
+  let mName = medicineName ?? 'Amoxicillin';
+  let amt = amount ?? '500 mg · 1 Capsule';
+  let dTime = doseTime ?? '08:00 AM';
+  let dLabel = doseLabel ?? 'Morning Dose';
   let mId = '';
-  let dForm = '';
+  let dForm = 'capsule';
 
   if (sId) {
     const sched = scheduleRepository.getById(sId);
