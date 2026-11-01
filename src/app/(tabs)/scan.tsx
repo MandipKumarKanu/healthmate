@@ -440,12 +440,16 @@ export default function ScanScreen() {
       isSample: false,
     });
 
-    // Mark as saved and immediately reset scan state back to initial camera capture
+    // Mark as saved so scan flow resets in the background
     hasSavedMedicineRef.current = true;
-    handleResetAll();
 
-    // Directly navigate to the medicine's detail page
+    // Navigate directly to the medicine details page first (prevents camera flash)
     router.push(`/medicines/${newMed.id}`);
+
+    // Clean up scan state in the background once transition is underway
+    setTimeout(() => {
+      handleResetAll();
+    }, 500);
   };
 
   // ---------------------------------------------------------------------------
