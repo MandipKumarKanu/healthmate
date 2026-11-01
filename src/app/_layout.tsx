@@ -41,7 +41,8 @@ export default function RootLayout() {
           screenOptions={{
             headerShown: false,
             contentStyle: { backgroundColor: '#F2F1F7' },
-            animation: 'slide_from_right',
+            animation: 'default',
+            animationDuration: 200,
           }}
         >
           <Stack.Screen name="index" />
@@ -63,6 +64,7 @@ export default function RootLayout() {
             options={{
               presentation: 'fullScreenModal',
               animation: 'fade',
+              animationDuration: 180,
               gestureEnabled: false,
             }}
           />

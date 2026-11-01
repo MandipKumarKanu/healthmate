@@ -421,13 +421,13 @@ export default function FullScreenAlarmScreen() {
         await nativeAlarmService.stopAlarm();
         setTimeout(() => {
           router.replace('/(tabs)/home');
-        }, 750);
+        }, 200);
       }
     } catch (e) {
       console.warn('Failed to record taken dose:', e);
       setErrorMessage('Could not complete action. Please try again.');
       setSliderCompleted(false);
-      Animated.spring(slideX, { toValue: 0, useNativeDriver: false }).start();
+      Animated.spring(slideX, { toValue: 0, tension: 130, friction: 8, useNativeDriver: false }).start();
       setIsProcessing(false);
     }
   }, [isProcessing, currentDose, doses, router, slideX]);
@@ -484,13 +484,13 @@ export default function FullScreenAlarmScreen() {
         await nativeAlarmService.setLockScreenOverlap(false);
         setTimeout(() => {
           router.replace('/(tabs)/home');
-        }, 750);
+        }, 200);
       }
     } catch (e: any) {
       console.warn('Failed to snooze alarm for schedule:', currentDose.scheduleId);
       setErrorMessage(e?.message || 'Could not snooze alarm. Please try again.');
       setSliderCompleted(false);
-      Animated.spring(slideX, { toValue: 0, useNativeDriver: false }).start();
+      Animated.spring(slideX, { toValue: 0, tension: 130, friction: 8, useNativeDriver: false }).start();
       setIsProcessing(false);
     }
   }, [isProcessing, currentDose, doses, snoozeMinutes, router, slideX]);
@@ -547,13 +547,13 @@ export default function FullScreenAlarmScreen() {
         setCompletedAction('skipped');
         await nativeAlarmService.setLockScreenOverlap(false);
         await nativeAlarmService.stopAlarm();
-        setTimeout(() => router.replace('/(tabs)/home'), 750);
+        setTimeout(() => router.replace('/(tabs)/home'), 200);
       }
     } catch (error) {
       console.warn('Failed to skip dose:', error);
       setErrorMessage('Could not skip this dose. Please try again.');
       setSliderCompleted(false);
-      Animated.spring(slideX, { toValue: 0, useNativeDriver: false }).start();
+      Animated.spring(slideX, { toValue: 0, tension: 130, friction: 8, useNativeDriver: false }).start();
       setIsProcessing(false);
     }
   }, [isProcessing, currentDose, doses, router, slideX]);
@@ -604,12 +604,12 @@ export default function FullScreenAlarmScreen() {
       await nativeAlarmService.stopAlarm();
       setTimeout(() => {
         router.replace('/(tabs)/home');
-      }, 750);
+      }, 200);
     } catch (e) {
       console.warn('Failed to take all doses:', e);
       setErrorMessage('Could not take all doses. Please try again.');
       setSliderCompleted(false);
-      Animated.spring(slideX, { toValue: 0, useNativeDriver: false }).start();
+      Animated.spring(slideX, { toValue: 0, tension: 130, friction: 8, useNativeDriver: false }).start();
       setIsProcessing(false);
     }
   }, [isProcessing, doses, router, slideX]);
@@ -723,8 +723,8 @@ export default function FullScreenAlarmScreen() {
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(arrowPulse, { toValue: 6, duration: 900, useNativeDriver: true }),
-        Animated.timing(arrowPulse, { toValue: 0, duration: 900, useNativeDriver: true }),
+        Animated.timing(arrowPulse, { toValue: 6, duration: 450, useNativeDriver: true }),
+        Animated.timing(arrowPulse, { toValue: 0, duration: 450, useNativeDriver: true }),
       ]),
     );
     loop.start();
@@ -754,7 +754,7 @@ export default function FullScreenAlarmScreen() {
             Vibration.vibrate(Platform.OS === 'android' ? [0, 80] : 80);
             Animated.timing(slideX, {
               toValue: maxSlide,
-              duration: 140,
+              duration: 90,
               useNativeDriver: false,
             }).start(() => {
               if (sliderAction === 'snooze') {
@@ -772,8 +772,8 @@ export default function FullScreenAlarmScreen() {
           } else {
             Animated.spring(slideX, {
               toValue: 0,
-              tension: 40,
-              friction: 7,
+              tension: 130,
+              friction: 8,
               useNativeDriver: false,
             }).start();
           }
