@@ -625,6 +625,11 @@ export default function FullScreenAlarmScreen() {
     return match ? match[1] : '08:00';
   }, [currentDose?.doseTime]);
 
+  const formattedCurrentTime = useMemo(
+    () => formatTime12Hour(currentDose?.doseTime || '08:00'),
+    [currentDose?.doseTime],
+  );
+
   const displayNextDose = useMemo(() => {
     if (nextDose) {
       const match = nextDose.doseTime?.match(/(\d{1,2}:\d{2})/);
@@ -649,26 +654,31 @@ export default function FullScreenAlarmScreen() {
     router.replace('/(tabs)/home');
   }, [currentDose, router]);
 
+  // Check if all pending doses are taken
+  const allDosesCount = doses.length;
+  const pendingCount = pendingDoses.length;
+
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.screenContainer}>
-          {/* Top Header Bar */}
-          <View style={styles.topHeader}>
-            <View style={styles.reminderStatusPill}>
-              <View style={styles.livePulseDot} />
-              <Text style={styles.reminderStatusText}>MEDICINE REMINDER</Text>
+          {/* Top Bar: Quiet, elegant */}
+          <View style={styles.topBar}>
+            <View style={styles.brandRow}>
+              <View style={styles.brandDot} />
+              <Text style={styles.brandText}>HealthMate</Text>
             </View>
 
             <TouchableOpacity
-              style={styles.closeButton}
+              style={styles.dismissButton}
               onPress={handleDismiss}
               activeOpacity={0.7}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               accessibilityRole="button"
               accessibilityLabel="Dismiss Alarm"
             >
-              <Ionicons name="close" size={18} color="#64748B" />
+              <Ionicons name="close" size={20} color="#8A8991" />
             </TouchableOpacity>
           </View>
 
@@ -710,198 +720,162 @@ export default function FullScreenAlarmScreen() {
             </View>
           )}
 
-          {/* Hero Clock & Greeting Section */}
-          <View style={styles.heroClockSection}>
-            <View style={styles.ambientGlow} />
-            <View style={styles.clockTimeRow}>
-              <Text style={styles.clockTimeLarge}>{clockDisplayTime}</Text>
-              <View style={styles.dosePeriodBadge}>
-                <Text style={styles.dosePeriodBadgeText}>
-                  {currentDose?.doseLabel || 'Morning Dose'}
-                </Text>
-              </View>
-            </View>
-            <Text style={styles.clockSubtitle}>Time to take your scheduled dose</Text>
+          {/* Hero Header: Human, Clear, Dignified */}
+          <View style={styles.heroHeader}>
+            <Text style={styles.heroTimeSub}>
+              {currentDose?.doseLabel ? `${currentDose.doseLabel} · ` : ''}
+              {formattedCurrentTime}
+            </Text>
+            <Text style={styles.heroTitle}>
+              {allDosesCount > 1 ? 'Morning Medications' : 'Time for Medication'}
+            </Text>
+            <Text style={styles.heroSubtitle}>
+              {allDosesCount > 1
+                ? `${pendingCount} dose${pendingCount === 1 ? '' : 's'} scheduled for right now`
+                : 'Take with a glass of water as prescribed'}
+            </Text>
           </View>
 
-          {/* Simultaneous Doses Tabs (if multiple pending) */}
-          {doses.length > 1 && (
-            <View style={styles.simultaneousSection}>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.simultaneousPillRow}
-              >
-                {doses.map((dose, idx) => {
-                  const isSelected = idx === selectedIndex;
-                  return (
-                    <TouchableOpacity
-                      key={dose.id}
-                      onPress={() => setSelectedIndex(idx)}
+          {/* Main Medications Card (Apple Health Grouped Inset Card) */}
+          <View style={styles.medicationsCard}>
+            {doses.map((dose, index) => {
+              const isSelected = index === selectedIndex;
+              const isTaken = dose.status === 'taken';
+              const isSkipped = dose.status === 'skipped';
+              const isLast = index === doses.length - 1;
+
+              return (
+                <View key={dose.id}>
+                  <TouchableOpacity
+                    style={[
+                      styles.medicationRow,
+                      isSelected && doses.length > 1 && styles.medicationRowSelected,
+                    ]}
+                    onPress={() => setSelectedIndex(index)}
+                    activeOpacity={0.7}
+                  >
+                    <View
                       style={[
-                        styles.simultaneousPill,
-                        isSelected && styles.simultaneousPillActive,
+                        styles.medIconBox,
+                        isTaken && styles.medIconBoxTaken,
                       ]}
                     >
+                      <MaterialCommunityIcons
+                        name="pill"
+                        size={22}
+                        color={isTaken ? Colors.success : Colors.primary}
+                        style={{ transform: [{ rotate: '-45deg' }] }}
+                      />
+                    </View>
+
+                    <View style={styles.medDetailsCol}>
                       <Text
                         style={[
-                          styles.simultaneousPillText,
-                          isSelected && styles.simultaneousPillTextActive,
+                          styles.medNameText,
+                          (isTaken || isSkipped) && styles.medNameMuted,
                         ]}
+                        numberOfLines={1}
                       >
                         {dose.medicineName}
                       </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          )}
+                      <Text style={styles.medDoseText} numberOfLines={1}>
+                        {dose.amount}
+                      </Text>
+                    </View>
 
-          {/* Main Medicine Card */}
-          <View style={styles.medCard}>
-            {/* Header: Icon, Name, Dose Amount */}
-            <View style={styles.cardHeader}>
-              <View style={styles.medIconContainer}>
-                <MaterialCommunityIcons name="pill" size={28} color="#0788F5" />
-              </View>
-              <View style={styles.cardHeaderCopy}>
-                <Text style={styles.cardMedName} numberOfLines={1}>
-                  {currentDose?.medicineName || 'Metformin'}
-                </Text>
-                <Text style={styles.cardDoseSubtitle} numberOfLines={1}>
-                  {currentDose?.amount || '500 mg · 1 tablet'}
-                </Text>
-              </View>
-              <View style={styles.dueBadge}>
-                <View style={styles.dueBadgeDot} />
-                <Text style={styles.dueBadgeText}>Due now</Text>
-              </View>
-            </View>
+                    {/* Status indicator on right */}
+                    <View style={styles.medStatusCol}>
+                      {isTaken ? (
+                        <View style={styles.takenBadge}>
+                          <Ionicons name="checkmark" size={14} color={Colors.success} />
+                          <Text style={styles.takenBadgeText}>Taken</Text>
+                        </View>
+                      ) : isSkipped ? (
+                        <View style={styles.skippedBadge}>
+                          <Text style={styles.skippedBadgeText}>Skipped</Text>
+                        </View>
+                      ) : (
+                        <View style={styles.dueBadgePill}>
+                          <Text style={styles.dueBadgePillText}>Due</Text>
+                        </View>
+                      )}
+                    </View>
+                  </TouchableOpacity>
 
-            {/* Visual Specs Badges Grid (2-column pills) */}
-            <View style={styles.specsGrid}>
-              <View style={styles.specBox}>
-                <Ionicons name="repeat-outline" size={17} color="#0788F5" />
-                <View style={styles.specBoxTextCol}>
-                  <Text style={styles.specBoxLabel}>FREQUENCY</Text>
-                  <Text style={styles.specBoxValue} numberOfLines={1}>
-                    {recurrenceLabel}
-                  </Text>
+                  {!isLast && <View style={styles.rowSeparator} />}
                 </View>
-              </View>
+              );
+            })}
 
-              <View style={styles.specBox}>
-                <Ionicons name="water-outline" size={17} color="#0788F5" />
-                <View style={styles.specBoxTextCol}>
-                  <Text style={styles.specBoxLabel}>DOSAGE</Text>
-                  <Text style={styles.specBoxValue} numberOfLines={1}>
-                    Take {doseInstruction}
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Schedule Prescription Footnote */}
-            <View style={styles.scheduleStrip}>
-              <Ionicons name="shield-checkmark-outline" size={15} color="#10B981" />
-              <Text style={styles.scheduleStripText} numberOfLines={1}>
-                Saved prescription · {startedLabel}
-              </Text>
-            </View>
-
-            {/* Reassurance Insight Bar */}
-            <View style={styles.insightBar}>
-              <Ionicons name="sparkles" size={15} color="#0788F5" />
-              <Text style={styles.insightBarText}>
-                Keeping your routine consistent maintains optimal health.
+            {/* Subtle schedule reassurance note */}
+            <View style={styles.cardFooter}>
+              <Ionicons name="calendar-outline" size={14} color="#8A8991" />
+              <Text style={styles.cardFooterText}>
+                {recurrenceLabel} · {startedLabel}
               </Text>
             </View>
           </View>
 
-          {/* Action Buttons Section */}
-          <View style={styles.actionsSection}>
-            {/* Primary Action Button: Mark as Taken (Hero Pulsing Pill) */}
+          {/* Action Buttons: Bold, Clean, Purposeful */}
+          <View style={styles.actionsContainer}>
+            {/* Primary Action Button */}
             <Animated.View style={{ transform: [{ scale: chimeScale }], width: '100%' }}>
               <TouchableOpacity
-                style={styles.heroTakenButton}
-                onPress={executeTakeDose}
+                style={styles.primaryButton}
+                onPress={pendingCount > 1 ? executeTakeAll : executeTakeDose}
                 disabled={isProcessing}
                 activeOpacity={0.85}
                 accessibilityRole="button"
                 accessibilityLabel="Mark as Taken"
               >
-                <View style={styles.heroCheckIconCircle}>
-                  <Ionicons name="checkmark" size={20} color="#0788F5" />
-                </View>
-                <Text style={styles.heroTakenButtonText}>Mark as Taken</Text>
+                <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                <Text style={styles.primaryButtonText}>
+                  {pendingCount > 1
+                    ? `Take All (${pendingCount} Medications)`
+                    : 'Mark as Taken'}
+                </Text>
               </TouchableOpacity>
             </Animated.View>
 
-            {/* Secondary Actions: Snooze & Skip Side-by-Side */}
-            <View style={styles.secondaryActionsRow}>
+            {/* Secondary Actions: Snooze & Skip */}
+            <View style={styles.secondaryRow}>
               <TouchableOpacity
-                style={styles.snoozeButton}
+                style={styles.secondaryCardButton}
                 onPress={executeSnooze}
                 disabled={isProcessing}
                 activeOpacity={0.7}
                 accessibilityRole="button"
                 accessibilityLabel={`Snooze for ${snoozeMinutes} minutes`}
               >
-                <MaterialCommunityIcons name="alarm-snooze" size={20} color="#334155" />
-                <Text style={styles.snoozeButtonText}>Snooze ({snoozeMinutes}m)</Text>
+                <MaterialCommunityIcons name="alarm-snooze" size={18} color="#111116" />
+                <Text style={styles.secondaryButtonText}>Snooze {snoozeMinutes}m</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.skipButton}
+                style={styles.secondaryCardButton}
                 onPress={executeSkipDose}
                 disabled={isProcessing}
                 activeOpacity={0.7}
                 accessibilityRole="button"
                 accessibilityLabel="Skip this dose"
               >
-                <Ionicons name="close-circle-outline" size={19} color="#E11D48" />
-                <Text style={styles.skipButtonText}>Skip for now</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Take All Button (When multiple unique doses exist) */}
-            {pendingDoses.length > 1 && (
-              <TouchableOpacity
-                testID="take-all-button"
-                style={styles.takeAllButton}
-                onPress={executeTakeAll}
-                disabled={isProcessing}
-                activeOpacity={0.8}
-              >
-                <Ionicons
-                  name="checkmark-done"
-                  size={16}
-                  color={Colors.primary}
-                  style={{ marginRight: 6 }}
-                />
-                <Text style={styles.takeAllButtonText}>
-                  Mark all {pendingDoses.length} doses as taken
+                <Ionicons name="close" size={18} color="#E05B67" />
+                <Text style={[styles.secondaryButtonText, { color: '#E05B67' }]}>
+                  Skip for now
                 </Text>
               </TouchableOpacity>
-            )}
+            </View>
           </View>
 
-          {/* Bottom Next Up Preview Card */}
-          <View style={styles.nextCard}>
-            <View style={styles.nextIconBox}>
-              <MaterialCommunityIcons name="pill" size={16} color="#0788F5" />
-            </View>
-            <View style={styles.nextInfo}>
-              <Text style={styles.nextMedName} numberOfLines={1}>
-                Next: {displayNextDose.medicineName}
-              </Text>
-              <Text style={styles.nextDetails} numberOfLines={1}>
-                {displayNextDose.doseTime} · {displayNextDose.amount}
+          {/* Upcoming Dose Preview */}
+          {nextDose && (
+            <View style={styles.upcomingDoseBar}>
+              <Text style={styles.upcomingLabel}>Next up</Text>
+              <Text style={styles.upcomingDetails} numberOfLines={1}>
+                {nextDose.medicineName} · {formatTime12Hour(nextDose.doseTime || '08:00')}
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
-          </View>
+          )}
         </View>
       </SafeAreaView>
     </View>
@@ -911,7 +885,7 @@ export default function FullScreenAlarmScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F2F1F7',
   },
   safeArea: {
     flex: 1,
@@ -921,406 +895,254 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingTop: 8,
-    paddingBottom: 16,
+    paddingBottom: 20,
   },
 
   // ---------------------------------------------------------------------------
-  // Top Header Bar
+  // Top Bar
   // ---------------------------------------------------------------------------
-  topHeader: {
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 4,
+    paddingVertical: 4,
   },
-  reminderStatusPill: {
+  brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 7,
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#DBEAFE',
   },
-  livePulseDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: '#0788F5',
-  },
-  reminderStatusText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#0788F5',
-    letterSpacing: 0.6,
-  },
-  closeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-
-  // ---------------------------------------------------------------------------
-  // Hero Clock & Due Status
-  // ---------------------------------------------------------------------------
-  heroClockSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    marginVertical: 6,
-  },
-  ambientGlow: {
-    position: 'absolute',
-    width: 220,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: 'rgba(7, 136, 245, 0.08)',
-  },
-  clockTimeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  clockTimeLarge: {
-    fontSize: 54,
-    fontWeight: '800',
-    color: '#0F172A',
-    letterSpacing: -1.5,
-  },
-  dosePeriodBadge: {
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#DBEAFE',
-  },
-  dosePeriodBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#0788F5',
-  },
-  clockSubtitle: {
-    fontSize: 13.5,
-    color: '#64748B',
-    marginTop: 2,
-    fontWeight: '500',
-  },
-
-  // ---------------------------------------------------------------------------
-  // Main Medicine Card
-  // ---------------------------------------------------------------------------
-  medCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 14,
-    elevation: 3,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-  },
-  medIconContainer: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
-    backgroundColor: '#EFF6FF',
-    borderWidth: 1,
-    borderColor: '#DBEAFE',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardHeaderCopy: {
-    flex: 1,
-  },
-  cardMedName: {
-    fontSize: 21,
-    fontWeight: '800',
-    color: '#0F172A',
-    letterSpacing: -0.3,
-  },
-  cardDoseSubtitle: {
-    fontSize: 13.5,
-    color: '#64748B',
-    marginTop: 2,
-    fontWeight: '500',
-  },
-  dueBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-  },
-  dueBadgeDot: {
+  brandDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#10B981',
+    backgroundColor: '#0788F5',
   },
-  dueBadgeText: {
-    fontSize: 11.5,
-    fontWeight: '700',
-    color: '#059669',
+  brandText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#8A8991',
+    letterSpacing: -0.2,
   },
-
-  // Specs Grid (Clean 2-column card badges)
-  specsGrid: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 14,
-  },
-  specBox: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+  dismissButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: '#ECEBF0',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  specBoxTextCol: {
-    flex: 1,
+
+  // ---------------------------------------------------------------------------
+  // Hero Header
+  // ---------------------------------------------------------------------------
+  heroHeader: {
+    marginVertical: 10,
   },
-  specBoxLabel: {
-    fontSize: 9.5,
-    fontWeight: '700',
-    color: '#94A3B8',
+  heroTimeSub: {
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: '#0788F5',
+    textTransform: 'uppercase',
     letterSpacing: 0.5,
+    marginBottom: 4,
   },
-  specBoxValue: {
-    fontSize: 12.5,
+  heroTitle: {
+    fontSize: 28,
     fontWeight: '700',
-    color: '#1E293B',
-    marginTop: 1,
+    color: '#111116',
+    letterSpacing: -0.6,
   },
-
-  // Prescription strip
-  scheduleStrip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 12,
-    paddingHorizontal: 2,
-  },
-  scheduleStripText: {
-    fontSize: 12,
-    color: '#64748B',
-    fontWeight: '500',
-    flex: 1,
-  },
-
-  // Reassurance Bar
-  insightBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#EFF6FF',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    marginTop: 12,
-  },
-  insightBarText: {
-    fontSize: 12,
-    color: '#1E40AF',
-    flex: 1,
-    lineHeight: 16,
-    fontWeight: '500',
+  heroSubtitle: {
+    fontSize: 14.5,
+    color: '#8A8991',
+    marginTop: 4,
+    lineHeight: 20,
   },
 
   // ---------------------------------------------------------------------------
-  // Action Buttons Section
+  // Medications Card (Apple Health Grouped Inset)
   // ---------------------------------------------------------------------------
-  actionsSection: {
+  medicationsCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#ECEBF0',
+    ...Shadows.card,
+    elevation: 2,
+    overflow: 'hidden',
+    marginVertical: 8,
+  },
+  medicationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  medicationRowSelected: {
+    backgroundColor: '#F8FAFC',
+  },
+  medIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 13,
+    backgroundColor: '#EAF4FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  medIconBoxTaken: {
+    backgroundColor: '#E8F8EE',
+  },
+  medDetailsCol: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  medNameText: {
+    fontSize: 16.5,
+    fontWeight: '700',
+    color: '#111116',
+    letterSpacing: -0.2,
+  },
+  medNameMuted: {
+    color: '#8A8991',
+    textDecorationLine: 'line-through',
+  },
+  medDoseText: {
+    fontSize: 13,
+    color: '#8A8991',
+    marginTop: 2,
+  },
+  medStatusCol: {
+    marginLeft: 10,
+  },
+  dueBadgePill: {
+    backgroundColor: '#EAF4FE',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  dueBadgePillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0788F5',
+  },
+  takenBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#E8F8EE',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  takenBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#23964E',
+  },
+  skippedBadge: {
+    backgroundColor: '#F0EFEF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  skippedBadgeText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#8A8991',
+  },
+  rowSeparator: {
+    height: 1,
+    backgroundColor: '#F3F2F6',
+    marginLeft: 72,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#F8F8FC',
+    borderTopWidth: 1,
+    borderTopColor: '#ECEBF0',
+  },
+  cardFooterText: {
+    fontSize: 12,
+    color: '#8A8991',
+  },
+
+  // ---------------------------------------------------------------------------
+  // Action Buttons
+  // ---------------------------------------------------------------------------
+  actionsContainer: {
     gap: 10,
-    marginVertical: 4,
+    marginVertical: 6,
   },
-  heroTakenButton: {
+  primaryButton: {
     width: '100%',
-    height: 56,
-    borderRadius: 28,
+    height: 52,
+    borderRadius: 16,
     backgroundColor: '#0788F5',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#0788F5',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 6,
+    ...Shadows.card,
+    elevation: 3,
   },
-  heroCheckIconCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  heroTakenButtonText: {
+  primaryButtonText: {
     fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
-    letterSpacing: 0.2,
+    letterSpacing: -0.2,
   },
-  secondaryActionsRow: {
+  secondaryRow: {
     flexDirection: 'row',
     gap: 10,
   },
-  snoozeButton: {
+  secondaryCardButton: {
     flex: 1,
-    height: 48,
-    borderRadius: 24,
+    height: 46,
+    borderRadius: 14,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#ECEBF0',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
+    gap: 7,
+    ...Shadows.subtle,
   },
-  snoozeButtonText: {
+  secondaryButtonText: {
     fontSize: 13.5,
-    fontWeight: '700',
-    color: '#334155',
-  },
-  skipButton: {
-    flex: 1,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#FFF1F2',
-    borderWidth: 1,
-    borderColor: '#FFE4E6',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  skipButtonText: {
-    fontSize: 13.5,
-    fontWeight: '700',
-    color: '#E11D48',
-  },
-  takeAllButton: {
-    width: '100%',
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#EFF6FF',
-    borderWidth: 1,
-    borderColor: '#BAE6FD',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  takeAllButtonText: {
-    fontSize: 12.5,
     fontWeight: '600',
-    color: '#0788F5',
+    color: '#111116',
   },
 
   // ---------------------------------------------------------------------------
-  // Bottom Next Up Preview Card
+  // Upcoming Dose Preview Bar
   // ---------------------------------------------------------------------------
-  nextCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+  upcomingDoseBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  nextIconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: '#EFF6FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  nextInfo: {
-    flex: 1,
-    marginLeft: 10,
-  },
-  nextMedName: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1E293B',
-  },
-  nextDetails: {
-    fontSize: 11.5,
-    color: '#64748B',
-    marginTop: 1,
-  },
-
-  // ---------------------------------------------------------------------------
-  // Simultaneous Doses Tabs
-  // ---------------------------------------------------------------------------
-  simultaneousSection: {
-    marginVertical: 4,
-  },
-  simultaneousPillRow: {
-    gap: 8,
-    paddingVertical: 2,
-  },
-  simultaneousPill: {
+    justifyContent: 'space-between',
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: Radius.pill,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#ECEBF0',
   },
-  simultaneousPillActive: {
-    backgroundColor: Colors.primaryLight,
-    borderColor: Colors.primary,
-  },
-  simultaneousPillText: {
+  upcomingLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#1E293B',
+    color: '#8A8991',
   },
-  simultaneousPillTextActive: {
-    color: Colors.primaryDark,
+  upcomingDetails: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#111116',
   },
 
   // ---------------------------------------------------------------------------
