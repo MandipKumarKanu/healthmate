@@ -888,7 +888,7 @@ export default function FullScreenAlarmScreen() {
           {/* Monumental Lockscreen Clock with radiating rays */}
           <View style={styles.lockClockSection}>
             <View style={styles.topClockBadge}>
-              <Ionicons name="time" size={26} color="#0788F5" />
+              <Ionicons name="alarm-outline" size={36} color="#0788F5" />
             </View>
             <Text style={styles.clockSubHeader}>Medicine Reminder</Text>
             <View style={styles.clockRow}>
@@ -1256,9 +1256,9 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   topClockBadge: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
+    width: 58,
+    height: 58,
+    borderRadius: 20,
     backgroundColor: '#EFF6FF',
     borderWidth: 1.5,
     borderColor: '#BFDBFE',
