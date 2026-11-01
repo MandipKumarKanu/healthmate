@@ -14,6 +14,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { MedicineIcon } from '../components/ui/MedicineIcon';
 import { nativeAlarmService } from '../services/nativeAlarmService';
 import { adherenceRepository } from '../database/repositories/adherenceRepository';
 import { scheduleRepository } from '../database/repositories/scheduleRepository';
@@ -97,6 +98,36 @@ function resolveDoseItem(
   };
 }
 
+function formatDoseTime(timeStr?: string): { time: string; period: string } {
+  if (!timeStr) {
+    const now = new Date();
+    let hours = now.getHours();
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const period = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12 || 12;
+    return { time: `${String(hours).padStart(2, '0')}:${minutes}`, period };
+  }
+
+  const match = timeStr.trim().match(/^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?$/i);
+  if (match) {
+    let hours = parseInt(match[1], 10);
+    const minutes = match[2];
+    const rawPeriod = match[3];
+
+    let period = rawPeriod ? rawPeriod.toUpperCase() : hours >= 12 ? 'PM' : 'AM';
+    if (!rawPeriod && hours >= 12) {
+      hours = hours % 12 || 12;
+    } else if (!rawPeriod && hours === 0) {
+      hours = 12;
+    } else if (rawPeriod && hours > 12) {
+      hours = hours % 12 || 12;
+    }
+    return { time: `${String(hours).padStart(2, '0')}:${minutes}`, period };
+  }
+
+  return { time: timeStr, period: '' };
+}
+
 export default function FullScreenAlarmScreen() {
   const router = useRouter();
 
@@ -117,6 +148,28 @@ export default function FullScreenAlarmScreen() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+
+  // Animation values
+  const [chimeScale] = useState(() => new Animated.Value(1));
+  const [bellRotate] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    const ringAnim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(bellRotate, { toValue: 1, duration: 150, useNativeDriver: true }),
+        Animated.timing(bellRotate, { toValue: -1, duration: 300, useNativeDriver: true }),
+        Animated.timing(bellRotate, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(bellRotate, { toValue: 0, duration: 150, useNativeDriver: true }),
+        Animated.delay(1800),
+      ]),
+    );
+
+    ringAnim.start();
+
+    return () => {
+      ringAnim.stop();
+    };
+  }, [bellRotate]);
 
   // Initialize initial dose from query parameters
   const initialDose = useMemo(() => {
@@ -141,9 +194,6 @@ export default function FullScreenAlarmScreen() {
 
   const [doses, setDoses] = useState<ActiveDoseItem[]>([initialDose]);
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
-
-  // Animation values
-  const [chimeScale] = useState(() => new Animated.Value(1));
 
   // Scoped lockscreen window overlap & back button trapping
   useEffect(() => {
@@ -567,23 +617,13 @@ export default function FullScreenAlarmScreen() {
       })
     : 'Started recently';
 
-  // App Theme: Consistent with HealthMate theme
-  const themeColors = {
-    bg: Colors.background, // #F2F1F7
-    card: Colors.cardBackground, // #FFFFFF
-    innerPanel: Colors.cardBackgroundSecondary, // #F8F8FC
-    divider: Colors.divider, // #E4E3E8
-    textPrimary: Colors.textPrimary, // #111116
-    textSecondary: '#64748B',
-    border: Colors.border, // #ECEBF0
-    glowRing: Colors.primaryLight, // #E8F4FF
-    skipBg: Colors.errorLight, // #FEECEE
-    skipBorder: '#FCD7DA',
-    haloColor: 'rgba(7, 136, 245, 0.08)',
-  };
+  const timeObj = useMemo(
+    () => formatDoseTime(currentDose?.doseTime),
+    [currentDose?.doseTime],
+  );
 
   return (
-    <View style={[styles.container, { backgroundColor: themeColors.bg }]}>
+    <View style={styles.container}>
       <StatusBar style="dark" />
       <SafeAreaView style={styles.safeArea}>
         <ScrollView
@@ -592,184 +632,164 @@ export default function FullScreenAlarmScreen() {
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
-          {/* Subtle concentric halo ripples behind time */}
-          <View style={styles.heroWrapper}>
-            <View style={[styles.timeHaloLarge, { borderColor: themeColors.haloColor }]} />
-            <View style={[styles.timeHaloSmall, { borderColor: themeColors.haloColor }]} />
-
-            <Text style={[styles.screenTitle, { color: themeColors.textSecondary }]}>
-              Medicine Reminder
-            </Text>
-
-            {/* Time with Ray Ticks */}
-            <View style={styles.scheduledTimeRow}>
-              <View style={styles.timeRaysLeft}>
-                <View style={[styles.timeRay, styles.timeRayTopLeft]} />
-                <View style={[styles.timeRay, styles.timeRayMidLeft]} />
-                <View style={[styles.timeRay, styles.timeRayBotLeft]} />
-              </View>
-
-              <Text style={[styles.scheduledTime, { color: themeColors.textPrimary }]}>
-                {currentDose?.doseTime || '08:00'}
-              </Text>
-
-              <View style={styles.timeRaysRight}>
-                <View style={[styles.timeRay, styles.timeRayTopRight]} />
-                <View style={[styles.timeRay, styles.timeRayMidRight]} />
-                <View style={[styles.timeRay, styles.timeRayBotRight]} />
-              </View>
+          {/* Top Hero: Ringing Badge & Digital Clock */}
+          <View style={styles.heroSection}>
+            <View style={styles.alarmStatusPill}>
+              <Animated.View
+                style={{
+                  transform: [
+                    {
+                      rotate: bellRotate.interpolate({
+                        inputRange: [-1, 0, 1],
+                        outputRange: ['-18deg', '0deg', '18deg'],
+                      }),
+                    },
+                  ],
+                }}
+              >
+                <Ionicons name="notifications" size={15} color={Colors.primary} />
+              </Animated.View>
+              <Text style={styles.alarmStatusText}>MEDICATION REMINDER</Text>
+              <View style={styles.statusDot} />
             </View>
 
-            <Text style={[styles.timeSubtitle, { color: themeColors.textSecondary }]}>
-              Time to take your medicine
-            </Text>
+            <View style={styles.timeRow}>
+              <Text style={styles.timeDigits}>{timeObj.time}</Text>
+              {timeObj.period ? (
+                <View style={styles.periodBadge}>
+                  <Text style={styles.periodText}>{timeObj.period}</Text>
+                </View>
+              ) : null}
+            </View>
+
+            <Text style={styles.timeTagline}>Time to take your scheduled dose</Text>
+
+            {/* Simultaneous Doses Selector (When multiple unique doses are due) */}
+            {doses.length > 1 && (
+              <View style={styles.simultaneousSection}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.dosePillRow}
+                >
+                  {doses.map((dose, idx) => {
+                    const isSelected = idx === selectedIndex;
+                    const isTaken = dose.status === 'taken';
+                    const isSnoozed = dose.status === 'snoozed';
+                    const isSkipped = dose.status === 'skipped';
+                    return (
+                      <TouchableOpacity
+                        key={dose.id}
+                        testID={`dose-pill-${dose.scheduleId}`}
+                        onPress={() => setSelectedIndex(idx)}
+                        activeOpacity={0.75}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Select ${dose.medicineName} dose`}
+                        style={[
+                          styles.dosePill,
+                          isSelected && styles.dosePillSelected,
+                        ]}
+                      >
+                        <Ionicons
+                          name={
+                            isTaken
+                              ? 'checkmark-circle'
+                              : isSnoozed
+                                ? 'alarm'
+                                : isSkipped
+                                  ? 'close-circle'
+                                  : 'medical'
+                          }
+                          size={14}
+                          color={
+                            isTaken
+                              ? Colors.success
+                              : isSnoozed
+                                ? Colors.warning
+                                : isSkipped
+                                  ? Colors.textTertiary
+                                  : isSelected
+                                    ? Colors.primary
+                                    : Colors.textSecondary
+                          }
+                        />
+                        <Text
+                          style={[
+                            styles.dosePillText,
+                            isSelected && styles.dosePillTextSelected,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {dose.medicineName}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
           </View>
 
-          {/* Simultaneous Doses Pill Selector (ONLY when multiple unique doses are due) */}
-          {doses.length > 1 && (
-            <View style={styles.simultaneousSection}>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.dosePillRow}
-              >
-                {doses.map((dose, idx) => {
-                  const isSelected = idx === selectedIndex;
-                  const isTaken = dose.status === 'taken';
-                  const isSnoozed = dose.status === 'snoozed';
-                  const isSkipped = dose.status === 'skipped';
-                  return (
-                    <TouchableOpacity
-                      key={dose.id}
-                      testID={`dose-pill-${dose.scheduleId}`}
-                      onPress={() => setSelectedIndex(idx)}
-                      activeOpacity={0.75}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Select ${dose.medicineName} dose`}
-                      style={[
-                        styles.dosePill,
-                        {
-                          backgroundColor: isSelected ? Colors.primaryLight : themeColors.card,
-                          borderColor: isSelected ? Colors.primary : themeColors.border,
-                        },
-                      ]}
-                    >
-                      <Ionicons
-                        name={
-                          isTaken
-                            ? 'checkmark-circle'
-                            : isSnoozed
-                              ? 'alarm'
-                              : isSkipped
-                                ? 'close-circle'
-                                : 'medical-outline'
-                        }
-                        size={14}
-                        color={
-                          isTaken
-                            ? Colors.success
-                            : isSnoozed
-                              ? Colors.warning
-                              : isSkipped
-                                ? Colors.textTertiary
-                                : Colors.primary
-                        }
-                      />
-                      <Text
-                        style={[
-                          styles.dosePillText,
-                          { color: isSelected ? Colors.primaryDark : themeColors.textPrimary },
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {dose.medicineName}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          )}
-
-          {/* Main Floating Medicine Card */}
-          <View style={[styles.medicineCard, { backgroundColor: themeColors.card }]}>
-            {/* Header: Icon, Name/Amount, Badge */}
+          {/* Center: Hero Medicine Card */}
+          <View style={styles.medicineCard}>
             <View style={styles.cardHeader}>
-              <View style={styles.pillIconBox}>
-                <MaterialCommunityIcons
-                  name="pill"
-                  size={22}
-                  color={Colors.primary}
-                  style={styles.pillIcon}
-                />
-              </View>
-
-              <View style={styles.cardHeading}>
-                <Text
-                  style={[styles.medicineName, { color: themeColors.textPrimary }]}
-                  numberOfLines={1}
-                >
+              <MedicineIcon
+                form={(currentDose?.dosageForm as any) || 'tablet'}
+                name={currentDose?.medicineName}
+                size={58}
+              />
+              <View style={styles.cardHeaderInfo}>
+                <View style={styles.cardBadgeRow}>
+                  <View style={styles.doseBadge}>
+                    <Text style={styles.doseBadgeText}>
+                      {currentDose?.doseLabel || 'Scheduled Dose'}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.medicineTitle} numberOfLines={2}>
                   {currentDose?.medicineName || 'Medication'}
                 </Text>
-                <Text
-                  style={[styles.medicineAmount, { color: themeColors.textSecondary }]}
-                  numberOfLines={1}
-                >
-                  {currentDose?.amount || '1 tablet'}
-                </Text>
-              </View>
-
-              <View style={styles.doseBadge}>
-                <Text style={styles.doseBadgeText}>
-                  {currentDose?.doseLabel || 'Scheduled'}
+                <Text style={styles.medicineDoseSubtitle}>
+                  {currentDose?.amount || '1 dose'}
                 </Text>
               </View>
             </View>
 
-            {/* Inner Details Container: 2 Clean Rows */}
-            <View style={[styles.detailsPanel, { backgroundColor: themeColors.innerPanel }]}>
-              {/* Row 1: Recurrence */}
-              <View style={styles.detailRow}>
-                <Ionicons name="calendar-outline" size={17} color={themeColors.textSecondary} />
-                <View style={styles.detailCopy}>
-                  <Text style={[styles.detailTitle, { color: themeColors.textPrimary }]}>
-                    {recurrenceLabel}
-                  </Text>
-                  <Text style={[styles.detailSubtitle, { color: themeColors.textSecondary }]}>
-                    Started {startedLabel}
-                  </Text>
+            <View style={styles.cardSpecsPanel}>
+              <View style={styles.specItem}>
+                <View style={styles.specIconBadge}>
+                  <Ionicons name="calendar-outline" size={17} color={Colors.primary} />
+                </View>
+                <View style={styles.specContent}>
+                  <Text style={styles.specLabel}>Schedule</Text>
+                  <Text style={styles.specValue}>{recurrenceLabel}</Text>
                 </View>
               </View>
 
-              <View style={[styles.detailDivider, { backgroundColor: themeColors.divider }]} />
+              <View style={styles.specDivider} />
 
-              {/* Row 2: Instructions */}
-              <View style={styles.detailRow}>
-                <Ionicons name="document-text-outline" size={17} color={themeColors.textSecondary} />
-                <View style={styles.detailCopy}>
-                  <Text style={[styles.detailTitle, { color: themeColors.textPrimary }]}>
-                    Take {doseInstruction}
-                  </Text>
-                  <Text style={[styles.detailSubtitle, { color: themeColors.textSecondary }]}>
-                    As directed on your label
-                  </Text>
+              <View style={styles.specItem}>
+                <View style={styles.specIconBadge}>
+                  <Ionicons name="fitness-outline" size={17} color={Colors.primary} />
+                </View>
+                <View style={styles.specContent}>
+                  <Text style={styles.specLabel}>Instruction</Text>
+                  <Text style={styles.specValue}>Take {doseInstruction} with water</Text>
                 </View>
               </View>
             </View>
           </View>
 
-          {/* Feedback & Error Alerts */}
+          {/* Alerts & Feedback Messages */}
           {toastMessage && (
-            <View style={[styles.feedbackBanner, { backgroundColor: Colors.primaryLight }]}>
+            <View style={styles.toastBanner}>
               <Ionicons name="information-circle-outline" size={18} color={Colors.primary} />
-              <Text style={[styles.feedbackText, { color: Colors.primaryDark }]}>
-                {toastMessage}
-              </Text>
+              <Text style={styles.toastText}>{toastMessage}</Text>
             </View>
           )}
 
           {completedAction && (
-            <View style={[styles.feedbackBanner, styles.completedBanner]}>
+            <View style={styles.completedBanner}>
               <Ionicons
                 name={
                   completedAction === 'taken'
@@ -798,130 +818,84 @@ export default function FullScreenAlarmScreen() {
             </View>
           )}
 
-          {/* Action Row: Snooze (Left), Mark as Taken (Center), Skip (Right) */}
-          <View style={styles.actionsRow}>
-            {/* Snooze */}
-            <TouchableOpacity
-              style={styles.sideAction}
-              onPress={executeSnooze}
-              disabled={isProcessing}
-              accessibilityRole="button"
-              accessibilityLabel={`Snooze for ${snoozeMinutes} minutes`}
-              accessibilityState={{ disabled: isProcessing }}
-              activeOpacity={0.7}
-            >
-              <View
-                style={[
-                  styles.sideActionCircle,
-                  { backgroundColor: themeColors.card, borderColor: themeColors.border },
-                ]}
+          {/* Bottom Actions Area */}
+          <View style={styles.bottomSection}>
+            {/* Primary Action: Mark as Taken */}
+            <Animated.View style={{ transform: [{ scale: chimeScale }], width: '100%' }}>
+              <TouchableOpacity
+                style={styles.takeButton}
+                onPress={executeTakeDose}
+                disabled={isProcessing}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel="Mark as Taken"
               >
-                <MaterialCommunityIcons
-                  name="alarm-snooze"
-                  size={24}
-                  color={themeColors.textPrimary}
-                />
-              </View>
-              <Text style={[styles.actionTitle, { color: themeColors.textPrimary }]}>Snooze</Text>
-              <Text style={[styles.actionSubtitle, { color: themeColors.textSecondary }]}>
-                {snoozeMinutes} minutes
-              </Text>
-            </TouchableOpacity>
+                <View style={styles.takeButtonIconBox}>
+                  <Ionicons name="checkmark" size={24} color={Colors.primary} />
+                </View>
+                <Text style={styles.takeButtonText}>Mark as Taken</Text>
+              </TouchableOpacity>
+            </Animated.View>
 
-            {/* Mark as Taken (Center Hero Button) */}
-            <TouchableOpacity
-              style={styles.primaryAction}
-              onPress={executeTakeDose}
-              disabled={isProcessing}
-              accessibilityRole="button"
-              accessibilityLabel="Mark as Taken"
-              accessibilityState={{ disabled: isProcessing }}
-              activeOpacity={0.82}
-            >
-              <View style={[styles.primaryActionRing, { backgroundColor: themeColors.glowRing }]}>
-                <Animated.View
-                  style={[
-                    styles.primaryActionCircle,
-                    { transform: [{ scale: chimeScale }] },
-                  ]}
-                >
-                  <Ionicons name="checkmark" size={34} color="#FFFFFF" />
-                </Animated.View>
-              </View>
-              <Text style={[styles.primaryActionTitle, { color: themeColors.textPrimary }]}>
-                Mark as Taken
-              </Text>
-            </TouchableOpacity>
-
-            {/* Skip */}
-            <TouchableOpacity
-              style={styles.sideAction}
-              onPress={executeSkipDose}
-              disabled={isProcessing}
-              accessibilityRole="button"
-              accessibilityLabel="Skip this dose for now"
-              accessibilityState={{ disabled: isProcessing }}
-              activeOpacity={0.7}
-            >
-              <View
-                style={[
-                  styles.sideActionCircle,
-                  {
-                    backgroundColor: themeColors.skipBg,
-                    borderColor: themeColors.skipBorder,
-                  },
-                ]}
+            {/* Secondary Action Row: Snooze & Skip */}
+            <View style={styles.secondaryActionsRow}>
+              <TouchableOpacity
+                style={styles.snoozeButton}
+                onPress={executeSnooze}
+                disabled={isProcessing}
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel={`Snooze for ${snoozeMinutes} minutes`}
               >
-                <Ionicons name="close" size={24} color={Colors.error} />
-              </View>
-              <Text style={[styles.actionTitle, { color: themeColors.textPrimary }]}>Skip</Text>
-              <Text style={[styles.actionSubtitle, { color: themeColors.textSecondary }]}>
-                For now
-              </Text>
-            </TouchableOpacity>
-          </View>
+                <Ionicons name="alarm-outline" size={19} color={Colors.textPrimary} />
+                <Text style={styles.snoozeButtonText}>Snooze ({snoozeMinutes}m)</Text>
+              </TouchableOpacity>
 
-          {/* Take All Button (Only when multiple unique simultaneous doses are active) */}
-          {pendingDoses.length > 1 && (
-            <TouchableOpacity
-              testID="take-all-button"
-              style={styles.takeAllButton}
-              onPress={executeTakeAll}
-              disabled={isProcessing}
-              accessibilityRole="button"
-              accessibilityLabel={`Mark all ${pendingDoses.length} due medications as taken`}
-              accessibilityState={{ disabled: isProcessing }}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="checkmark-done" size={17} color={Colors.primary} />
-              <Text style={styles.takeAllButtonText}>
-                Mark all {pendingDoses.length} doses as taken
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Next Medicine Preview Bar (Fits neatly within screen height) */}
-          {nextDose && (
-            <View
-              style={[
-                styles.nextCard,
-                { backgroundColor: themeColors.card, borderColor: themeColors.border },
-              ]}
-            >
-              <View style={styles.nextIconBox}>
-                <Ionicons name="document-text-outline" size={16} color={Colors.primary} />
-              </View>
-              <View style={styles.nextCopy}>
-                <Text style={[styles.nextTitle, { color: themeColors.textPrimary }]}>
-                  Next: {nextDose.medicineName}
-                </Text>
-                <Text style={[styles.nextSubtitle, { color: themeColors.textSecondary }]}>
-                  {nextDose.doseTime || '08:00'} · {nextDose.amount || '1 dose'}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
+              <TouchableOpacity
+                style={styles.skipButton}
+                onPress={executeSkipDose}
+                disabled={isProcessing}
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel="Skip this dose"
+              >
+                <Ionicons name="close-circle-outline" size={19} color={Colors.error} />
+                <Text style={styles.skipButtonText}>Skip Dose</Text>
+              </TouchableOpacity>
             </View>
-          )}
+
+            {/* Take All Button (If multiple unique simultaneous doses exist) */}
+            {pendingDoses.length > 1 && (
+              <TouchableOpacity
+                testID="take-all-button"
+                style={styles.takeAllButton}
+                onPress={executeTakeAll}
+                disabled={isProcessing}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="checkmark-done" size={18} color={Colors.primary} />
+                <Text style={styles.takeAllButtonText}>
+                  Mark all {pendingDoses.length} doses as taken
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Next Upcoming Dose Preview Bar */}
+            {nextDose && (
+              <View style={styles.nextDoseBar}>
+                <View style={styles.nextDoseIconWrap}>
+                  <Ionicons name="time-outline" size={16} color={Colors.primary} />
+                </View>
+                <View style={styles.nextDoseInfo}>
+                  <Text style={styles.nextDoseTitle}>Next: {nextDose.medicineName}</Text>
+                  <Text style={styles.nextDoseSubtitle}>
+                    {nextDose.doseTime || 'Upcoming'} · {nextDose.amount || '1 dose'}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
+              </View>
+            )}
+          </View>
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -931,6 +905,7 @@ export default function FullScreenAlarmScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: Colors.background,
   },
   safeArea: {
     flex: 1,
@@ -939,349 +914,248 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 8,
+    flexGrow: 1,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 14,
     paddingBottom: 20,
+    gap: 16,
   },
 
   // ---------------------------------------------------------------------------
-  // Hero Clock & Halo
+  // Top Hero: Ringing Badge & Digital Clock
   // ---------------------------------------------------------------------------
-  heroWrapper: {
-    width: '100%',
+  heroSection: {
     alignItems: 'center',
-    justifyContent: 'center',
+    width: '100%',
     paddingTop: 4,
-    paddingBottom: 8,
-    position: 'relative',
-    overflow: 'hidden',
   },
-  timeHaloLarge: {
-    position: 'absolute',
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    borderWidth: 1,
-    top: -24,
-  },
-  timeHaloSmall: {
-    position: 'absolute',
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    borderWidth: 1,
-    top: 16,
-  },
-  screenTitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    letterSpacing: 0.2,
-    marginBottom: 6,
-  },
-  scheduledTimeRow: {
+  alarmStatusPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scheduledTime: {
-    fontSize: 54,
-    fontWeight: '800',
-    letterSpacing: -1.5,
-    fontVariant: ['tabular-nums'],
-    lineHeight: 62,
-  },
-  timeRaysLeft: {
-    justifyContent: 'space-between',
-    height: 34,
-    alignItems: 'flex-end',
-    width: 18,
-    marginRight: 10,
-  },
-  timeRaysRight: {
-    justifyContent: 'space-between',
-    height: 34,
-    alignItems: 'flex-start',
-    width: 18,
-    marginLeft: 10,
-  },
-  timeRay: {
-    height: 3,
-    backgroundColor: '#0788F5',
-    borderRadius: 2,
-  },
-  timeRayTopLeft: { width: 12, transform: [{ rotate: '-35deg' }] },
-  timeRayMidLeft: { width: 15, transform: [{ rotate: '0deg' }] },
-  timeRayBotLeft: { width: 12, transform: [{ rotate: '35deg' }] },
-  timeRayTopRight: { width: 12, transform: [{ rotate: '35deg' }] },
-  timeRayMidRight: { width: 15, transform: [{ rotate: '0deg' }] },
-  timeRayBotRight: { width: 12, transform: [{ rotate: '-35deg' }] },
-  timeSubtitle: {
-    fontSize: 13.5,
-    fontWeight: '400',
-    marginTop: 3,
-  },
-
-  // ---------------------------------------------------------------------------
-  // Simultaneous Doses (Only when multiple unique doses exist)
-  // ---------------------------------------------------------------------------
-  simultaneousSection: {
-    width: '100%',
-    marginBottom: 8,
-    marginTop: 2,
-    alignItems: 'center',
-  },
-  dosePillRow: {
     gap: 8,
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-  },
-  dosePill: {
-    minHeight: 34,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
     borderRadius: Radius.pill,
-    borderWidth: 1,
   },
-  dosePillText: {
+  alarmStatusText: {
     fontSize: 12,
-    fontWeight: '600',
-    maxWidth: 130,
-  },
-
-  // ---------------------------------------------------------------------------
-  // Main Medicine Card (Compact)
-  // ---------------------------------------------------------------------------
-  medicineCard: {
-    width: '100%',
-    borderRadius: 20,
-    padding: 16,
-    marginTop: 4,
-    ...Shadows.card,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  pillIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 13,
-    backgroundColor: Colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pillIcon: {
-    transform: [{ rotate: '-45deg' }],
-  },
-  cardHeading: {
-    flex: 1,
-    marginLeft: 12,
-    paddingRight: 6,
-  },
-  medicineName: {
-    fontSize: 18,
     fontWeight: '700',
-    letterSpacing: -0.2,
-  },
-  medicineAmount: {
-    fontSize: 13,
-    fontWeight: '400',
-    marginTop: 1,
-  },
-  doseBadge: {
-    backgroundColor: Colors.primaryLight,
-    borderRadius: 10,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-  },
-  doseBadgeText: {
     color: Colors.primary,
-    fontSize: 11.5,
-    fontWeight: '600',
+    letterSpacing: 0.6,
   },
-
-  // ---------------------------------------------------------------------------
-  // Inner Details Panel (2 Rows)
-  // ---------------------------------------------------------------------------
-  detailsPanel: {
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.primary,
+  },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    gap: 8,
     marginTop: 10,
   },
-  detailRow: {
-    minHeight: 42,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 4,
+  timeDigits: {
+    fontSize: 64,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+    letterSpacing: -1.5,
+    fontVariant: ['tabular-nums'],
+    lineHeight: 72,
   },
-  detailCopy: {
-    flex: 1,
-    marginLeft: 10,
-  },
-  detailTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  detailSubtitle: {
-    fontSize: 11.5,
-    fontWeight: '400',
-    marginTop: 1,
-  },
-  detailDivider: {
-    height: 1,
-    marginLeft: 27,
-  },
-
-  // ---------------------------------------------------------------------------
-  // Action Buttons (Compact Sizing)
-  // ---------------------------------------------------------------------------
-  actionsRow: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    marginTop: 16,
-    paddingHorizontal: 6,
-  },
-  sideAction: {
-    alignItems: 'center',
-    width: 76,
-  },
-  sideActionCircle: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    alignItems: 'center',
-    justifyContent: 'center',
+  periodBadge: {
+    backgroundColor: Colors.cardBackground,
     borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    alignSelf: 'center',
     ...Shadows.subtle,
   },
-  actionTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    marginTop: 6,
+  periodText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: Colors.primary,
   },
-  actionSubtitle: {
-    fontSize: 11,
-    marginTop: 1,
-  },
-  primaryAction: {
-    alignItems: 'center',
-    width: 108,
-  },
-  primaryActionRing: {
-    width: 82,
-    height: 82,
-    borderRadius: 41,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryActionCircle: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Shadows.floating,
-    elevation: 5,
-  },
-  primaryActionTitle: {
-    fontSize: 13.5,
-    fontWeight: '700',
-    marginTop: 6,
+  timeTagline: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: Colors.textSecondary,
+    marginTop: 4,
     textAlign: 'center',
   },
 
   // ---------------------------------------------------------------------------
-  // Take All (Multiple Unique Doses Only)
+  // Simultaneous Doses Pill Selector
   // ---------------------------------------------------------------------------
-  takeAllButton: {
+  simultaneousSection: {
     width: '100%',
-    minHeight: 40,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderRadius: Radius.pill,
-    backgroundColor: Colors.primaryLight,
-    borderWidth: 1,
-    borderColor: '#BAE6FD',
     marginTop: 12,
   },
-  takeAllButtonText: {
-    color: Colors.primaryDark,
+  dosePillRow: {
+    gap: 8,
+    paddingHorizontal: 4,
+  },
+  dosePill: {
+    minHeight: 36,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.cardBackground,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  dosePillSelected: {
+    backgroundColor: Colors.primaryLight,
+    borderColor: Colors.primary,
+  },
+  dosePillText: {
     fontSize: 12.5,
-    fontWeight: '700',
+    fontWeight: '600',
+    color: Colors.textPrimary,
+    maxWidth: 140,
+  },
+  dosePillTextSelected: {
+    color: Colors.primaryDark,
   },
 
   // ---------------------------------------------------------------------------
-  // Next Medicine Preview Card (Compact)
+  // Center: Hero Medicine Card
   // ---------------------------------------------------------------------------
-  nextCard: {
+  medicineCard: {
     width: '100%',
-    minHeight: 56,
+    backgroundColor: Colors.cardBackground,
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    ...Shadows.card,
+    gap: 16,
+  },
+  cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginTop: 14,
-    ...Shadows.subtle,
+    gap: 14,
   },
-  nextIconBox: {
+  cardHeaderInfo: {
+    flex: 1,
+  },
+  cardBadgeRow: {
+    flexDirection: 'row',
+    marginBottom: 4,
+  },
+  doseBadge: {
+    backgroundColor: Colors.primaryLight,
+    borderRadius: Radius.pill,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  doseBadgeText: {
+    color: Colors.primary,
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
+  medicineTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    lineHeight: 26,
+    letterSpacing: -0.2,
+  },
+  medicineDoseSubtitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  cardSpecsPanel: {
+    backgroundColor: Colors.cardBackgroundSecondary,
+    borderRadius: Radius.lg,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    gap: 8,
+  },
+  specItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 2,
+  },
+  specIconBadge: {
     width: 30,
     height: 30,
-    borderRadius: 8,
-    backgroundColor: Colors.primaryLight,
+    borderRadius: 9,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
   },
-  nextCopy: {
+  specContent: {
     flex: 1,
-    marginLeft: 10,
   },
-  nextTitle: {
-    fontSize: 12.5,
-    fontWeight: '600',
-  },
-  nextSubtitle: {
+  specLabel: {
     fontSize: 11,
+    fontWeight: '600',
+    color: Colors.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  specValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.textPrimary,
     marginTop: 1,
+  },
+  specDivider: {
+    height: 1,
+    backgroundColor: Colors.borderLight,
+    marginLeft: 40,
   },
 
   // ---------------------------------------------------------------------------
   // Banners & Notifications
   // ---------------------------------------------------------------------------
-  feedbackBanner: {
+  toastBanner: {
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginTop: 8,
+    backgroundColor: Colors.primaryLight,
+    borderRadius: Radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
-  feedbackText: {
+  toastText: {
     flex: 1,
-    fontSize: 12.5,
-    lineHeight: 17,
-    fontWeight: '500',
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
+    color: Colors.primaryDark,
   },
   completedBanner: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     backgroundColor: Colors.successLight,
+    borderRadius: Radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
   completedText: {
     flex: 1,
     color: Colors.successDark,
-    fontSize: 12.5,
-    lineHeight: 17,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '700',
   },
   errorBanner: {
@@ -1290,16 +1164,144 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     backgroundColor: Colors.errorLight,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginTop: 8,
+    borderRadius: Radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
   errorText: {
     flex: 1,
     color: Colors.errorDark,
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 12.5,
+    lineHeight: 17,
     fontWeight: '600',
+  },
+
+  // ---------------------------------------------------------------------------
+  // Bottom Action Controls
+  // ---------------------------------------------------------------------------
+  bottomSection: {
+    width: '100%',
+    gap: 12,
+  },
+  takeButton: {
+    minHeight: 58,
+    width: '100%',
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.32,
+    shadowRadius: 14,
+    elevation: 6,
+  },
+  takeButtonIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  takeButtonText: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  secondaryActionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  snoozeButton: {
+    flex: 1,
+    minHeight: 50,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.cardBackground,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    ...Shadows.subtle,
+  },
+  snoozeButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+  },
+  skipButton: {
+    flex: 1,
+    minHeight: 50,
+    borderRadius: Radius.pill,
+    backgroundColor: '#FDECEE',
+    borderWidth: 1,
+    borderColor: '#FCD7DA',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  skipButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.error,
+  },
+  takeAllButton: {
+    width: '100%',
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.primaryLight,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+  },
+  takeAllButtonText: {
+    color: Colors.primaryDark,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  nextDoseBar: {
+    width: '100%',
+    minHeight: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.cardBackground,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    gap: 10,
+    ...Shadows.subtle,
+  },
+  nextDoseIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: Colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nextDoseInfo: {
+    flex: 1,
+  },
+  nextDoseTitle: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+  },
+  nextDoseSubtitle: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 1,
   },
 });
