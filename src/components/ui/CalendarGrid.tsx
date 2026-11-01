@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { Radius, Spacing } from '../../theme/tokens';
 import { ReminderSchedule } from '../../types';
-import { hasReminderForDate, isScheduleDueOnDate } from '../../utils/scheduleRecurrence';
+import { hasReminderForDate, isScheduleDueOnDate, getTodayDateString } from '../../utils/scheduleRecurrence';
 
 interface CalendarGridProps {
   selectedDate: string; // 'YYYY-MM-DD'
@@ -30,6 +30,64 @@ const MONTH_NAMES = [
 
 const WEEK_DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
+interface DayCellProps {
+  day: number;
+  dateStr: string;
+  isSelected: boolean;
+  isToday: boolean;
+  hasReminder: boolean;
+  onSelect: (dateStr: string) => void;
+}
+
+function DayCell({ day, dateStr, isSelected, isToday, hasReminder, onSelect }: DayCellProps) {
+  const [scaleAnim] = useState(() => new Animated.Value(1));
+
+  useEffect(() => {
+    if (isSelected) {
+      scaleAnim.setValue(0.82);
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 6,
+        tension: 120,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [isSelected, scaleAnim]);
+
+  return (
+    <TouchableOpacity
+      style={styles.dayCell}
+      onPress={() => onSelect(dateStr)}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={`Select date ${day}`}
+    >
+      <Animated.View
+        style={[
+          styles.dayNumberCircle,
+          isToday && !isSelected && styles.todaySquare,
+          isSelected && styles.selectedCircle,
+          isSelected && { transform: [{ scale: scaleAnim }] },
+        ]}
+      >
+        <Text
+          style={[
+            styles.dayText,
+            isToday && !isSelected && styles.todayDayText,
+            isSelected && styles.selectedDayText,
+          ]}
+        >
+          {day}
+        </Text>
+      </Animated.View>
+
+      <View style={styles.dotContainer}>
+        {hasReminder && !isSelected ? <View style={styles.reminderDot} /> : null}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 export function CalendarGrid({
   selectedDate,
   onSelectDate,
@@ -41,6 +99,17 @@ export function CalendarGrid({
   const selectedObj = new Date(selectedYear, selectedMonth - 1, selectedDay);
   const [viewYear, setViewYear] = useState(selectedObj.getFullYear());
   const [viewMonth, setViewMonth] = useState(selectedObj.getMonth()); // 0-indexed
+  const [gridFadeAnim] = useState(() => new Animated.Value(1));
+
+  // Fade transition on month change
+  useEffect(() => {
+    gridFadeAnim.setValue(0.4);
+    Animated.timing(gridFadeAnim, {
+      toValue: 1,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  }, [viewMonth, viewYear, gridFadeAnim]);
 
   // Keep the visible month in sync when selectedDate changes from outside
   // (e.g. a date tapped in another screen) across month/year boundaries.
@@ -137,38 +206,31 @@ export function CalendarGrid({
       </View>
 
       {/* Days Grid */}
-      <View style={styles.daysGrid}>
+      <Animated.View style={[styles.daysGrid, { opacity: gridFadeAnim }]}>
         {days.map((item, idx) => {
           if (!item.day || !item.dateStr) {
             return <View key={`empty-${idx}`} style={styles.dayCell} />;
           }
 
           const isSelected = item.dateStr === selectedDate;
+          const isToday = item.dateStr === getTodayDateString();
           const dateKey = item.dateStr;
           const hasScheduledReminder = hasReminderForDate(schedules, dateKey);
           const hasReminder = datesWithReminders.has(dateKey) || hasScheduledReminder;
 
           return (
-            <TouchableOpacity
+            <DayCell
               key={item.dateStr}
-              style={styles.dayCell}
-              onPress={() => onSelectDate(item.dateStr!)}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.dayNumberCircle, isSelected && styles.selectedCircle]}>
-                <Text style={[styles.dayText, isSelected && styles.selectedDayText]}>
-                  {item.day}
-                </Text>
-              </View>
-
-              {/* Indicator dot */}
-              <View style={styles.dotContainer}>
-                {hasReminder && !isSelected ? <View style={styles.reminderDot} /> : null}
-              </View>
-            </TouchableOpacity>
+              day={item.day}
+              dateStr={item.dateStr}
+              isSelected={isSelected}
+              isToday={isToday}
+              hasReminder={hasReminder}
+              onSelect={onSelectDate}
+            />
           );
         })}
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -233,13 +295,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  todaySquare: {
+    borderRadius: 8,
+    backgroundColor: '#E8F2FD',
+    borderWidth: 1.5,
+    borderColor: '#93C5FD',
+  },
   selectedCircle: {
     backgroundColor: Colors.primary,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 4,
+    elevation: 3,
   },
   dayText: {
     fontSize: 15,
     fontWeight: '500',
     color: Colors.textPrimary,
+  },
+  todayDayText: {
+    color: Colors.primary,
+    fontWeight: '700',
   },
   selectedDayText: {
     color: Colors.textInverse,

@@ -20,6 +20,8 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      loadDosesForDate(selectedDate);
+
       const onBackPress = () => {
         BackHandler.exitApp();
         return true;
@@ -27,7 +29,7 @@ export default function HomeScreen() {
 
       const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
       return () => subscription.remove();
-    }, []),
+    }, [loadDosesForDate, selectedDate]),
   );
 
   useEffect(() => {

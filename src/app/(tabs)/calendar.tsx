@@ -1,5 +1,5 @@
-import React, { useCallback } from 'react';
-import { StyleSheet, View, Text } from 'react-native';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
+import { StyleSheet, View, Text, Animated } from 'react-native';
 import { AppAlert as Alert } from '../../services/appAlert';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,7 +18,7 @@ import { useReminderStore } from '../../store/reminderStore';
 import { ScheduledDose } from '../../types';
 import { adherenceRepository } from '../../database/repositories/adherenceRepository';
 import { scheduleRepository } from '../../database/repositories/scheduleRepository';
-import { formatScheduleDateLabel, getDateTapAction } from '../../utils/scheduleRecurrence';
+import { formatScheduleDateLabel, getTodayDateString } from '../../utils/scheduleRecurrence';
 
 export default function CalendarScreen() {
   const router = useRouter();
@@ -26,26 +26,55 @@ export default function CalendarScreen() {
   const { doses, daySummary, loadDosesForDate, markDoseStatus, deleteSchedule } =
     useReminderStore();
 
+  const [activeSchedules, setActiveSchedules] = useState(() => scheduleRepository.getAll());
+
   useFocusEffect(
     useCallback(() => {
       // SQLite is the source of truth. Re-read when returning from create/edit
       // reminder screens even when the selected date itself has not changed.
       loadDosesForDate(selectedDate);
+      setActiveSchedules(scheduleRepository.getAll());
     }, [selectedDate, loadDosesForDate]),
   );
+  const isFutureDate = selectedDate > getTodayDateString();
+  const shouldShowSummary = !isFutureDate && !!daySummary;
 
-  const activeSchedules = scheduleRepository.getAll();
+  const [contentFadeAnim] = useState(() => new Animated.Value(1));
+  const [contentSlideXAnim] = useState(() => new Animated.Value(0));
+  const prevDateRef = useRef(selectedDate);
+
+  // Directional slide & fade on date selection (future from right, past from left)
+  useEffect(() => {
+    const prevDate = prevDateRef.current;
+    if (prevDate === selectedDate) return;
+
+    const isForward = selectedDate > prevDate;
+    prevDateRef.current = selectedDate;
+
+    // Future (forward) slides in from Right (+32px), Past (backward) from Left (-32px)
+    const initialOffset = isForward ? 32 : -32;
+
+    contentFadeAnim.setValue(0.2);
+    contentSlideXAnim.setValue(initialOffset);
+
+    Animated.parallel([
+      Animated.timing(contentFadeAnim, {
+        toValue: 1,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+      Animated.spring(contentSlideXAnim, {
+        toValue: 0,
+        friction: 8,
+        tension: 90,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [selectedDate, contentFadeAnim, contentSlideXAnim]);
 
   const handleSelectDate = (date: string) => {
     setSelectedDate(date);
-    // Dates with reminders stay in place (list updates below the calendar);
-    // empty dates jump straight into Add Reminder with the date prefilled.
-    if (getDateTapAction(activeSchedules, date) === 'openCreate') {
-      router.push({
-        pathname: '/reminders/create',
-        params: { date },
-      });
-    }
+    loadDosesForDate(date);
   };
 
   const handleMorePress = (dose: ScheduledDose) => {
@@ -124,61 +153,74 @@ export default function CalendarScreen() {
           onSelectDate={handleSelectDate}
         />
 
-        {/* Selected Date Summary Card */}
-        {daySummary ? <DayAdherenceSummaryCard summary={daySummary} /> : null}
+        {/* Animated Schedule Section */}
+        <Animated.View
+          style={[
+            styles.animatedTimeline,
+            {
+              opacity: contentFadeAnim,
+              transform: [{ translateX: contentSlideXAnim }],
+            },
+          ]}
+        >
+          {/* Selected Date Summary Card (Only shown for past & today when doses exist) */}
+          {shouldShowSummary && daySummary ? (
+            <DayAdherenceSummaryCard summary={daySummary} />
+          ) : null}
 
-        {/* Selected Date Schedule Section */}
-        <SectionHeader
-          title={formatScheduleDateLabel(selectedDate)}
-          actionText="+ Add"
-          onActionPress={() =>
-            router.push({
-              pathname: '/reminders/create',
-              params: { date: selectedDate },
-            })
-          }
-        />
-
-        {/* Doses List */}
-        {doses.map((dose) => (
-          <ReminderCard
-            key={dose.id}
-            dose={dose}
-            onMarkTaken={() => markDoseStatus(dose, 'taken', selectedDate)}
-            onSkip={() => markDoseStatus(dose, 'skipped', selectedDate)}
-            onMorePress={() => handleMorePress(dose)}
-            onPressCard={() => router.push(`/medicines/${dose.medicineId}`)}
+          {/* Selected Date Schedule Section */}
+          <SectionHeader
+            title={formatScheduleDateLabel(selectedDate)}
+            actionText="+ Add"
+            onActionPress={() =>
+              router.push({
+                pathname: '/reminders/create',
+                params: { date: selectedDate },
+              })
+            }
           />
-        ))}
 
-        {doses.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <View style={styles.emptyIconCircle}>
-              <Ionicons name="calendar-outline" size={30} color={Colors.primary} />
-            </View>
-            <Text style={styles.emptyTitle}>No medication scheduled for this date</Text>
-            <Text style={styles.emptySubtitle}>
-              Tap the button below to set up a medication reminder for this date.
-            </Text>
-            <AppButton
-              title="Schedule Medication"
-              variant="outline"
-              size="md"
-              style={styles.emptyScheduleButton}
-              onPress={() =>
-                router.push({
-                  pathname: '/reminders/create',
-                  params: { date: selectedDate },
-                })
-              }
+          {/* Doses List */}
+          {doses.map((dose) => (
+            <ReminderCard
+              key={dose.id}
+              dose={dose}
+              onMarkTaken={() => markDoseStatus(dose, 'taken', selectedDate)}
+              onSkip={() => markDoseStatus(dose, 'skipped', selectedDate)}
+              onMorePress={() => handleMorePress(dose)}
+              onPressCard={() => router.push(`/medicines/${dose.medicineId}`)}
             />
-          </View>
-        ) : (
-          /* Helper Note */
-          <Text style={styles.helperNote}>
-            Use the more options button (•••) on any dose card to edit, delete, or log.
-          </Text>
-        )}
+          ))}
+
+          {doses.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <View style={styles.emptyIconCircle}>
+                <Ionicons name="calendar-outline" size={30} color={Colors.primary} />
+              </View>
+              <Text style={styles.emptyTitle}>No medication scheduled for this date</Text>
+              <Text style={styles.emptySubtitle}>
+                Tap the button below to set up a medication reminder for this date.
+              </Text>
+              <AppButton
+                title="Schedule Medication"
+                variant="outline"
+                size="md"
+                style={styles.emptyScheduleButton}
+                onPress={() =>
+                  router.push({
+                    pathname: '/reminders/create',
+                    params: { date: selectedDate },
+                  })
+                }
+              />
+            </View>
+          ) : (
+            /* Helper Note */
+            <Text style={styles.helperNote}>
+              Use the more options button (•••) on any dose card to edit, delete, or log.
+            </Text>
+          )}
+        </Animated.View>
 
         {/* Medical Disclaimer */}
         <MedicalDisclaimer
@@ -193,6 +235,9 @@ export default function CalendarScreen() {
 const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 110,
+  },
+  animatedTimeline: {
+    overflow: 'hidden',
   },
   body: {
     paddingHorizontal: Spacing.screenPaddingHorizontal,
