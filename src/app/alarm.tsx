@@ -816,54 +816,150 @@ export default function FullScreenAlarmScreen() {
             </Text>
           </View>
 
-          {/* Hero Medicine Card (Centerpiece) */}
-          <View style={styles.heroCard}>
-            <View style={styles.heroIconBox}>
-              <MaterialCommunityIcons
-                name="pill"
-                size={34}
-                color="#0788F5"
-                style={{ transform: [{ rotate: '-45deg' }] }}
-              />
-            </View>
+          {/* Hero Medicine Display: Adaptive for 1 Medicine vs 2+ Medicines */}
+          {doses.length === 1 ? (
+            /* Single Medicine Hero Card */
+            <View style={styles.heroCard}>
+              <View style={styles.heroIconBox}>
+                <MaterialCommunityIcons
+                  name="pill"
+                  size={34}
+                  color="#0788F5"
+                  style={{ transform: [{ rotate: '-45deg' }] }}
+                />
+              </View>
 
-            <Text style={styles.heroMedName} numberOfLines={1}>
-              {currentDose?.medicineName || 'Metformin'}
-            </Text>
-            <Text style={styles.heroDoseAmount}>
-              {currentDose?.amount || '500 mg · 1 tablet'}
-            </Text>
-
-            <View style={styles.instructionPill}>
-              <Text style={styles.instructionPillText}>
-                Take with a glass of water
+              <Text style={styles.heroMedName} numberOfLines={1}>
+                {currentDose?.medicineName || 'Metformin'}
               </Text>
-            </View>
+              <Text style={styles.heroDoseAmount}>
+                {currentDose?.amount || '500 mg · 1 tablet'}
+              </Text>
 
-            {/* If other simultaneous medicines exist */}
-            {otherDoses.length > 0 && (
-              <View style={styles.simultaneousNotice}>
-                <Ionicons name="add-circle-outline" size={15} color="#0788F5" />
-                <Text style={styles.simultaneousNoticeText}>
-                  Also due: {otherDoses.map((d) => `${d.medicineName} (${d.amount})`).join(', ')}
+              <View style={styles.instructionPill}>
+                <Text style={styles.instructionPillText}>
+                  Take with a glass of water
                 </Text>
               </View>
-            )}
 
-            <View style={styles.heroCardDivider} />
+              <View style={styles.heroCardDivider} />
 
-            <View style={styles.heroCardMetaRow}>
-              <View style={styles.metaCol}>
-                <Text style={styles.metaLabel}>SCHEDULE</Text>
-                <Text style={styles.metaValue}>{recurrenceLabel}</Text>
-              </View>
-              <View style={styles.metaDivider} />
-              <View style={styles.metaCol}>
-                <Text style={styles.metaLabel}>PRESCRIBED</Text>
-                <Text style={styles.metaValue}>{startedLabel}</Text>
+              <View style={styles.heroCardMetaRow}>
+                <View style={styles.metaCol}>
+                  <Text style={styles.metaLabel}>SCHEDULE</Text>
+                  <Text style={styles.metaValue}>{recurrenceLabel}</Text>
+                </View>
+                <View style={styles.metaDivider} />
+                <View style={styles.metaCol}>
+                  <Text style={styles.metaLabel}>PRESCRIBED</Text>
+                  <Text style={styles.metaValue}>{startedLabel}</Text>
+                </View>
               </View>
             </View>
-          </View>
+          ) : (
+            /* Multi-Medicine Grouped Card (When 2 or more medicines are due at same time) */
+            <View style={styles.multiMedCard}>
+              <View style={styles.multiMedHeader}>
+                <View style={styles.multiMedHeaderLeft}>
+                  <View style={styles.multiIconBadge}>
+                    <MaterialCommunityIcons
+                      name="pill-multiple"
+                      size={20}
+                      color="#0788F5"
+                    />
+                  </View>
+                  <View>
+                    <Text style={styles.multiHeaderTitle}>Scheduled Medications</Text>
+                    <Text style={styles.multiHeaderSubtitle}>
+                      Take with water as directed
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.multiCountBadge}>
+                  <Text style={styles.multiCountBadgeText}>
+                    {pendingDoses.length} Due
+                  </Text>
+                </View>
+              </View>
+
+              <ScrollView
+                style={styles.multiScrollList}
+                showsVerticalScrollIndicator={false}
+                bounces={false}
+              >
+                {doses.map((dose, idx) => {
+                  const isTaken = dose.status === 'taken';
+                  const isSkipped = dose.status === 'skipped';
+                  const isLast = idx === doses.length - 1;
+
+                  return (
+                    <View key={dose.id}>
+                      <TouchableOpacity
+                        style={styles.multiDoseRow}
+                        onPress={() => setSelectedIndex(idx)}
+                        activeOpacity={0.7}
+                      >
+                        <View
+                          style={[
+                            styles.multiRowIconBox,
+                            isTaken && styles.multiRowIconBoxTaken,
+                          ]}
+                        >
+                          <MaterialCommunityIcons
+                            name="pill"
+                            size={20}
+                            color={isTaken ? Colors.success : '#0788F5'}
+                            style={{ transform: [{ rotate: '-45deg' }] }}
+                          />
+                        </View>
+
+                        <View style={styles.multiRowTextCol}>
+                          <Text
+                            style={[
+                              styles.multiRowMedName,
+                              (isTaken || isSkipped) && styles.multiRowMedNameMuted,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {dose.medicineName}
+                          </Text>
+                          <Text style={styles.multiRowDoseAmount} numberOfLines={1}>
+                            {dose.amount}
+                          </Text>
+                        </View>
+
+                        <View style={styles.multiRowStatusCol}>
+                          {isTaken ? (
+                            <View style={styles.rowTakenBadge}>
+                              <Ionicons name="checkmark" size={13} color={Colors.success} />
+                              <Text style={styles.rowTakenBadgeText}>Taken</Text>
+                            </View>
+                          ) : isSkipped ? (
+                            <View style={styles.rowSkippedBadge}>
+                              <Text style={styles.rowSkippedBadgeText}>Skipped</Text>
+                            </View>
+                          ) : (
+                            <View style={styles.rowDueBadge}>
+                              <Text style={styles.rowDueBadgeText}>Due</Text>
+                            </View>
+                          )}
+                        </View>
+                      </TouchableOpacity>
+
+                      {!isLast && <View style={styles.multiRowSeparator} />}
+                    </View>
+                  );
+                })}
+              </ScrollView>
+
+              <View style={styles.multiCardFooter}>
+                <Ionicons name="calendar-outline" size={13} color="#8A8991" />
+                <Text style={styles.multiCardFooterText}>
+                  {recurrenceLabel} · {startedLabel}
+                </Text>
+              </View>
+            </View>
+          )}
 
           {/* Bottom Interactive Lockscreen Slider & Actions */}
           <View style={styles.bottomSection}>
@@ -1128,6 +1224,163 @@ const styles = StyleSheet.create({
     width: 1,
     height: 24,
     backgroundColor: '#E2E8F0',
+  },
+
+  // ---------------------------------------------------------------------------
+  // Multi-Medicine Grouped Card
+  // ---------------------------------------------------------------------------
+  multiMedCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    elevation: 3,
+    marginVertical: 6,
+    overflow: 'hidden',
+  },
+  multiMedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  multiMedHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  multiIconBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  multiHeaderTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  multiHeaderSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  multiCountBadge: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  multiCountBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0788F5',
+  },
+  multiScrollList: {
+    maxHeight: 220,
+  },
+  multiDoseRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+  },
+  multiRowIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  multiRowIconBoxTaken: {
+    backgroundColor: '#ECFDF5',
+  },
+  multiRowTextCol: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  multiRowMedName: {
+    fontSize: 15.5,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  multiRowMedNameMuted: {
+    color: '#94A3B8',
+    textDecorationLine: 'line-through',
+  },
+  multiRowDoseAmount: {
+    fontSize: 12.5,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  multiRowStatusCol: {
+    marginLeft: 10,
+  },
+  rowDueBadge: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 9,
+  },
+  rowDueBadgeText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#0788F5',
+  },
+  rowTakenBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 9,
+  },
+  rowTakenBadgeText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  rowSkippedBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 9,
+  },
+  rowSkippedBadgeText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  multiRowSeparator: {
+    height: 1,
+    backgroundColor: '#F8FAFC',
+    marginLeft: 68,
+  },
+  multiCardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    backgroundColor: '#F8FAFC',
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  multiCardFooterText: {
+    fontSize: 12,
+    color: '#8A8991',
   },
 
   // ---------------------------------------------------------------------------
