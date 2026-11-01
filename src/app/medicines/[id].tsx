@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { AppAlert as Alert } from '../../services/appAlert';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { Radius, Spacing, Typography } from '../../theme/tokens';
+import { ReminderSchedule } from '../../types';
+import { formatTime12Hour } from '../../utils/reminderValidation';
 import { AppScreen } from '../../components/ui/AppScreen';
 import { AppHeader } from '../../components/ui/AppHeader';
 import { AppCard } from '../../components/ui/AppCard';
@@ -35,7 +37,17 @@ export default function MedicineDetailsScreen() {
 
   const storeMedicine = useMedicineStore((s) => s.medicines.find((m) => m.id === id));
   const medicine = storeMedicine || medicineRepository.getById(id || '');
-  const schedule = id ? scheduleRepository.getByMedicineId(id) : null;
+  const [schedules, setSchedules] = useState<ReminderSchedule[]>(() =>
+    id ? scheduleRepository.getAllByMedicineId(id) : [],
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (id) {
+        setSchedules(scheduleRepository.getAllByMedicineId(id));
+      }
+    }, [id]),
+  );
 
   useEffect(() => {
     if (!medicine?.id) return;
@@ -167,21 +179,28 @@ export default function MedicineDetailsScreen() {
     }
   };
 
-  const formatScheduleText = () => {
-    if (!schedule || !schedule.enabled || schedule.times.length === 0) {
-      return 'No reminder schedule set';
+  const formatSingleScheduleTitle = (s: ReminderSchedule): string => {
+    const timesStr = s.times.map((t) => formatTime12Hour(t.time)).join(', ');
+    let recurrenceStr = '';
+    if (s.recurrence === 'daily') {
+      recurrenceStr = 'Every Day';
+    } else if (s.recurrence === 'weekly') {
+      recurrenceStr = 'Every Week';
+    } else if (s.recurrence === 'monthly') {
+      recurrenceStr = 'Every Month';
+    } else if (s.recurrence === 'custom') {
+      const days =
+        s.daysOfWeek && s.daysOfWeek.length > 0
+          ? s.daysOfWeek.map((d) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d]).join(', ')
+          : 'Custom';
+      recurrenceStr = `Custom (${days})`;
+    } else if (s.recurrence === 'once') {
+      recurrenceStr = 'Once';
+    } else {
+      recurrenceStr = String(s.recurrence);
     }
-    const times = schedule.times.map((t) => t.time).join(' & ');
-    const recurrenceStr =
-      schedule.recurrence === 'daily'
-        ? 'Every day'
-        : schedule.recurrence.charAt(0).toUpperCase() + schedule.recurrence.slice(1);
-    return `${times} · ${recurrenceStr}`;
+    return `${timesStr} · ${recurrenceStr}`;
   };
-
-  const scheduleDoseNote = schedule?.times[0]?.amount
-    ? `${schedule.times[0].amount} per reminder · Confirm against your prescription`
-    : 'No saved dose amount';
 
   return (
     <AppScreen scrollable contentContainerStyle={styles.scrollContent}>
@@ -668,20 +687,69 @@ export default function MedicineDetailsScreen() {
         {/* Section: Your schedule */}
         <SectionHeader
           title="Your schedule"
-          actionText="+ Add Dose"
+          count={schedules.length > 0 ? schedules.length : undefined}
+          actionText="+ Add Reminder"
           onActionPress={() => router.push(`/reminders/create?medicineId=${medicine.id}`)}
         />
         <AppCard style={styles.scheduleCard}>
-          <Text style={styles.scheduleTitle}>{formatScheduleText()}</Text>
-          <Text style={styles.scheduleNote}>{scheduleDoseNote}</Text>
+          {schedules.length === 0 ? (
+            <>
+              <Text style={styles.scheduleTitle}>No reminder schedule set</Text>
+              <Text style={styles.scheduleNote}>Set up reminders so you never miss a dose</Text>
 
-          <TouchableOpacity
-            style={styles.setReminderButton}
-            onPress={() => router.push(`/reminders/create?medicineId=${medicine.id}`)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.setReminderButtonText}>Set Reminder</Text>
-          </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.setReminderButton}
+                onPress={() => router.push(`/reminders/create?medicineId=${medicine.id}`)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.setReminderButtonText}>Set Reminder</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <View style={styles.scheduleListContainer}>
+              {schedules.map((s, idx) => (
+                <TouchableOpacity
+                  key={s.id || idx}
+                  style={styles.scheduleDetailRow}
+                  onPress={() =>
+                    router.push(
+                      `/reminders/create?medicineId=${medicine.id}&scheduleId=${s.id}`,
+                    )
+                  }
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.scheduleDetailBadge}>
+                    <Feather
+                      name={s.enabled ? 'bell' : 'bell-off'}
+                      size={15}
+                      color={s.enabled ? Colors.primary : Colors.textSecondary}
+                    />
+                  </View>
+                  <View style={styles.scheduleDetailInfo}>
+                    <Text style={styles.scheduleDetailTitle}>
+                      {formatSingleScheduleTitle(s)}
+                    </Text>
+                    <Text style={styles.scheduleDetailNote}>
+                      {s.times[0]?.amount
+                        ? `${s.times[0].amount} · ${s.enabled ? 'Active' : 'Disabled'}`
+                        : s.enabled
+                          ? 'Active'
+                          : 'Disabled'}
+                    </Text>
+                  </View>
+                  <Feather name="chevron-right" size={16} color={Colors.textTertiary} />
+                </TouchableOpacity>
+              ))}
+
+              <TouchableOpacity
+                style={styles.setReminderButton}
+                onPress={() => router.push(`/reminders/create?medicineId=${medicine.id}`)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.setReminderButtonText}>+ Add Another Reminder</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </AppCard>
 
         {/* Section: Package details */}
@@ -991,6 +1059,39 @@ const styles = StyleSheet.create({
   },
   scheduleCard: {
     marginBottom: Spacing.lg,
+  },
+  scheduleListContainer: {
+    gap: 8,
+  },
+  scheduleDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+    gap: 10,
+  },
+  scheduleDetailBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scheduleDetailInfo: {
+    flex: 1,
+  },
+  scheduleDetailTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  scheduleDetailNote: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
+    fontWeight: '500',
   },
   scheduleTitle: {
     fontSize: 16,

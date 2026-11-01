@@ -5,6 +5,7 @@ import { Colors } from '../../theme/colors';
 import { Radius, Spacing, Typography } from '../../theme/tokens';
 import { Medicine, ReminderSchedule } from '../../types';
 import { isLowStock } from '../../services/refillService';
+import { formatTime12Hour } from '../../utils/reminderValidation';
 import { MedicineIcon } from './MedicineIcon';
 import { StatusBadge } from './StatusBadge';
 
@@ -15,33 +16,39 @@ interface MedicineCardProps {
   onPress: () => void;
 }
 
+function formatScheduleItem(s: ReminderSchedule): string {
+  const timesStr = s.times.map((t) => formatTime12Hour(t.time)).join(', ');
+  let recurrenceStr = '';
+  if (s.recurrence === 'daily') {
+    recurrenceStr = 'Daily';
+  } else if (s.recurrence === 'weekly') {
+    recurrenceStr = 'Weekly';
+  } else if (s.recurrence === 'monthly') {
+    recurrenceStr = 'Monthly';
+  } else if (s.recurrence === 'custom') {
+    const days =
+      s.daysOfWeek && s.daysOfWeek.length > 0
+        ? s.daysOfWeek.map((d) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d]).join(', ')
+        : 'Custom';
+    recurrenceStr = `Custom (${days})`;
+  } else if (s.recurrence === 'once') {
+    recurrenceStr = 'Once';
+  } else {
+    recurrenceStr = String(s.recurrence);
+  }
+
+  const doseAmount = s.times[0]?.amount ? ` · ${s.times[0].amount}` : '';
+  return `${timesStr} · ${recurrenceStr}${doseAmount}`;
+}
+
 export function MedicineCard({ medicine, schedule, schedules, onPress }: MedicineCardProps) {
   const isExpired =
     medicine.packageDetails.expiryDate?.toLowerCase().includes('2026') ||
     medicine.packageDetails.packageDetailsText?.toLowerCase().includes('expired');
 
-  const formatScheduleText = () => {
-    const list = schedules ?? (schedule ? [schedule] : []);
-    const activeList = list.filter((s) => s.enabled && s.times.length > 0);
-    if (activeList.length === 0) {
-      return null;
-    }
-    return activeList
-      .map((s) => {
-        const timesStr = s.times.map((t) => t.time).join(' & ');
-        const recurrenceStr =
-          s.recurrence === 'daily'
-            ? 'Daily'
-            : s.recurrence.charAt(0).toUpperCase() + s.recurrence.slice(1);
-        return `${timesStr} · ${recurrenceStr}`;
-      })
-      .join('; ');
-  };
-
-  const scheduleText = formatScheduleText();
-  const hasActiveReminder =
-    (schedules ? schedules.some((s) => s.enabled && s.times.length > 0) : schedule?.enabled) ||
-    false;
+  const list = schedules ?? (schedule ? [schedule] : []);
+  const activeSchedules = list.filter((s) => s.enabled && s.times.length > 0);
+  const hasActiveReminder = activeSchedules.length > 0;
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
@@ -77,18 +84,22 @@ export function MedicineCard({ medicine, schedule, schedules, onPress }: Medicin
         ) : null}
       </View>
 
-      {/* Bottom Section: Schedule info */}
-      <View style={styles.scheduleRow}>
-        {scheduleText ? (
-          <>
-            <Feather name="bell" size={13} color={Colors.textSecondary} />
-            <Text style={styles.scheduleText}>{scheduleText}</Text>
-          </>
+      {/* Bottom Section: Schedule info (each reminder on its own line) */}
+      <View style={styles.schedulesContainer}>
+        {activeSchedules.length > 0 ? (
+          activeSchedules.map((s, idx) => (
+            <View key={s.id || idx} style={styles.scheduleRow}>
+              <Feather name="bell" size={13} color={Colors.primary} style={styles.bellIcon} />
+              <Text style={styles.scheduleText} numberOfLines={2}>
+                {formatScheduleItem(s)}
+              </Text>
+            </View>
+          ))
         ) : (
-          <>
-            <Feather name="bell-off" size={13} color={Colors.textSecondary} />
-            <Text style={styles.scheduleText}>No reminder set</Text>
-          </>
+          <View style={styles.scheduleRow}>
+            <Feather name="bell-off" size={13} color={Colors.textSecondary} style={styles.bellIcon} />
+            <Text style={styles.scheduleTextMuted}>No reminder set</Text>
+          </View>
         )}
       </View>
     </TouchableOpacity>
@@ -138,15 +149,30 @@ const styles = StyleSheet.create({
   expiredText: {
     color: Colors.error,
   },
+  schedulesContainer: {
+    paddingTop: 6,
+    gap: 4,
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderLight,
+    marginTop: 4,
+  },
   scheduleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 4,
+    paddingVertical: 1,
+  },
+  bellIcon: {
+    marginRight: 6,
   },
   scheduleText: {
     fontSize: 13,
+    color: Colors.textPrimary,
+    fontWeight: '500',
+    flex: 1,
+  },
+  scheduleTextMuted: {
+    fontSize: 13,
     color: Colors.textSecondary,
-    marginLeft: 6,
     fontWeight: '500',
   },
 });
