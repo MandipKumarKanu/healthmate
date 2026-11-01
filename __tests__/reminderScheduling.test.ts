@@ -229,6 +229,49 @@ describe('Reminder Notification Scheduling Engine', () => {
     });
   });
 
+  describe('Custom recurrence', () => {
+    it('returns repeating WEEKLY triggers for each selected day when unbounded', () => {
+      const now = new Date(2026, 9, 26, 8, 0, 0); // Oct 26, 2026
+      const schedule = {
+        recurrence: 'custom' as const,
+        daysOfWeek: [1, 3, 5], // Mon, Wed, Fri
+        startDate: '2026-10-26',
+      };
+
+      const triggers = getNotificationTriggersForDose(schedule, '08:00', now);
+      expect(triggers).toHaveLength(3);
+      triggers.forEach((t) => {
+        expect(t.type).toBe(Notifications.SchedulableTriggerInputTypes.WEEKLY);
+      });
+      const weekdays = triggers.map((t) => (t as any).weekday);
+      // Expo weekdays: 1 = Sun, 2 = Mon, 4 = Wed, 6 = Fri
+      expect(weekdays).toEqual([2, 4, 6]);
+    });
+
+    it('generates discrete DATE triggers matching custom days when bounded by endDate', () => {
+      const now = new Date(2026, 9, 26, 12, 0, 0); // Monday Oct 26, 2026 12:00 (after 08:00)
+      const schedule = {
+        recurrence: 'custom' as const,
+        daysOfWeek: [1, 3, 5], // Mon, Wed, Fri
+        startDate: '2026-10-26',
+        endDate: '2026-11-02',
+      };
+
+      // 08:00 on Oct 26 has passed. Upcoming matches:
+      // Wed Oct 28, Fri Oct 30, Mon Nov 02
+      const triggers = getNotificationTriggersForDose(schedule, '08:00', now);
+      expect(triggers).toHaveLength(3);
+      triggers.forEach((t) => {
+        expect(t.type).toBe(Notifications.SchedulableTriggerInputTypes.DATE);
+      });
+      const dates = triggers.map((t) => {
+        const d = (t as any).date;
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      });
+      expect(dates).toEqual(['2026-10-28', '2026-10-30', '2026-11-02']);
+    });
+  });
+
   describe('notificationService.scheduleDoseReminder integration', () => {
     it('schedules one-time dose reminder as a date trigger', async () => {
       const futureDate = new Date(Date.now() + 86400000);

@@ -63,7 +63,9 @@ export function getPreviousDayString(dateStr: string): string {
  *              for shorter months (e.g. day 31 -> Feb 28/29, Apr 30, Jun 30, etc.)
  */
 export function isScheduleDueOnDate(
-  schedule: Pick<ReminderSchedule, 'recurrence' | 'startDate' | 'endDate'>,
+  schedule: Pick<ReminderSchedule, 'recurrence' | 'startDate' | 'endDate'> & {
+    daysOfWeek?: number[];
+  },
   date: string,
 ): boolean {
   const target = parseDateParts(date);
@@ -92,6 +94,13 @@ export function isScheduleDueOnDate(
   if (schedule.recurrence === 'monthly') {
     const lastDay = new Date(target[0], target[1], 0).getDate();
     return target[2] === Math.min(start[2], lastDay);
+  }
+  if (schedule.recurrence === 'custom') {
+    if (schedule.daysOfWeek && schedule.daysOfWeek.length > 0) {
+      const targetDay = new Date(target[0], target[1] - 1, target[2]).getDay();
+      return schedule.daysOfWeek.includes(targetDay);
+    }
+    return false;
   }
 
   return false;

@@ -32,6 +32,35 @@ interface ScheduleHistoryRow {
   updated_at: string;
 }
 
+function parseRecurrenceField(storedRecurrence: string): {
+  recurrence: RecurrenceType;
+  daysOfWeek?: number[];
+} {
+  if (storedRecurrence.startsWith('custom:')) {
+    const rawDays = storedRecurrence.slice('custom:'.length);
+    const daysOfWeek = rawDays
+      .split(',')
+      .map(Number)
+      .filter((n) => Number.isFinite(n) && n >= 0 && n <= 6);
+    return {
+      recurrence: 'custom',
+      daysOfWeek: daysOfWeek.length > 0 ? daysOfWeek : undefined,
+    };
+  }
+  if (storedRecurrence === 'custom') {
+    return { recurrence: 'custom' };
+  }
+  return { recurrence: storedRecurrence as RecurrenceType };
+}
+
+function serializeRecurrenceField(schedule: Pick<ReminderSchedule, 'recurrence' | 'daysOfWeek'>): string {
+  if (schedule.recurrence === 'custom' && schedule.daysOfWeek && schedule.daysOfWeek.length > 0) {
+    const sorted = [...schedule.daysOfWeek].sort((a, b) => a - b);
+    return `custom:${sorted.join(',')}`;
+  }
+  return schedule.recurrence;
+}
+
 function mapRowToSchedule(row: ScheduleRow): ReminderSchedule {
   let times: ReminderTime[] = [];
   try {
@@ -40,10 +69,13 @@ function mapRowToSchedule(row: ScheduleRow): ReminderSchedule {
     times = [];
   }
 
+  const { recurrence, daysOfWeek } = parseRecurrenceField(row.recurrence);
+
   return {
     id: row.id,
     medicineId: row.medicine_id,
-    recurrence: row.recurrence as RecurrenceType,
+    recurrence,
+    daysOfWeek,
     startDate: row.start_date,
     endDate: row.end_date ?? undefined,
     times,
@@ -82,10 +114,13 @@ function mapHistoryRowToSchedule(row: ScheduleHistoryRow): ReminderSchedule {
     times = [];
   }
 
+  const { recurrence, daysOfWeek } = parseRecurrenceField(row.recurrence);
+
   return {
     id: row.schedule_id, // Preserves the original schedule_id so adherence_logs match accurately
     medicineId: row.medicine_id,
-    recurrence: row.recurrence as RecurrenceType,
+    recurrence,
+    daysOfWeek,
     startDate: row.start_date,
     endDate: row.end_date ?? undefined,
     times,
@@ -173,10 +208,11 @@ export const scheduleRepository = {
     const today = getTodayDateString();
 
     let newStartDate = schedule.startDate;
+    const dbRecurrence = serializeRecurrenceField(schedule);
 
     if (existing) {
       const timesChanged = JSON.stringify(existing.times) !== JSON.stringify(schedule.times);
-      const recurrenceChanged = existing.recurrence !== schedule.recurrence;
+      const recurrenceChanged = serializeRecurrenceField(existing) !== dbRecurrence;
       const datesChanged =
         existing.startDate !== schedule.startDate || existing.endDate !== schedule.endDate;
 
@@ -200,7 +236,7 @@ export const scheduleRepository = {
                 histId,
                 existing.id,
                 existing.medicineId,
-                existing.recurrence,
+                serializeRecurrenceField(existing),
                 existing.startDate,
                 effectiveEndDate,
                 JSON.stringify(existing.times),
@@ -227,7 +263,7 @@ export const scheduleRepository = {
       [
         schedule.id,
         schedule.medicineId,
-        schedule.recurrence,
+        dbRecurrence,
         newStartDate,
         schedule.endDate ?? null,
         JSON.stringify(schedule.times),

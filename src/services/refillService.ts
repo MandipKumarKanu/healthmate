@@ -120,7 +120,7 @@ export const refillService = {
           title: 'Refill soon',
           body: `${medicineName} stock is low (${stock}${unitLabel} left). Order a refill in time.`,
           data: { kind: 'refill', medicineName },
-          sound: 'default',
+          sound: true,
           ...(Platform.OS === 'android' ? { channelId: 'medication-reminders' } : {}),
         },
         trigger: {

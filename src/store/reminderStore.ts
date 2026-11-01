@@ -60,6 +60,7 @@ export async function armScheduleAlarms(
         dose.label,
         {
           recurrence: schedule.recurrence,
+          daysOfWeek: schedule.daysOfWeek,
           startDate: schedule.startDate,
           endDate: schedule.endDate,
         },

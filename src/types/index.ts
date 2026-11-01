@@ -87,6 +87,7 @@ export interface ReminderSchedule {
   notificationsEnabled: boolean;
   createdAt: string;
   updatedAt: string;
+  daysOfWeek?: number[]; // [0..6] (0 = Sunday, 1 = Monday, ...) for custom schedules
 }
 
 export interface ScheduledDose {

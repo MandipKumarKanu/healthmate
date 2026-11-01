@@ -23,8 +23,13 @@ try {
   // Expo Go and web may not expose the native notification module.
 }
 
+export type ScheduleConfig = Pick<
+  ReminderSchedule,
+  'recurrence' | 'startDate' | 'endDate' | 'daysOfWeek'
+>;
+
 export function getNotificationTriggersForDose(
-  schedule: Pick<ReminderSchedule, 'recurrence' | 'startDate' | 'endDate'> | undefined,
+  schedule: ScheduleConfig | undefined,
   time: string,
   now: Date = new Date(),
   allowAlarmClock: boolean = true,
@@ -239,6 +244,56 @@ export function getNotificationTriggersForDose(
     return triggers;
   }
 
+  // 5. Custom recurrence (specific days of week)
+  if (recurrence === 'custom') {
+    const days =
+      effectiveSchedule.daysOfWeek && effectiveSchedule.daysOfWeek.length > 0
+        ? effectiveSchedule.daysOfWeek
+        : [new Date(start[0], start[1] - 1, start[2]).getDay()];
+
+    if (!endDate && startDate <= todayStr) {
+      return days.map((day) => ({
+        type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+        weekday: day + 1, // 1 = Sunday ... 7 = Saturday
+        hour,
+        minute,
+        ...androidOptions,
+      }));
+    }
+
+    // Bounded or future start date: schedule discrete DATE triggers
+    const triggers: Notifications.SchedulableNotificationTriggerInput[] = [];
+    const [startY, startM, startD] = parseDateParts(startDate > todayStr ? startDate : todayStr)!;
+    const cursor = new Date(startY, startM - 1, startD);
+    const maxOccurrences = 60;
+    let iterations = 0;
+
+    while (triggers.length < maxOccurrences && iterations < 365) {
+      iterations++;
+      const y = cursor.getFullYear();
+      const m = cursor.getMonth() + 1;
+      const d = cursor.getDate();
+      const dateStr = [y, String(m).padStart(2, '0'), String(d).padStart(2, '0')].join('-');
+
+      if (endDate && dateStr > endDate) break;
+
+      if (isScheduleDueOnDate(effectiveSchedule, dateStr)) {
+        const targetDate = new Date(y, m - 1, d, hour, minute, 0, 0);
+        if (targetDate.getTime() > now.getTime()) {
+          triggers.push({
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: targetDate,
+            ...androidOptions,
+          });
+        }
+      }
+
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    return triggers;
+  }
+
   return [];
 }
 
@@ -253,7 +308,7 @@ export function getNotificationTriggersForDose(
  * by dose after each firing.
  */
 export function getNativeAlarmTriggerWindow(
-  schedule: Pick<ReminderSchedule, 'recurrence' | 'startDate' | 'endDate'> | undefined,
+  schedule: ScheduleConfig | undefined,
   time: string,
   now: Date = new Date(),
 ): number[] {
@@ -364,6 +419,30 @@ export function getNativeAlarmTriggerWindow(
     return triggers;
   }
 
+  if (recurrence === 'custom') {
+    const [y, m, d] = parseDateParts(scanStart)!;
+    const cursor = new Date(y, m - 1, d);
+    let iterations = 0;
+    while (triggers.length < 60 && iterations < 365) {
+      iterations++;
+      const curY = cursor.getFullYear();
+      const month = cursor.getMonth();
+      const day = cursor.getDate();
+      const dateStr = [
+        curY,
+        String(month + 1).padStart(2, '0'),
+        String(day).padStart(2, '0'),
+      ].join('-');
+      if (endDate && dateStr > endDate) break;
+      if (isScheduleDueOnDate(effectiveSchedule, dateStr)) {
+        const targetDate = new Date(curY, month, day, hour, minute, 0, 0);
+        if (targetDate.getTime() > now.getTime()) triggers.push(targetDate.getTime());
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return triggers;
+  }
+
   return [];
 }
 
@@ -380,7 +459,7 @@ export function getNativeAlarmTriggerWindow(
 // native alarm module such as iOS.)
 // ---------------------------------------------------------------------------
 
-type DatedRecurrence = Extract<RecurrenceType, 'daily' | 'weekly' | 'monthly'>;
+type DatedRecurrence = Extract<RecurrenceType, 'daily' | 'weekly' | 'monthly' | 'custom'>;
 
 /**
  * Elapsed-day equivalent of the occurrence caps inside
@@ -391,6 +470,7 @@ const TRIGGER_WINDOW_CAP_DAYS: Record<DatedRecurrence, number> = {
   daily: 60,
   weekly: 364,
   monthly: 729,
+  custom: 60,
 };
 
 /**
@@ -423,7 +503,10 @@ export function getRequiredCoverageThroughDate(
 
   const today = toDateStringOf(now);
   const capDays =
-    recurrence === 'daily' || recurrence === 'weekly' || recurrence === 'monthly'
+    recurrence === 'daily' ||
+    recurrence === 'weekly' ||
+    recurrence === 'monthly' ||
+    recurrence === 'custom'
       ? TRIGGER_WINDOW_CAP_DAYS[recurrence]
       : 60;
   const horizon = new Date(now.getFullYear(), now.getMonth(), now.getDate() + capDays);
@@ -485,7 +568,6 @@ export const notificationService = {
         description: 'Time-sensitive medication dose alarms',
         importance: AndroidImportance.MAX,
         vibrationPattern: [0, 300, 200, 300, 200, 500],
-        sound: 'default',
         enableVibrate: true,
         enableLights: true,
         lightColor: '#0788F5',
@@ -596,7 +678,7 @@ export const notificationService = {
     amount: string,
     time: string, // 'HH:mm'
     doseLabel?: string,
-    scheduleConfig?: Pick<ReminderSchedule, 'recurrence' | 'startDate' | 'endDate'>,
+    scheduleConfig?: ScheduleConfig,
   ): Promise<string | null> {
     try {
       const [hourStr, minStr] = time.split(':');
@@ -665,7 +747,7 @@ export const notificationService = {
                   amount,
                   doseLabel: doseLabel ?? '',
                 },
-                sound: 'default',
+                sound: true,
                 ...(Platform.OS === 'android' ? { channelId: 'medication-reminders' } : {}),
               },
               trigger,
@@ -1026,6 +1108,7 @@ async function performReconcile(): Promise<ReconcileResult> {
               dose.label,
               {
                 recurrence: schedule.recurrence,
+                daysOfWeek: schedule.daysOfWeek,
                 startDate: schedule.startDate,
                 endDate: schedule.endDate,
               },
