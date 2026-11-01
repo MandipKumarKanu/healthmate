@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -132,6 +132,43 @@ export default function SetReminderScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [editingScheduleId, setEditingScheduleId] = useState<string | undefined>(routeScheduleId);
 
+  // Other active schedules for the selected medicine (to prevent duplicate times)
+  const otherSchedules = useMemo(() => {
+    if (!selectedMed) return [];
+    return scheduleRepository
+      .getAllByMedicineId(selectedMed.id)
+      .filter((s) => s.id !== editingScheduleId && s.enabled);
+  }, [selectedMed, editingScheduleId]);
+
+  const otherScheduledTimes = useMemo(() => {
+    const set = new Set<string>();
+    otherSchedules.forEach((s) => {
+      s.times.forEach((t) => set.add(t.time));
+    });
+    return set;
+  }, [otherSchedules]);
+
+  // When creating a new reminder, ensure initial dose time doesn't collide with existing times
+  useEffect(() => {
+    if (!routeScheduleId && selectedMed) {
+      setTimes((prevTimes) => {
+        if (prevTimes.length === 1 && otherScheduledTimes.has(prevTimes[0].time)) {
+          const commonPresets = ['08:00', '12:00', '14:00', '18:00', '20:00', '22:00'];
+          const firstFree = commonPresets.find((p) => !otherScheduledTimes.has(p)) || '09:00';
+          return [
+            {
+              id: 't_1',
+              time: firstFree,
+              amount: prevTimes[0].amount || '1 tablet',
+              label: getTimeLabel(firstFree),
+            },
+          ];
+        }
+        return prevTimes;
+      });
+    }
+  }, [selectedMed, routeScheduleId, otherScheduledTimes]);
+
   // Time picker state and snap wheels for quick, precise minute selection.
   const [pickerTarget, setPickerTarget] = useState<{ id: string | 'new'; date: Date } | null>(null);
   const [tempPickerDate, setTempPickerDate] = useState<Date>(new Date());
@@ -202,11 +239,20 @@ export default function SetReminderScreen() {
 
   const getNextSuggestedTime = (): string => {
     const commonPresets = ['08:00', '12:00', '14:00', '18:00', '20:00', '22:00'];
-    const available = commonPresets.find((p) => !times.some((t) => t.time === p));
+    const currentTimes = new Set(times.map((t) => t.time));
+    const available = commonPresets.find(
+      (p) => !currentTimes.has(p) && !otherScheduledTimes.has(p),
+    );
     if (available) return available;
     const now = new Date();
-    const nextHour = (now.getHours() + 1) % 24;
-    return `${String(nextHour).padStart(2, '0')}:00`;
+    for (let offset = 1; offset <= 24; offset++) {
+      const candidateHour = (now.getHours() + offset) % 24;
+      const candidateTime = `${String(candidateHour).padStart(2, '0')}:00`;
+      if (!currentTimes.has(candidateTime) && !otherScheduledTimes.has(candidateTime)) {
+        return candidateTime;
+      }
+    }
+    return '09:00';
   };
 
   const handleTimeSelected = (targetId: string | 'new', selectedTime: string) => {
@@ -220,6 +266,14 @@ export default function SetReminderScreen() {
       Alert.alert(
         'Duplicate Reminder Time',
         `A dose is already scheduled for ${formatTime12Hour(selectedTime)}. Each dose reminder must have a distinct time.`,
+      );
+      return;
+    }
+
+    if (otherScheduledTimes.has(selectedTime)) {
+      Alert.alert(
+        'Reminder Already Exists',
+        `${selectedMed?.name || 'This medicine'} already has an active reminder scheduled for ${formatTime12Hour(selectedTime)}. You cannot schedule the same medicine at the same time.`,
       );
       return;
     }
@@ -320,6 +374,14 @@ export default function SetReminderScreen() {
       }
       removeTime(existing.id);
     } else {
+      if (otherScheduledTimes.has(presetTime)) {
+        Alert.alert(
+          'Reminder Already Exists',
+          `${selectedMed?.name || 'This medicine'} already has an active reminder scheduled for ${formatTime12Hour(presetTime)}. You cannot schedule the same medicine at the same time.`,
+        );
+        return;
+      }
+
       const newEntry: ReminderTime = {
         id: `t_${Date.now()}_${presetTime.replace(':', '')}`,
         time: presetTime,
@@ -335,6 +397,13 @@ export default function SetReminderScreen() {
       Alert.alert(
         'Duplicate Reminder Time',
         `A dose is already scheduled for ${formatTime12Hour(presetTime)}.`,
+      );
+      return;
+    }
+    if (otherScheduledTimes.has(presetTime)) {
+      Alert.alert(
+        'Reminder Already Exists',
+        `${selectedMed?.name || 'This medicine'} already has an active reminder scheduled for ${formatTime12Hour(presetTime)}. You cannot schedule the same medicine at the same time.`,
       );
       return;
     }
@@ -389,6 +458,16 @@ export default function SetReminderScreen() {
     if (!timesValidation.valid) {
       Alert.alert('Schedule Validation Error', timesValidation.error);
       return;
+    }
+
+    for (const dose of times) {
+      if (otherScheduledTimes.has(dose.time)) {
+        Alert.alert(
+          'Duplicate Reminder Time',
+          `${selectedMed.name} already has an active reminder scheduled for ${formatTime12Hour(dose.time)}. You cannot schedule the same medicine at the same time.`,
+        );
+        return;
+      }
     }
 
     setIsSaving(true);
@@ -670,33 +749,68 @@ export default function SetReminderScreen() {
             <View style={styles.presetGrid}>
               {PRESET_DOSES.map((preset) => {
                 const isAdded = times.some((t) => t.time === preset.time);
+                const isTaken = otherScheduledTimes.has(preset.time);
                 return (
                   <TouchableOpacity
                     key={preset.time}
-                    style={[styles.presetCard, isAdded && styles.presetCardActive]}
+                    style={[
+                      styles.presetCard,
+                      isAdded && styles.presetCardActive,
+                      isTaken && styles.presetCardTaken,
+                    ]}
                     onPress={() => togglePresetTime(preset.time, preset.label)}
                     accessibilityRole="button"
-                    accessibilityLabel={`${isAdded ? 'Remove' : 'Add'} ${preset.label} preset at ${formatTime12Hour(preset.time)}`}
+                    accessibilityLabel={`${isAdded ? 'Remove' : isTaken ? 'Already scheduled' : 'Add'} ${preset.label} preset at ${formatTime12Hour(preset.time)}`}
                     activeOpacity={0.7}
                   >
                     <View
                       style={[
                         styles.presetIconCircle,
-                        { backgroundColor: isAdded ? Colors.primaryLight : preset.bg },
+                        {
+                          backgroundColor: isAdded
+                            ? Colors.primaryLight
+                            : isTaken
+                              ? '#E2E8F0'
+                              : preset.bg,
+                        },
                       ]}
                     >
                       <Ionicons
-                        name={isAdded ? 'checkmark' : (preset.icon as any)}
+                        name={
+                          isAdded
+                            ? 'checkmark'
+                            : isTaken
+                              ? 'lock-closed'
+                              : (preset.icon as any)
+                        }
                         size={14}
-                        color={isAdded ? Colors.primary : preset.color}
+                        color={
+                          isAdded
+                            ? Colors.primary
+                            : isTaken
+                              ? Colors.textSecondary
+                              : preset.color
+                        }
                       />
                     </View>
                     <View style={styles.presetTextCol}>
-                      <Text style={[styles.presetLabel, isAdded && styles.presetLabelActive]}>
+                      <Text
+                        style={[
+                          styles.presetLabel,
+                          isAdded && styles.presetLabelActive,
+                          isTaken && styles.presetLabelTaken,
+                        ]}
+                      >
                         {preset.label}
                       </Text>
-                      <Text style={[styles.presetTime, isAdded && styles.presetTimeActive]}>
-                        {formatTime12Hour(preset.time)}
+                      <Text
+                        style={[
+                          styles.presetTime,
+                          isAdded && styles.presetTimeActive,
+                          isTaken && styles.presetTimeTaken,
+                        ]}
+                      >
+                        {isTaken ? 'Already set' : formatTime12Hour(preset.time)}
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -1366,6 +1480,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryLight,
     borderColor: Colors.primary,
   },
+  presetCardTaken: {
+    backgroundColor: '#F1F5F9',
+    borderColor: '#E2E8F0',
+    opacity: 0.8,
+  },
   presetIconCircle: {
     width: 26,
     height: 26,
@@ -1384,6 +1503,9 @@ const styles = StyleSheet.create({
   presetLabelActive: {
     color: Colors.primary,
   },
+  presetLabelTaken: {
+    color: Colors.textSecondary,
+  },
   presetTime: {
     fontSize: 11,
     fontWeight: '500',
@@ -1392,6 +1514,10 @@ const styles = StyleSheet.create({
   },
   presetTimeActive: {
     color: Colors.primaryDark,
+  },
+  presetTimeTaken: {
+    color: Colors.textTertiary,
+    fontWeight: '600',
   },
   addCustomTimeBtn: {
     flexDirection: 'row',
