@@ -316,7 +316,7 @@ export default function AIAssistantScreen() {
 
       let charIndex = 0;
       const totalChars = reply.length;
-      const chunkSize = Math.max(3, Math.ceil(totalChars / 100));
+      const chunkSize = Math.max(2, Math.ceil(totalChars / 260));
 
       streamingTimerRef.current = setInterval(() => {
         charIndex += chunkSize;
@@ -330,7 +330,7 @@ export default function AIAssistantScreen() {
         } else {
           setStreamingText(reply.slice(0, charIndex));
         }
-      }, 16);
+      }, 26);
     },
     [conversationId, messages, generateOfflineReply, offlinePrefixForError, stopStreaming],
   );

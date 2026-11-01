@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, View, Text } from 'react-native';
 import { ScheduledDose } from '../../types';
 import { StatusBadge } from '../ui/StatusBadge';
+import { formatTime12Hour } from '../../utils/reminderValidation';
 
 export interface MedicationTimelineItemProps {
   dose: ScheduledDose;
@@ -14,7 +15,7 @@ export function MedicationTimelineItem({ dose, isLast = false }: MedicationTimel
       <View style={styles.leftInfo}>
         <Text style={styles.medName}>{dose.medicineName}</Text>
         <Text style={styles.detailsText}>
-          {dose.time} - {dose.strength} · {dose.amount}
+          {formatTime12Hour(dose.time)} - {dose.strength} · {dose.amount}
         </Text>
       </View>
       <StatusBadge status={dose.status} />

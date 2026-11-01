@@ -19,6 +19,7 @@ import { ScheduledDose } from '../../types';
 import { adherenceRepository } from '../../database/repositories/adherenceRepository';
 import { scheduleRepository } from '../../database/repositories/scheduleRepository';
 import { formatScheduleDateLabel, getTodayDateString } from '../../utils/scheduleRecurrence';
+import { formatTime12Hour } from '../../utils/reminderValidation';
 
 export default function CalendarScreen() {
   const router = useRouter();
@@ -78,7 +79,10 @@ export default function CalendarScreen() {
   };
 
   const handleMorePress = (dose: ScheduledDose) => {
-    Alert.alert(dose.medicineName, `Scheduled for ${dose.time} (${dose.amount})`, [
+    Alert.alert(
+      dose.medicineName,
+      `Scheduled for ${formatTime12Hour(dose.time)} (${dose.amount})`,
+      [
       {
         text: 'Edit Reminder',
         onPress: () =>

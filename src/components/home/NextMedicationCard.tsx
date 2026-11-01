@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ScheduledDose } from '../../types';
 import { Radius, Shadows, Spacing } from '../../theme/tokens';
+import { formatTime12Hour } from '../../utils/reminderValidation';
 
 export interface NextMedicationCardProps {
   dose: ScheduledDose;
@@ -30,7 +31,7 @@ export function NextMedicationCard({ dose, onMarkAsTaken }: NextMedicationCardPr
               {dose.strength} · {dose.amount}
             </Text>
           </View>
-          <Text style={styles.timeText}>{dose.time}</Text>
+          <Text style={styles.timeText}>{formatTime12Hour(dose.time)}</Text>
         </View>
 
         {/* Schedule Subtext */}

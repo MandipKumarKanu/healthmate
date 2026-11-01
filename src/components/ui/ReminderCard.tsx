@@ -7,6 +7,7 @@ import { ScheduledDose } from '../../types';
 import { MedicineIcon } from './MedicineIcon';
 import { StatusBadge } from './StatusBadge';
 import { AppButton } from './AppButton';
+import { formatTime12Hour } from '../../utils/reminderValidation';
 
 interface ReminderCardProps {
   dose: ScheduledDose;
@@ -29,7 +30,7 @@ export function ReminderCard({
     <View style={styles.container}>
       {/* Time Header & Status Badge */}
       <View style={styles.headerRow}>
-        <Text style={styles.timeText}>{dose.time}</Text>
+        <Text style={styles.timeText}>{formatTime12Hour(dose.time)}</Text>
         <StatusBadge status={dose.status} />
       </View>
 
