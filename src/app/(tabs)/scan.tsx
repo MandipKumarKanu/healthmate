@@ -406,7 +406,7 @@ export default function ScanScreen() {
     }
   };
 
-  const handleSaveToCabinet = async (directToReminder: boolean = false) => {
+  const handleSaveToCabinet = async () => {
     if (!medName.trim()) {
       Alert.alert('Notice', 'Please provide a medicine name.');
       return;
@@ -444,22 +444,8 @@ export default function ScanScreen() {
     hasSavedMedicineRef.current = true;
     handleResetAll();
 
-    if (directToReminder) {
-      router.push(`/reminders/create?medicineId=${newMed.id}`);
-      return;
-    }
-
-    Alert.alert(
-      'Added to Cabinet',
-      `${newMed.name} was successfully added to your medicine cabinet!`,
-      [
-        {
-          text: 'Set Reminder',
-          onPress: () => router.push(`/reminders/create?medicineId=${newMed.id}`),
-        },
-        { text: 'Done', onPress: () => router.push('/(tabs)/medicines') },
-      ],
-    );
+    // Directly navigate to the medicine's detail page
+    router.push(`/medicines/${newMed.id}`);
   };
 
   // ---------------------------------------------------------------------------
@@ -1209,24 +1195,13 @@ export default function ScanScreen() {
 
               <View style={styles.secondaryButtonsRow}>
                 <TouchableOpacity
-                  style={styles.secondaryBtn}
-                  onPress={() => {
-                    handleSaveToCabinet(true);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="notifications-outline" size={16} color={Colors.primary} />
-                  <Text style={styles.secondaryBtnText}>Set Reminder</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.secondaryBtn}
+                  style={[styles.secondaryBtn, { flex: 1 }]}
                   onPress={handleResetAll}
                   activeOpacity={0.8}
                 >
                   <Feather name="camera" size={16} color={Colors.textSecondary} />
                   <Text style={[styles.secondaryBtnText, { color: Colors.textSecondary }]}>
-                    Scan Another
+                    Scan Another Medicine
                   </Text>
                 </TouchableOpacity>
               </View>
