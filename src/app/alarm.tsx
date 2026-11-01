@@ -887,6 +887,9 @@ export default function FullScreenAlarmScreen() {
 
           {/* Monumental Lockscreen Clock with radiating rays */}
           <View style={styles.lockClockSection}>
+            <View style={styles.topClockBadge}>
+              <Ionicons name="time" size={26} color="#0788F5" />
+            </View>
             <Text style={styles.clockSubHeader}>Medicine Reminder</Text>
             <View style={styles.clockRow}>
               <View style={styles.clockRaysLeft}>
@@ -1075,14 +1078,6 @@ export default function FullScreenAlarmScreen() {
             </View>
           )}
 
-          {/* Gentle Health Consistency Tip */}
-          <View style={styles.tipBanner}>
-            <Ionicons name="sparkles" size={15} color="#0788F5" />
-            <Text style={styles.tipBannerText}>
-              Keeping your routine consistent helps you stay on track.
-            </Text>
-          </View>
-
           {/* Bottom Interactive Lockscreen Slider & Actions */}
           <View style={styles.bottomSection}>
             {/* Interactive Slider Track */}
@@ -1257,8 +1252,24 @@ const styles = StyleSheet.create({
   lockClockSection: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 10,
+    marginTop: 6,
     marginBottom: 4,
+  },
+  topClockBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1.5,
+    borderColor: '#BFDBFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+    shadowColor: '#0788F5',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 2,
   },
   clockSubHeader: {
     fontSize: 14.5,
@@ -1424,28 +1435,7 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
 
-  // ---------------------------------------------------------------------------
-  // Health Tip / Consistency Banner
-  // ---------------------------------------------------------------------------
-  tipBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#EFF6FF',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 11,
-    borderWidth: 1,
-    borderColor: '#DBEAFE',
-    marginVertical: 4,
-  },
-  tipBannerText: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#0369A1',
-    lineHeight: 18,
-  },
+
 
   // ---------------------------------------------------------------------------
   // Multi-Medicine Grouped Card
