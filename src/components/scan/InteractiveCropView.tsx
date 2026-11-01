@@ -2,11 +2,13 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
   StyleSheet,
   View,
+  ScrollView,
   Text,
   Image,
   TouchableOpacity,
   GestureResponderEvent,
   LayoutChangeEvent,
+  useWindowDimensions,
 } from 'react-native';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
@@ -19,8 +21,6 @@ interface InteractiveCropViewProps {
   sideLabel?: string;
   onDone: (options: { crop?: CropBounds; rotation: number; enhance: boolean }) => void;
   onRetake: () => void;
-  onInteractionStart?: () => void;
-  onInteractionEnd?: () => void;
 }
 
 const CORNER_HANDLE_SIZE = 28;
@@ -31,9 +31,10 @@ export function InteractiveCropView({
   sideLabel = 'Front Side',
   onDone,
   onRetake,
-  onInteractionStart,
-  onInteractionEnd,
 }: InteractiveCropViewProps) {
+  const { height: windowHeight } = useWindowDimensions();
+  const viewportHeight = Math.min(380, Math.max(270, Math.round(windowHeight * 0.42)));
+
   const [naturalDimensions, setNaturalDimensions] = useState<{ width: number; height: number }>({
     width: 0,
     height: 0,
@@ -121,38 +122,12 @@ export function InteractiveCropView({
   // Gestures via native Responder system
   const dragStartPos = useRef({ pageX: 0, pageY: 0 });
   const startBoxRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
-  const isInteractingRef = useRef(false);
-
-  const startInteracting = useCallback(() => {
-    if (!isInteractingRef.current) {
-      isInteractingRef.current = true;
-      onInteractionStart?.();
-    }
-  }, [onInteractionStart]);
-
-  const endInteracting = useCallback(() => {
-    if (isInteractingRef.current) {
-      isInteractingRef.current = false;
-      onInteractionEnd?.();
-    }
-  }, [onInteractionEnd]);
-
-  useEffect(() => {
-    return () => {
-      endInteracting();
-    };
-  }, [endInteracting]);
 
   const clamp = (val: number, min: number, max: number) => Math.max(min, Math.min(val, max));
 
   const handleGrant = (evt: GestureResponderEvent) => {
-    startInteracting();
     dragStartPos.current = { pageX: evt.nativeEvent.pageX, pageY: evt.nativeEvent.pageY };
     startBoxRef.current = { ...cropBox };
-  };
-
-  const handleRelease = () => {
-    endInteracting();
   };
 
   const handleMove = (
@@ -218,7 +193,6 @@ export function InteractiveCropView({
   };
 
   const handleApplyDone = () => {
-    endInteracting();
     if (imageDisplayRect.scale <= 0) {
       onDone({ rotation, enhance });
       return;
@@ -249,11 +223,6 @@ export function InteractiveCropView({
     });
   };
 
-  const handleRetakePress = () => {
-    endInteracting();
-    onRetake();
-  };
-
   return (
     <View style={styles.container}>
       {/* Top Banner with side indicator and instructions */}
@@ -266,12 +235,9 @@ export function InteractiveCropView({
         </Text>
       </View>
 
-      {/* Main Image Viewport with Scrim & Crop Box */}
+      {/* Main Image Viewport with Scrim & Crop Box (Fixed outside ScrollView for rock-solid gestures) */}
       <View
-        style={styles.viewport}
-        onTouchStart={startInteracting}
-        onTouchEnd={endInteracting}
-        onTouchCancel={endInteracting}
+        style={[styles.viewport, { height: viewportHeight }]}
         onLayout={(evt: LayoutChangeEvent) => {
           const { width, height } = evt.nativeEvent.layout;
           setContainerLayout({ width, height });
@@ -366,8 +332,6 @@ export function InteractiveCropView({
                 onResponderTerminationRequest={() => false}
                 onResponderGrant={handleGrant}
                 onResponderMove={(e) => handleMove('body', e)}
-                onResponderRelease={handleRelease}
-                onResponderTerminate={handleRelease}
               >
                 <View style={[styles.gridLineH, { top: '33.3%' }]} pointerEvents="none" />
                 <View style={[styles.gridLineH, { top: '66.6%' }]} pointerEvents="none" />
@@ -392,8 +356,6 @@ export function InteractiveCropView({
                 onResponderTerminationRequest={() => false}
                 onResponderGrant={handleGrant}
                 onResponderMove={(e) => handleMove('tl', e)}
-                onResponderRelease={handleRelease}
-                onResponderTerminate={handleRelease}
               >
                 <View style={styles.handleDot} />
               </View>
@@ -407,8 +369,6 @@ export function InteractiveCropView({
                 onResponderTerminationRequest={() => false}
                 onResponderGrant={handleGrant}
                 onResponderMove={(e) => handleMove('tr', e)}
-                onResponderRelease={handleRelease}
-                onResponderTerminate={handleRelease}
               >
                 <View style={styles.handleDot} />
               </View>
@@ -422,8 +382,6 @@ export function InteractiveCropView({
                 onResponderTerminationRequest={() => false}
                 onResponderGrant={handleGrant}
                 onResponderMove={(e) => handleMove('bl', e)}
-                onResponderRelease={handleRelease}
-                onResponderTerminate={handleRelease}
               >
                 <View style={styles.handleDot} />
               </View>
@@ -437,8 +395,6 @@ export function InteractiveCropView({
                 onResponderTerminationRequest={() => false}
                 onResponderGrant={handleGrant}
                 onResponderMove={(e) => handleMove('br', e)}
-                onResponderRelease={handleRelease}
-                onResponderTerminate={handleRelease}
               >
                 <View style={styles.handleDot} />
               </View>
@@ -455,70 +411,87 @@ export function InteractiveCropView({
         )}
       </View>
 
-      {/* Adjustment Tools Toolbar */}
-      <View style={styles.toolsRow}>
-        <TouchableOpacity style={styles.toolButton} onPress={resetCropToDefault} activeOpacity={0.7}>
-          <MaterialCommunityIcons name="crop" size={20} color={Colors.primary} />
-          <Text style={styles.toolButtonText}>Auto Fit</Text>
-        </TouchableOpacity>
+      {/* Scrollable Controls Section (Toolbar & Action Buttons) */}
+      <ScrollView
+        style={styles.controlsScroll}
+        contentContainerStyle={styles.controlsScrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
+        {/* Adjustment Tools Toolbar */}
+        <View style={styles.toolsRow}>
+          <TouchableOpacity style={styles.toolButton} onPress={resetCropToDefault} activeOpacity={0.7}>
+            <MaterialCommunityIcons name="crop" size={20} color={Colors.primary} />
+            <Text style={styles.toolButtonText}>Auto Fit</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity style={styles.toolButton} onPress={handleRotate} activeOpacity={0.7}>
-          <Feather name="rotate-cw" size={19} color={Colors.textPrimary} />
-          <Text style={styles.toolButtonText}>Rotate</Text>
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.toolButton} onPress={handleRotate} activeOpacity={0.7}>
+            <Feather name="rotate-cw" size={19} color={Colors.textPrimary} />
+            <Text style={styles.toolButtonText}>Rotate</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.toolButton, enhance && styles.toolButtonActive]}
-          onPress={handleToggleEnhance}
-          activeOpacity={0.7}
-        >
-          <MaterialCommunityIcons
-            name="auto-fix"
-            size={20}
-            color={enhance ? Colors.primary : Colors.textPrimary}
-          />
-          <Text style={[styles.toolButtonText, enhance && styles.toolButtonTextActive]}>
-            {enhance ? 'Enhanced' : 'Enhance'}
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.toolButton, enhance && styles.toolButtonActive]}
+            onPress={handleToggleEnhance}
+            activeOpacity={0.7}
+          >
+            <MaterialCommunityIcons
+              name="auto-fix"
+              size={20}
+              color={enhance ? Colors.primary : Colors.textPrimary}
+            />
+            <Text style={[styles.toolButtonText, enhance && styles.toolButtonTextActive]}>
+              {enhance ? 'Enhanced' : 'Enhance'}
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity style={styles.toolButton} onPress={handleReset} activeOpacity={0.7}>
-          <Ionicons name="refresh" size={19} color={Colors.textSecondary} />
-          <Text style={styles.toolButtonText}>Reset</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Action Footer: Retake & Done */}
-      <View style={styles.footerRow}>
-        <TouchableOpacity style={styles.retakeButton} onPress={handleRetakePress} activeOpacity={0.8}>
-          <Feather name="arrow-left" size={16} color={Colors.textPrimary} />
-          <Text style={styles.retakeButtonText}>Retake</Text>
-        </TouchableOpacity>
-
-        <View style={styles.doneButtonWrapper}>
-          <AppButton
-            title="Done"
-            onPress={handleApplyDone}
-            variant="primary"
-            size="lg"
-            icon={<Feather name="check" size={18} color="#FFFFFF" />}
-          />
+          <TouchableOpacity style={styles.toolButton} onPress={handleReset} activeOpacity={0.7}>
+            <Ionicons name="refresh" size={19} color={Colors.textSecondary} />
+            <Text style={styles.toolButtonText}>Reset</Text>
+          </TouchableOpacity>
         </View>
-      </View>
+
+        {/* Action Footer: Retake & Done */}
+        <View style={styles.footerRow}>
+          <TouchableOpacity style={styles.retakeButton} onPress={onRetake} activeOpacity={0.8}>
+            <Feather name="arrow-left" size={16} color={Colors.textPrimary} />
+            <Text style={styles.retakeButtonText}>Retake</Text>
+          </TouchableOpacity>
+
+          <View style={styles.doneButtonWrapper}>
+            <AppButton
+              title="Done"
+              onPress={handleApplyDone}
+              variant="primary"
+              size="lg"
+              icon={<Feather name="check" size={18} color="#FFFFFF" />}
+            />
+          </View>
+        </View>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
     width: '100%',
     alignItems: 'center',
+  },
+  controlsScroll: {
+    width: '100%',
+    flex: 1,
+    marginTop: Spacing.sm,
+  },
+  controlsScrollContent: {
+    paddingBottom: Spacing.xl,
   },
   topInfoBar: {
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,
     gap: 8,
   },
   sideBadge: {
@@ -540,7 +513,6 @@ const styles = StyleSheet.create({
   },
   viewport: {
     width: '100%',
-    height: 400,
     backgroundColor: '#0F1115',
     borderRadius: Radius.card,
     overflow: 'hidden',

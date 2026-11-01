@@ -70,14 +70,6 @@ export default function ScanScreen() {
   const [backOriginalUri, setBackOriginalUri] = useState<string | null>(null);
   const [backCroppedUri, setBackCroppedUri] = useState<string | null>(null);
   const [savedScanImageUri, setSavedScanImageUri] = useState<string | null>(null);
-  const [isCropDragging, setIsCropDragging] = useState(false);
-
-  // Safety: reset crop dragging state if flow step navigates away
-  useEffect(() => {
-    if (currentStep !== 'crop') {
-      setIsCropDragging(false);
-    }
-  }, [currentStep]);
 
   // Analysis progress
   const [currentStage, setCurrentStage] = useState<ScanStage>('idle');
@@ -464,9 +456,12 @@ export default function ScanScreen() {
 
   return (
     <AppScreen
-      scrollable={true}
-      scrollEnabled={!isCropDragging}
-      contentContainerStyle={[styles.scrollContent, isGating && styles.gatingScrollContent]}
+      scrollable={currentStep !== 'crop'}
+      contentContainerStyle={[
+        styles.scrollContent,
+        isGating && styles.gatingScrollContent,
+        currentStep === 'crop' && styles.cropScrollContent,
+      ]}
     >
       {/* Header */}
       <AppHeader
@@ -545,7 +540,13 @@ export default function ScanScreen() {
         }
       />
 
-      <View style={[styles.body, isGating && styles.gatingBody]}>
+      <View
+        style={[
+          styles.body,
+          currentStep === 'crop' && styles.cropBody,
+          isGating && styles.gatingBody,
+        ]}
+      >
         {/* Offline Notice banner if offline */}
         {isOnline === false && currentStep === 'capture' && hasApiKey && (
           <View style={styles.internetNoticeBanner}>
@@ -723,8 +724,6 @@ export default function ScanScreen() {
             sideLabel={targetSide === 'front' ? 'Front Side' : 'Back Side'}
             onDone={handleCropDone}
             onRetake={handleCropRetake}
-            onInteractionStart={() => setIsCropDragging(true)}
-            onInteractionEnd={() => setIsCropDragging(false)}
           />
         )}
 
@@ -1262,12 +1261,20 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 160,
   },
+  cropScrollContent: {
+    flex: 1,
+    paddingBottom: 0,
+  },
   gatingScrollContent: {
     flexGrow: 1,
     paddingBottom: 80,
   },
   body: {
     paddingHorizontal: Spacing.screenPaddingHorizontal,
+  },
+  cropBody: {
+    flex: 1,
+    paddingBottom: Spacing.xs,
   },
   gatingBody: {
     flex: 1,
