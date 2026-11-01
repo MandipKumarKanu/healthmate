@@ -175,8 +175,10 @@ export const aiAssistantService = {
     if (this._cachedKey !== undefined) return this._cachedKey ?? null;
     try {
       const storedKey = await SecureStore.getItemAsync(KEY_STORE_NAME);
-      this._cachedKey = storedKey;
-      return storedKey ?? null;
+      if (storedKey && storedKey.trim()) {
+        this._cachedKey = storedKey.trim();
+        return this._cachedKey;
+      }
     } catch {
       // Do not cache a storage failure as "no key". A later read may succeed.
       this._cachedKey = undefined;
@@ -187,6 +189,9 @@ export const aiAssistantService = {
         { code: 'SECURE_STORE_READ' },
       );
     }
+    const envKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY?.trim() || null;
+    this._cachedKey = envKey;
+    return envKey;
   },
 
   async saveApiKey(key: string): Promise<void> {

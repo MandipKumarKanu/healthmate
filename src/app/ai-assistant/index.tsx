@@ -149,8 +149,8 @@ export default function AIAssistantScreen() {
           (answer: string) => {
             const filled = answer
               .replace(/\$\{medicineName\}/g, medicineName.trim())
-              .replace(/\$\{activeIngredientLabel\}/g, 'the active ingredient')
-              .replace(/\$\{dosageFormLabel\}/g, 'a medicine');
+              .replace(/\$\{activeIngredientLabel\}/g, 'its active ingredient')
+              .replace(/\$\{dosageFormLabel\}/g, 'a medication');
             return filled;
           },
         );
@@ -212,7 +212,11 @@ export default function AIAssistantScreen() {
       let reply: string;
       let usedNetwork = false;
 
-      if (hasApiKey) {
+      // Always resolve actual key directly to prevent race condition on screen mount
+      const actualKey = await aiAssistantService.getApiKey().catch(() => null);
+
+      if (actualKey) {
+        setHasApiKey(true);
         try {
           const answer = await aiAssistantService.askGemini(
             text.trim(),
@@ -221,6 +225,7 @@ export default function AIAssistantScreen() {
               role: m.role === 'assistant' ? 'assistant' : 'user',
               content: m.content,
             })),
+            { apiKey: actualKey },
           );
           reply = answer.text;
           usedNetwork = true;
@@ -233,6 +238,7 @@ export default function AIAssistantScreen() {
           reply = `${offlinePrefixForError(error)}${generateOfflineReply(text)}`;
         }
       } else {
+        setHasApiKey(false);
         reply = generateOfflineReply(text);
       }
 
@@ -250,7 +256,7 @@ export default function AIAssistantScreen() {
       setMessages((prev) => [...prev, assistantMsg]);
       setIsTyping(false);
     },
-    [conversationId, messages, hasApiKey, generateOfflineReply, offlinePrefixForError],
+    [conversationId, messages, generateOfflineReply, offlinePrefixForError],
   );
 
   useEffect(() => {
@@ -264,6 +270,12 @@ export default function AIAssistantScreen() {
     lastAutoQueryRef.current = query;
     void sendMessage(query);
   }, [query, sendMessage]);
+
+  useEffect(() => {
+    return () => {
+      lastAutoQueryRef.current = null;
+    };
+  }, []);
 
   const handleNewChat = () => {
     const newConv = aiRepository.createConversation('Medication Q&A');
