@@ -51,3 +51,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - AI health assistant integration with Gemini API.
 - Calendar adherence logging and monthly tracking.
 - Secure local storage for personal preferences and API keys.
+

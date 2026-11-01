@@ -38,7 +38,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { keyboardHeight, isKeyboardVisible } = useKeyboardHeight();
   const SCREEN_HEIGHT = Dimensions.get('window').height;
-  const appVersion = Constants.expoConfig?.version ?? '1.0.0';
+  const appVersion = Constants.expoConfig?.version ?? '2.0.0';
   const {
     profile,
     preferences,

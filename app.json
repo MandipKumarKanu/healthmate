@@ -2,14 +2,14 @@
   "expo": {
     "name": "HealthMate",
     "slug": "healthmate",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "healthmate",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon",
-      "buildNumber": "12"
+      "buildNumber": "13"
     },
     "android": {
       "package": "com.healthmate.app",
@@ -20,7 +20,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "versionCode": 12,
+      "versionCode": 13,
       "permissions": [
         "android.permission.INTERNET",
         "android.permission.ACCESS_NETWORK_STATE",
