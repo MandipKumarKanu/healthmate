@@ -3,7 +3,6 @@ import {
   StyleSheet,
   View,
   Text,
-  ActivityIndicator,
   TouchableOpacity,
   TextInput,
   ScrollView,
@@ -39,6 +38,11 @@ import {
   getTimeLabel,
 } from '../../utils/reminderValidation';
 import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
+import {
+  RecurrenceScheduleModal,
+  formatFriendlyDate,
+} from '../../components/reminders/RecurrenceScheduleModal';
+import { parseDateParts } from '../../utils/scheduleRecurrence';
 
 const TIME_WHEEL_ITEM_HEIGHT = 48;
 const TIME_WHEEL_VIEW_HEIGHT = 144;
@@ -53,6 +57,46 @@ const MINUTE_WHEEL_SNAP_OFFSETS = Array.from(
   { length: 60 },
   (_, index) => TIME_WHEEL_FIRST_SNAP_OFFSET + index * TIME_WHEEL_ITEM_HEIGHT,
 );
+
+const PRESET_DOSES = [
+  { label: 'Morning', time: '08:00', icon: 'sunny', color: '#D97706', bg: '#FEF3C7' },
+  { label: 'Afternoon', time: '14:00', icon: 'partly-sunny', color: '#0284C7', bg: '#E0F2FE' },
+  { label: 'Evening', time: '18:00', icon: 'cloudy-night', color: '#7C3AED', bg: '#EDE9FE' },
+  { label: 'Night', time: '22:00', icon: 'moon', color: '#4338CA', bg: '#E0E7FF' },
+] as const;
+
+function getTimeIconInfo(time: string) {
+  if (time < '11:00') {
+    return {
+      icon: 'sunny',
+      label: 'Morning',
+      color: '#D97706',
+      bg: '#FEF3C7',
+    };
+  }
+  if (time < '17:00') {
+    return {
+      icon: 'partly-sunny',
+      label: 'Afternoon',
+      color: '#0284C7',
+      bg: '#E0F2FE',
+    };
+  }
+  if (time < '21:00') {
+    return {
+      icon: 'cloudy-night',
+      label: 'Evening',
+      color: '#7C3AED',
+      bg: '#EDE9FE',
+    };
+  }
+  return {
+    icon: 'moon',
+    label: 'Night',
+    color: '#4338CA',
+    bg: '#E0E7FF',
+  };
+}
 
 export default function SetReminderScreen() {
   const router = useRouter();
@@ -71,15 +115,21 @@ export default function SetReminderScreen() {
   const [isMedModalVisible, setIsMedModalVisible] = useState(false);
   const [modalSearch, setModalSearch] = useState('');
   const [recurrence, setRecurrence] = useState<RecurrenceType>('daily');
+  const [startDate, setStartDate] = useState<string>(
+    date && /^\d{4}-\d{2}-\d{2}$/.test(date) && date >= getTodayDateString()
+      ? date
+      : getTodayDateString(),
+  );
+  const [endDate, setEndDate] = useState<string | undefined>(undefined);
+  const [daysOfWeek, setDaysOfWeek] = useState<number[] | undefined>(undefined);
+  const [isScheduleModalVisible, setIsScheduleModalVisible] = useState(false);
   const [times, setTimes] = useState<ReminderTime[]>([
     { id: 't_1', time: '08:00', amount: '1 tablet', label: 'Morning' },
   ]);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [amount, setAmount] = useState('1 tablet');
   const [amountError, setAmountError] = useState<string | null>(null);
-  const [editingTimes, setEditingTimes] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveProgress, setSaveProgress] = useState('');
   const [editingScheduleId, setEditingScheduleId] = useState<string | undefined>(routeScheduleId);
 
   // Time picker state and snap wheels for quick, precise minute selection.
@@ -128,15 +178,14 @@ export default function SetReminderScreen() {
   );
 
   useEffect(() => {
-    if (medicineId || routeScheduleId) {
-      const existingSched = routeScheduleId
-        ? scheduleRepository.getById(routeScheduleId)
-        : medicineId
-          ? scheduleRepository.getByMedicineId(medicineId)
-          : null;
+    if (routeScheduleId) {
+      const existingSched = scheduleRepository.getById(routeScheduleId);
       if (existingSched) {
         setEditingScheduleId(existingSched.id);
         setRecurrence(existingSched.recurrence);
+        setDaysOfWeek(existingSched.daysOfWeek);
+        setStartDate(existingSched.startDate);
+        setEndDate(existingSched.endDate);
         setTimes(
           existingSched.times.map((t) => ({
             ...t,
@@ -146,10 +195,10 @@ export default function SetReminderScreen() {
         if (existingSched.times.length > 0 && existingSched.times[0].amount) {
           setAmount(existingSched.times[0].amount);
         }
-        setNotificationsEnabled(existingSched.notificationsEnabled);
+        setNotificationsEnabled(true);
       }
     }
-  }, [medicineId, routeScheduleId]);
+  }, [routeScheduleId]);
 
   const getNextSuggestedTime = (): string => {
     const commonPresets = ['08:00', '12:00', '14:00', '18:00', '20:00', '22:00'];
@@ -262,6 +311,25 @@ export default function SetReminderScreen() {
     });
   };
 
+  const togglePresetTime = (presetTime: string, label: string) => {
+    const existing = times.find((t) => t.time === presetTime);
+    if (existing) {
+      if (times.length <= 1) {
+        Alert.alert('Notice', 'At least one reminder time is required.');
+        return;
+      }
+      removeTime(existing.id);
+    } else {
+      const newEntry: ReminderTime = {
+        id: `t_${Date.now()}_${presetTime.replace(':', '')}`,
+        time: presetTime,
+        amount: amount.trim() || '1 tablet',
+        label,
+      };
+      setTimes((prev) => [...prev, newEntry].sort((a, b) => a.time.localeCompare(b.time)));
+    }
+  };
+
   const addPresetTime = (presetTime: string) => {
     if (isDuplicateReminderTime(times, presetTime)) {
       Alert.alert(
@@ -324,11 +392,6 @@ export default function SetReminderScreen() {
     }
 
     setIsSaving(true);
-    setSaveProgress(
-      notificationsEnabled
-        ? 'Checking notification and alarm access…'
-        : 'Saving reminder schedule…',
-    );
     try {
       let canNotify = notificationsEnabled;
       if (notificationsEnabled) {
@@ -344,13 +407,10 @@ export default function SetReminderScreen() {
       // Use the date visible in the calendar when the route did not supply one.
       // This keeps the in-memory reminder list in sync with the saved SQLite row.
       const refreshDate = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : selectedDate;
-      setSaveProgress(
-        canNotify ? 'Saving schedule and preparing alarms…' : 'Saving reminder schedule…',
-      );
       const existingSchedule = editingScheduleId
         ? scheduleRepository.getById(editingScheduleId)
-        : scheduleRepository.getByMedicineId(selectedMed.id);
-      const scheduleId = existingSchedule?.id ?? `sched_${selectedMed.id}`;
+        : null;
+      const scheduleId = editingScheduleId || `sched_${selectedMed.id}_${Date.now()}`;
       const now = new Date().toISOString();
 
       const saveResult = await saveSchedule(
@@ -358,10 +418,9 @@ export default function SetReminderScreen() {
           id: scheduleId,
           medicineId: selectedMed.id,
           recurrence,
-          startDate:
-            existingSchedule?.startDate ??
-            (date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : getTodayDateString()),
-          endDate: existingSchedule?.endDate,
+          daysOfWeek,
+          startDate,
+          endDate,
           times,
           enabled: true,
           notificationsEnabled: canNotify,
@@ -413,7 +472,6 @@ export default function SetReminderScreen() {
       );
     } finally {
       setIsSaving(false);
-      setSaveProgress('');
     }
   };
 
@@ -421,6 +479,7 @@ export default function SetReminderScreen() {
     { type: 'daily', label: 'Every Day' },
     { type: 'weekly', label: 'Every Week' },
     { type: 'monthly', label: 'Every Month' },
+    { type: 'custom', label: 'Custom' },
     { type: 'once', label: 'Once' },
   ];
 
@@ -494,7 +553,12 @@ export default function SetReminderScreen() {
                 styles.recurrenceButton,
                 recurrence === opt.type && styles.recurrenceButtonActive,
               ]}
-              onPress={() => setRecurrence(opt.type)}
+              onPress={() => {
+                setRecurrence(opt.type);
+                if (opt.type === 'weekly' || opt.type === 'monthly' || opt.type === 'custom') {
+                  setIsScheduleModalVisible(true);
+                }
+              }}
             >
               <Text
                 style={[
@@ -508,130 +572,150 @@ export default function SetReminderScreen() {
           ))}
         </View>
 
+        {/* Active Schedule Details Card */}
+        <TouchableOpacity
+          style={styles.scheduleDetailsCard}
+          onPress={() => setIsScheduleModalVisible(true)}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Open schedule details and calendar"
+        >
+          <View style={styles.scheduleDetailsIcon}>
+            <Ionicons name="calendar" size={18} color={Colors.primary} />
+          </View>
+          <View style={styles.scheduleDetailsInfo}>
+            <Text style={styles.scheduleDetailsTitle}>
+              {recurrence === 'daily'
+                ? 'Repeats Every Day'
+                : recurrence === 'weekly'
+                  ? `Every Week · ${formatFriendlyDate(startDate).split(',')[0]}`
+                  : recurrence === 'monthly'
+                    ? `Every Month · Day ${parseDateParts(startDate)?.[2] || ''}`
+                    : recurrence === 'custom'
+                      ? daysOfWeek && daysOfWeek.length > 0
+                        ? `Custom · ${daysOfWeek.map((d) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d]).join(', ')}`
+                        : 'Custom Days'
+                      : 'Single Dose (Once)'}
+            </Text>
+            <Text style={styles.scheduleDetailsSub}>
+              Starts {formatFriendlyDate(startDate)}
+              {endDate ? ` · Ends ${formatFriendlyDate(endDate)}` : ' · Ongoing'}
+            </Text>
+          </View>
+          <View style={styles.scheduleChangePill}>
+            <Text style={styles.scheduleChangePillText}>Calendar</Text>
+            <Ionicons name="chevron-forward" size={14} color={Colors.primary} />
+          </View>
+        </TouchableOpacity>
+
         {/* Reminder Times Section */}
         <View style={styles.reminderHeading}>
           <SectionHeader title="Reminder Times" />
-          <TouchableOpacity
-            onPress={() => setEditingTimes((value) => !value)}
-            accessibilityRole="button"
-            accessibilityLabel={
-              editingTimes
-                ? 'Finish editing reminder times'
-                : 'Edit reminder times and dose amounts'
-            }
-          >
-            <Text style={styles.editAction}>{editingTimes ? 'Done' : 'Edit'}</Text>
-          </TouchableOpacity>
+          <View style={styles.doseCountBadge}>
+            <Text style={styles.doseCountBadgeText}>
+              {times.length} {times.length === 1 ? 'dose' : 'doses'}/day
+            </Text>
+          </View>
         </View>
 
         <AppCard style={styles.card}>
-          {times.map((t) => (
-            <View key={t.id} style={styles.timeRow}>
-              <View style={styles.timeCol}>
-                {editingTimes ? (
-                  <TextInput
-                    style={styles.timeValueInput}
-                    value={t.label ?? ''}
-                    onChangeText={(label) =>
-                      setTimes((previous) =>
-                        previous.map((item) => (item.id === t.id ? { ...item, label } : item)),
-                      )
-                    }
-                    placeholder="Dose name (e.g. Morning)"
-                    placeholderTextColor="#64748B"
-                    accessibilityLabel={`Dose name for ${t.time}`}
-                  />
-                ) : (
-                  <Text style={styles.timeValueText}>{t.label || getTimeLabel(t.time)}</Text>
-                )}
+          {/* Active dose times list */}
+          {times.map((t) => {
+            const meta = getTimeIconInfo(t.time);
+            const displayLabel = t.label || meta.label;
+            const isOnlyOne = times.length <= 1;
 
-                {editingTimes ? (
-                  <View style={styles.doseAmountRow}>
-                    <Text style={styles.doseAmountPrefix}>Dose:</Text>
-                    <TextInput
-                      style={styles.doseAmountInlineInput}
-                      value={t.amount}
-                      onChangeText={(val) => handleDoseAmountChange(t.id, val)}
-                      placeholder="e.g. 1 tablet"
-                      placeholderTextColor="#64748B"
-                      accessibilityLabel={`Dose amount for ${t.label || t.time}`}
-                    />
-                  </View>
-                ) : (
-                  <Text style={styles.doseNote}>{t.amount || amount}</Text>
-                )}
-              </View>
+            return (
+              <View key={t.id} style={styles.timeRowCard}>
+                <View style={[styles.timeRowIconBadge, { backgroundColor: meta.bg }]}>
+                  <Ionicons name={meta.icon as any} size={18} color={meta.color} />
+                </View>
 
-              <View style={styles.timeActions}>
+                <View style={styles.timeRowInfo}>
+                  <Text style={styles.timeRowLabel}>{displayLabel}</Text>
+                  <Text style={styles.timeRowAmount}>{t.amount || amount || '1 dose'}</Text>
+                </View>
+
                 <TouchableOpacity
-                  style={styles.timePickerButton}
+                  style={styles.timeRowPill}
                   onPress={() => openTimePicker(t.id, t.time)}
                   accessibilityRole="button"
-                  accessibilityLabel={`Change time for ${t.label || 'dose'}, currently ${formatTime12Hour(t.time)}`}
+                  accessibilityLabel={`Change time for ${displayLabel}, currently ${formatTime12Hour(t.time)}`}
                   activeOpacity={0.7}
                 >
-                  <Feather name="clock" size={15} color={Colors.primary} style={styles.clockIcon} />
-                  <Text style={styles.timePickerButtonText}>{formatTime12Hour(t.time)}</Text>
+                  <Feather name="clock" size={13} color={Colors.primary} style={{ marginRight: 6 }} />
+                  <Text style={styles.timeRowPillText}>{formatTime12Hour(t.time)}</Text>
+                  <Feather name="chevron-down" size={13} color={Colors.primary} style={{ marginLeft: 4 }} />
                 </TouchableOpacity>
 
-                {editingTimes && (
+                {!isOnlyOne && (
                   <TouchableOpacity
-                    style={styles.deleteTimeButton}
+                    style={styles.timeRowDeleteBtn}
                     onPress={() => removeTime(t.id)}
                     accessibilityRole="button"
-                    accessibilityLabel={`Delete reminder time ${formatTime12Hour(t.time)}`}
+                    accessibilityLabel={`Remove ${displayLabel} reminder time`}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    activeOpacity={0.7}
                   >
-                    <Ionicons name="trash-outline" size={18} color={Colors.error} />
+                    <Ionicons name="trash-outline" size={17} color={Colors.error} />
                   </TouchableOpacity>
                 )}
               </View>
-            </View>
-          ))}
+            );
+          })}
 
-          {/* Add time & Presets */}
-          {editingTimes && (
-            <>
-              <TouchableOpacity
-                style={styles.addAnotherTime}
-                onPress={() => openTimePicker('new', getNextSuggestedTime())}
-                accessibilityRole="button"
-                accessibilityLabel="Pick time and add dose"
-              >
-                <Ionicons name="time-outline" size={20} color={Colors.primary} />
-                <Text style={styles.addAnotherText}>Pick Time & Add Dose</Text>
-              </TouchableOpacity>
-
-              <Text style={styles.presetsLabel}>Quick Add Presets</Text>
-              <ScrollView
-                horizontal
-                style={styles.presetScroller}
-                contentContainerStyle={styles.presetRow}
-                showsHorizontalScrollIndicator={false}
-                nestedScrollEnabled
-                keyboardShouldPersistTaps="handled"
-              >
-                {['08:00', '14:00', '18:00', '22:00'].map((preset) => {
-                  const isAdded = times.some((t) => t.time === preset);
-                  return (
-                    <TouchableOpacity
-                      key={preset}
-                      style={[styles.presetChip, isAdded && styles.presetChipDisabled]}
-                      onPress={() => addPresetTime(preset)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Add preset ${getTimeLabel(preset)} at ${formatTime12Hour(preset)}`}
+          {/* Quick Presets & Add Section */}
+          <View style={styles.quickPresetsSection}>
+            <Text style={styles.quickPresetsTitle}>Quick Add / Toggle Doses</Text>
+            <View style={styles.presetGrid}>
+              {PRESET_DOSES.map((preset) => {
+                const isAdded = times.some((t) => t.time === preset.time);
+                return (
+                  <TouchableOpacity
+                    key={preset.time}
+                    style={[styles.presetCard, isAdded && styles.presetCardActive]}
+                    onPress={() => togglePresetTime(preset.time, preset.label)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${isAdded ? 'Remove' : 'Add'} ${preset.label} preset at ${formatTime12Hour(preset.time)}`}
+                    activeOpacity={0.7}
+                  >
+                    <View
+                      style={[
+                        styles.presetIconCircle,
+                        { backgroundColor: isAdded ? Colors.primaryLight : preset.bg },
+                      ]}
                     >
-                      <Text
-                        style={[styles.presetChipText, isAdded && styles.presetChipTextDisabled]}
-                      >
-                        {isAdded ? '✓ ' : '+ '}
-                        {getTimeLabel(preset)} · {formatTime12Hour(preset)}
+                      <Ionicons
+                        name={isAdded ? 'checkmark' : (preset.icon as any)}
+                        size={14}
+                        color={isAdded ? Colors.primary : preset.color}
+                      />
+                    </View>
+                    <View style={styles.presetTextCol}>
+                      <Text style={[styles.presetLabel, isAdded && styles.presetLabelActive]}>
+                        {preset.label}
                       </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </>
-          )}
+                      <Text style={[styles.presetTime, isAdded && styles.presetTimeActive]}>
+                        {formatTime12Hour(preset.time)}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Custom Time Picker Button */}
+            <TouchableOpacity
+              style={styles.addCustomTimeBtn}
+              onPress={() => openTimePicker('new', getNextSuggestedTime())}
+              accessibilityRole="button"
+              accessibilityLabel="Pick custom reminder time"
+              activeOpacity={0.7}
+            >
+              <Ionicons name="add-circle-outline" size={18} color={Colors.primary} />
+              <Text style={styles.addCustomTimeText}>Pick Custom Time</Text>
+            </TouchableOpacity>
+          </View>
         </AppCard>
 
         {/* Dosage Amount */}
@@ -654,33 +738,8 @@ export default function SetReminderScreen() {
           )}
         </AppCard>
 
-        {/* Notification Toggle */}
-        <SectionHeader title="Notifications" />
-        <AppCard style={styles.card}>
-          <TouchableOpacity
-            style={styles.toggleRow}
-            onPress={() => setNotificationsEnabled(!notificationsEnabled)}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={styles.toggleTitle}>Send Notifications</Text>
-              <Text style={styles.toggleSub}>Receive alerts on this device at scheduled times</Text>
-            </View>
-            <Ionicons
-              name={notificationsEnabled ? 'checkbox' : 'square-outline'}
-              size={24}
-              color={notificationsEnabled ? Colors.primary : Colors.textTertiary}
-            />
-          </TouchableOpacity>
-        </AppCard>
-
         {/* Save Button */}
         <View style={styles.saveContainer}>
-          {isSaving ? (
-            <View style={styles.saveProgressRow}>
-              <ActivityIndicator size="small" color={Colors.primary} />
-              <Text style={styles.saveProgressText}>{saveProgress}</Text>
-            </View>
-          ) : null}
           <AppButton
             title={isSaving ? 'Saving schedule…' : 'Save Medication Schedule'}
             onPress={handleSave}
@@ -996,21 +1055,7 @@ export default function SetReminderScreen() {
                           setIsMedModalVisible(false);
                           setModalSearch('');
 
-                          const existingSched = scheduleRepository.getByMedicineId(med.id);
-                          setEditingScheduleId(existingSched?.id);
-                          if (existingSched) {
-                            setRecurrence(existingSched.recurrence);
-                            setTimes(
-                              existingSched.times.map((t) => ({
-                                ...t,
-                                label: t.label || getTimeLabel(t.time),
-                              })),
-                            );
-                            if (existingSched.times.length > 0 && existingSched.times[0].amount) {
-                              setAmount(existingSched.times[0].amount);
-                            }
-                            setNotificationsEnabled(existingSched.notificationsEnabled);
-                          } else {
+                          if (!routeScheduleId) {
                             const defaultDose =
                               med.dosageForm === 'syrup'
                                 ? '5 ml'
@@ -1058,13 +1103,29 @@ export default function SetReminderScreen() {
             </View>
         </View>
       </Modal>
+
+      {/* Recurrence Schedule Setup Modal */}
+      <RecurrenceScheduleModal
+        visible={isScheduleModalVisible}
+        initialRecurrence={recurrence}
+        initialStartDate={startDate}
+        initialEndDate={endDate}
+        initialDaysOfWeek={daysOfWeek}
+        onClose={() => setIsScheduleModalVisible(false)}
+        onApply={(config) => {
+          setRecurrence(config.recurrence);
+          setStartDate(config.startDate);
+          setEndDate(config.endDate);
+          setDaysOfWeek(config.daysOfWeek);
+        }}
+      />
     </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: 160,
+    paddingBottom: Spacing.xl,
   },
   body: {
     paddingHorizontal: Spacing.screenPaddingHorizontal,
@@ -1136,7 +1197,53 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    marginBottom: Spacing.md,
+  },
+  scheduleDetailsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     marginBottom: Spacing.lg,
+    gap: 12,
+  },
+  scheduleDetailsIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scheduleDetailsInfo: {
+    flex: 1,
+  },
+  scheduleDetailsTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  scheduleDetailsSub: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  scheduleChangePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: Radius.pill,
+    gap: 4,
+  },
+  scheduleChangePillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.primary,
   },
   recurrenceButton: {
     flex: 1,
@@ -1166,143 +1273,147 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  editAction: {
-    color: Colors.primary,
-    fontSize: 16,
-    fontWeight: '600',
+  doseCountBadge: {
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: Radius.pill,
   },
-  timeRow: {
+  doseCountBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
+  timeRowCard: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
+    gap: 10,
   },
-  timeCol: {
+  timeRowIconBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timeRowInfo: {
     flex: 1,
-    marginRight: 12,
   },
-  timeValueInput: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-    paddingVertical: 2,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  timeValueText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-  },
-  doseAmountRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  doseAmountPrefix: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginRight: 4,
-  },
-  doseAmountInlineInput: {
-    fontSize: 13,
-    color: Colors.textPrimary,
-    paddingVertical: 1,
-    paddingHorizontal: 4,
-    minWidth: 80,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  doseNote: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  timeActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  timePickerButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F0EFF3',
-    borderRadius: Radius.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    minWidth: 104,
-  },
-  clockIcon: {
-    marginRight: 6,
-  },
-  timePickerButtonText: {
-    fontSize: 14,
-    color: Colors.textPrimary,
-    fontWeight: '600',
-  },
-  deleteTimeButton: {
-    padding: 8,
-  },
-  addAnotherTime: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#E8E7ED',
-    borderRadius: Radius.pill,
-    paddingVertical: 14,
-    marginTop: 14,
-    marginBottom: 8,
-  },
-  addAnotherText: {
-    color: Colors.primary,
+  timeRowLabel: {
     fontSize: 15,
-    fontWeight: '600',
-    marginLeft: 8,
+    fontWeight: '700',
+    color: Colors.textPrimary,
   },
-  presetsLabel: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginTop: 12,
-    marginBottom: 8,
-    fontWeight: '600',
+  timeRowAmount: {
+    fontSize: 13,
+    color: Colors.textPrimary,
+    marginTop: 2,
+    fontWeight: '700',
   },
-  presetScroller: {
-    flexGrow: 0,
-    marginHorizontal: -2,
-  },
-  presetRow: {
+  timeRowPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'nowrap',
-    gap: 8,
-    paddingHorizontal: 2,
-    paddingBottom: 2,
-  },
-  presetChip: {
-    flexShrink: 0,
-    backgroundColor: Colors.primaryLight,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: Radius.pill,
-  },
-  presetChipDisabled: {
     backgroundColor: '#F0EFF3',
-    opacity: 0.75,
+    borderRadius: Radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
   },
-  presetChipText: {
+  timeRowPillText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  timeRowDeleteBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: Radius.pill,
+    backgroundColor: '#FEECEE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickPresetsSection: {
+    marginTop: 14,
+  },
+  quickPresetsTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 8,
+  },
+  presetGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  presetCard: {
+    width: '48.5%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: Radius.lg,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    gap: 8,
+  },
+  presetCardActive: {
+    backgroundColor: Colors.primaryLight,
+    borderColor: Colors.primary,
+  },
+  presetIconCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: Radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  presetTextCol: {
+    flex: 1,
+  },
+  presetLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  presetLabelActive: {
     color: Colors.primary,
   },
-  presetChipTextDisabled: {
-    color: Colors.textSecondary,
+  presetTime: {
+    fontSize: 11,
     fontWeight: '500',
+    color: Colors.textSecondary,
+    marginTop: 1,
+  },
+  presetTimeActive: {
+    color: Colors.primaryDark,
+  },
+  addCustomTimeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: Radius.lg,
+    borderWidth: 1.5,
+    borderColor: '#BFDBFE',
+    borderStyle: 'dashed',
+    paddingVertical: 11,
+    marginTop: 10,
+    gap: 6,
+  },
+  addCustomTimeText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.primary,
   },
   amountInput: {
-    fontSize: 15,
+    fontSize: 16,
+    fontWeight: '700',
     color: Colors.textPrimary,
     paddingVertical: 6,
   },
@@ -1337,19 +1448,7 @@ const styles = StyleSheet.create({
   },
   saveContainer: {
     marginTop: Spacing.sm,
-    marginBottom: Spacing.xl,
-  },
-  saveProgressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    marginBottom: Spacing.sm,
-  },
-  saveProgressText: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    fontWeight: '500',
+    marginBottom: 0,
   },
   modalBackdrop: {
     flex: 1,
