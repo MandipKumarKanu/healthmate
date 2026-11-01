@@ -12,7 +12,7 @@ import {
   AppStateStatus,
 } from 'react-native';
 import { AppAlert as Alert } from '../../services/appAlert';
-import { useRouter, useFocusEffect, useNavigation } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import { Camera } from 'expo-camera';
@@ -28,21 +28,16 @@ type PermissionStatus = 'granted' | 'denied' | 'needs_settings' | 'not_determine
 
 export default function OnboardingPermissionsScreen() {
   const router = useRouter();
-  const navigation = useNavigation<any>();
   const { completeOnboarding, profile } = useAppStore();
 
   useEffect(() => {
     if (profile?.onboardingCompleted) {
-      try {
-        navigation.reset({
-          index: 0,
-          routes: [{ name: '(tabs)' }],
-        });
-      } catch {
-        router.replace('/(tabs)/home');
+      if (router.canDismiss()) {
+        router.dismissAll();
       }
+      router.replace('/(tabs)/home');
     }
-  }, [profile?.onboardingCompleted, navigation, router]);
+  }, [profile?.onboardingCompleted, router]);
 
   const [notificationStatus, setNotificationStatus] = useState<PermissionStatus>('not_determined');
   const [exactAlarmStatus, setExactAlarmStatus] = useState<PermissionStatus>('not_determined');
@@ -370,17 +365,10 @@ export default function OnboardingPermissionsScreen() {
   const handleFinish = () => {
     if (!isNotificationsGranted) return;
     completeOnboarding();
-    try {
-      navigation.reset({
-        index: 0,
-        routes: [{ name: '(tabs)' }],
-      });
-    } catch {
-      if (router.canDismiss()) {
-        router.dismissAll();
-      }
-      router.replace('/(tabs)/home');
+    if (router.canDismiss()) {
+      router.dismissAll();
     }
+    router.replace('/(tabs)/home');
   };
 
   return (

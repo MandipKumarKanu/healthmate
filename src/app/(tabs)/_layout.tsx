@@ -6,14 +6,24 @@ export default function TabLayout() {
   return (
     <Tabs
       backBehavior="initialRoute"
-      tabBar={({ state, navigateToTab }) => {
+      tabBar={({ state, emitter, navigateToTab }) => {
         const currentRoute = state.routes[state.index].name as TabName;
         return (
           <CustomBottomTabBar
             activeTab={currentRoute}
             onTabPress={(tab) => {
               const targetRoute = state.routes.find((r) => r.name === tab);
-              if (targetRoute) {
+              if (!targetRoute) return;
+
+              const isFocused = currentRoute === tab;
+
+              const event = emitter.emit({
+                type: 'tabPress',
+                target: targetRoute.key,
+                canPreventDefault: true,
+              });
+
+              if (!isFocused && !event.defaultPrevented) {
                 navigateToTab(targetRoute.key);
               }
             }}

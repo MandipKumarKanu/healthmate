@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   StyleSheet,
   View,
@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect, useScrollToTop } from 'expo-router';
 import { Colors } from '../../theme/colors';
 import { useKeyboardAwareScroll } from '../../hooks/useKeyboardAwareScroll';
 
@@ -21,6 +22,7 @@ interface AppScreenProps {
   contentContainerStyle?: StyleProp<ViewStyle>;
   extraScrollHeight?: number;
   safeAreaEdges?: ('top' | 'bottom')[];
+  resetScrollOnFocus?: boolean;
 }
 
 export function AppScreen({
@@ -30,11 +32,24 @@ export function AppScreen({
   contentContainerStyle,
   extraScrollHeight = 80,
   safeAreaEdges = ['top', 'bottom'],
+  resetScrollOnFocus = true,
 }: AppScreenProps) {
   const insets = useSafeAreaInsets();
   const { scrollViewRef, handleFocusCapture, onScroll } = useKeyboardAwareScroll({
     extraOffset: extraScrollHeight,
   });
+
+  useScrollToTop(scrollViewRef);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (resetScrollOnFocus && scrollable) {
+        requestAnimationFrame(() => {
+          scrollViewRef.current?.scrollTo({ x: 0, y: 0, animated: false });
+        });
+      }
+    }, [resetScrollOnFocus, scrollable, scrollViewRef])
+  );
 
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 

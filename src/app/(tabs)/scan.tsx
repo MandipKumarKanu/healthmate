@@ -438,10 +438,14 @@ export default function ScanScreen() {
   // ---------------------------------------------------------------------------
   // Render sub-views based on active step
   // ---------------------------------------------------------------------------
+  const isGating =
+    currentStep === 'capture' &&
+    (isCheckingPrerequisites || isOnline === false || !hasApiKey);
+
   return (
     <AppScreen
       scrollable={currentStep !== 'crop'}
-      contentContainerStyle={styles.scrollContent}
+      contentContainerStyle={[styles.scrollContent, isGating && styles.gatingScrollContent]}
     >
       {/* Header */}
       <AppHeader
@@ -458,9 +462,11 @@ export default function ScanScreen() {
         }
         subtitle={
           currentStep === 'capture'
-            ? targetSide === 'front'
-              ? 'Capture front of medicine package'
-              : 'Capture back of package (optional)'
+            ? !hasApiKey
+              ? 'Connect Personal AI to start scanning'
+              : targetSide === 'front'
+                ? 'Capture front of medicine package'
+                : 'Capture back of package (optional)'
             : currentStep === 'crop'
               ? 'Adjust crop rectangle and orientation'
               : currentStep === 'review'
@@ -518,9 +524,9 @@ export default function ScanScreen() {
         }
       />
 
-      <View style={styles.body}>
+      <View style={[styles.body, isGating && styles.gatingBody]}>
         {/* Offline Notice banner if offline */}
-        {isOnline === false && currentStep === 'capture' && (
+        {isOnline === false && currentStep === 'capture' && hasApiKey && (
           <View style={styles.internetNoticeBanner}>
             <Ionicons name="cloud-offline-outline" size={17} color={Colors.error} />
             <Text style={styles.internetNoticeText}>
@@ -533,7 +539,7 @@ export default function ScanScreen() {
         {currentStep === 'capture' && (
           <>
             {isCheckingPrerequisites ? (
-              <View style={styles.gatingCard}>
+              <View style={styles.gatingContainer}>
                 <ActivityIndicator size="large" color={Colors.primary} />
                 <Text style={styles.prerequisiteTitle}>Initializing Medicine Scanner…</Text>
                 <Text style={styles.prerequisiteSub}>
@@ -541,7 +547,7 @@ export default function ScanScreen() {
                 </Text>
               </View>
             ) : isOnline === false ? (
-              <View style={styles.gatingCard}>
+              <View style={styles.gatingContainer}>
                 <View style={[styles.gatingIconCircle, { backgroundColor: Colors.errorLight }]}>
                   <Ionicons name="cloud-offline-outline" size={38} color={Colors.error} />
                 </View>
@@ -570,9 +576,9 @@ export default function ScanScreen() {
                 </View>
               </View>
             ) : !hasApiKey ? (
-              <View style={styles.gatingCard}>
+              <View style={styles.gatingContainer}>
                 <View style={[styles.gatingIconCircle, { backgroundColor: Colors.primaryLight }]}>
-                  <Ionicons name="sparkles" size={38} color={Colors.primary} />
+                  <Ionicons name="sparkles" size={40} color={Colors.primary} />
                 </View>
                 <Text style={styles.gatingTitle}>Unlock AI Medicine Scanner</Text>
                 <Text style={styles.gatingSubtitle}>
@@ -601,14 +607,16 @@ export default function ScanScreen() {
             ) : (
               <View style={styles.cameraContainer}>
                 {permission?.granted ? (
-                  <CameraView
-                    ref={cameraRef}
-                    style={styles.cameraView}
-                    facing="back"
-                    flash={flashMode}
-                  >
-                    {/* Camera Overlay with Frame and Guidance */}
-                    <View style={styles.overlayFrame}>
+                  <View style={styles.cameraWrapper}>
+                    <CameraView
+                      ref={cameraRef}
+                      style={styles.cameraView}
+                      facing="back"
+                      flash={flashMode}
+                    />
+
+                    {/* Camera Overlay with Frame and Guidance (Positioned on top of camera) */}
+                    <View style={styles.overlayFrame} pointerEvents="none">
                       {/* Side indicator badge */}
                       <View style={styles.sideIndicatorPill}>
                         <Text style={styles.sideIndicatorText}>
@@ -626,7 +634,7 @@ export default function ScanScreen() {
                         Position the medicine package clearly and capture
                       </Text>
                     </View>
-                  </CameraView>
+                  </View>
                 ) : (
                   <View style={styles.cameraPlaceholder}>
                     <Ionicons name="camera-outline" size={48} color={Colors.primary} />
@@ -1229,8 +1237,18 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 160,
   },
+  gatingScrollContent: {
+    flexGrow: 1,
+    paddingBottom: 80,
+  },
   body: {
     paddingHorizontal: Spacing.screenPaddingHorizontal,
+  },
+  gatingBody: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: 450,
   },
   headerRightActions: {
     flexDirection: 'row',
@@ -1294,13 +1312,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: Spacing.xs,
   },
-  cameraView: {
+  cameraWrapper: {
     width: '100%',
     height: 380,
     borderRadius: Radius.card,
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
+  },
+  cameraView: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   cameraPlaceholder: {
     width: '100%',
@@ -1458,57 +1484,56 @@ const styles = StyleSheet.create({
     borderRadius: 29,
     backgroundColor: Colors.primary,
   },
-  gatingCard: {
-    backgroundColor: Colors.cardBackground,
-    borderRadius: Radius.card,
-    padding: Spacing.xl,
+  gatingContainer: {
+    width: '100%',
+    maxWidth: 360,
     alignItems: 'center',
-    marginTop: Spacing.sm,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
   },
   gatingIconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.md,
   },
   gatingTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
     color: Colors.textPrimary,
     textAlign: 'center',
     marginBottom: Spacing.xs,
   },
   gatingSubtitle: {
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 14,
+    lineHeight: 21,
     color: Colors.textSecondary,
     textAlign: 'center',
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.xl,
+    paddingHorizontal: Spacing.xs,
   },
   gatingActions: {
     width: '100%',
-    gap: Spacing.md,
+    maxWidth: 320,
+    gap: Spacing.sm,
+    alignItems: 'center',
   },
   gatingPrimaryBtn: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.sm,
     backgroundColor: Colors.primary,
-    borderRadius: Radius.md,
+    borderRadius: Radius.pill,
     paddingVertical: 14,
+    ...Shadows.subtle,
   },
   gatingPrimaryBtnText: {
-    fontSize: 15,
+    fontSize: 15.5,
     fontWeight: '700',
     color: '#FFFFFF',
   },
@@ -1516,10 +1541,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 4,
     paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
   },
   gatingSecondaryBtnText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
     color: Colors.primary,
   },
