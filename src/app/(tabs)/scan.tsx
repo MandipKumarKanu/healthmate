@@ -728,16 +728,16 @@ export default function ScanScreen() {
               </Text>
             </View>
 
-            {/* Side-by-side Images Review Grid */}
+            {/* Stacked Images Review Grid (Two Cards Top & Bottom) */}
             <View style={styles.reviewImagesGrid}>
-              {/* Front Review Box */}
+              {/* Front Packaging Review Box */}
               <View style={styles.reviewBox}>
                 <View style={styles.reviewBoxHeader}>
                   <View style={styles.reviewTitleWithBadge}>
                     <View style={styles.miniCheckDot}>
                       <Feather name="check" size={10} color="#FFFFFF" />
                     </View>
-                    <Text style={styles.reviewBoxTitle}>Front</Text>
+                    <Text style={styles.reviewBoxTitle}>Front Packaging</Text>
                   </View>
                   <View style={styles.reviewHeaderActions}>
                     <TouchableOpacity
@@ -751,7 +751,7 @@ export default function ScanScreen() {
                     <TouchableOpacity
                       onPress={handleRetakeFront}
                       activeOpacity={0.7}
-                      style={[styles.reviewSmallActionBtn, { marginLeft: 6 }]}
+                      style={[styles.reviewSmallActionBtn, styles.reviewRetakeBtn]}
                     >
                       <Feather name="refresh-cw" size={11} color={Colors.textSecondary} />
                       <Text style={[styles.reviewBoxAction, { color: Colors.textSecondary }]}>
@@ -775,7 +775,7 @@ export default function ScanScreen() {
                 )}
               </View>
 
-              {/* Back Review Box */}
+              {/* Back Packaging Review Box */}
               <View style={styles.reviewBox}>
                 <View style={styles.reviewBoxHeader}>
                   <View style={styles.reviewTitleWithBadge}>
@@ -784,10 +784,10 @@ export default function ScanScreen() {
                         <Feather name="check" size={10} color="#FFFFFF" />
                       </View>
                     ) : null}
-                    <Text style={styles.reviewBoxTitle}>Back</Text>
+                    <Text style={styles.reviewBoxTitle}>Back Packaging</Text>
                     {!backCroppedUri && (
                       <View style={styles.miniOptionalBadge}>
-                        <Text style={styles.miniOptionalBadgeText}>Opt</Text>
+                        <Text style={styles.miniOptionalBadgeText}>Optional</Text>
                       </View>
                     )}
                   </View>
@@ -805,10 +805,10 @@ export default function ScanScreen() {
                       <TouchableOpacity
                         onPress={handleRemoveBackImage}
                         activeOpacity={0.7}
-                        style={[styles.reviewSmallActionBtn, { marginLeft: 6 }]}
+                        style={[styles.reviewSmallActionBtn, styles.reviewDeleteBtn]}
                       >
                         <Feather name="trash-2" size={12} color={Colors.error} />
-                        <Text style={[styles.reviewBoxAction, { color: Colors.error }]}>Del</Text>
+                        <Text style={[styles.reviewBoxAction, { color: Colors.error }]}>Remove</Text>
                       </TouchableOpacity>
                     </View>
                   ) : null}
@@ -829,19 +829,21 @@ export default function ScanScreen() {
                   <View style={styles.reviewBoxEmpty}>
                     <MaterialCommunityIcons
                       name="image-plus"
-                      size={28}
+                      size={30}
                       color={Colors.primary}
                       style={{ marginBottom: 4 }}
                     />
-                    <Text style={styles.reviewBoxEmptyText}>Add Back</Text>
-                    <Text style={styles.reviewBoxEmptySub}>Composition & Expiry</Text>
+                    <Text style={styles.reviewBoxEmptyText}>Add Back Packaging</Text>
+                    <Text style={styles.reviewBoxEmptySub}>
+                      Captures batch number, expiry date & extra salt info
+                    </Text>
                     <View style={styles.reviewEmptyBtnRow}>
                       <TouchableOpacity
                         style={styles.reviewSmallAddBtn}
                         onPress={handleStartCaptureBack}
                         activeOpacity={0.8}
                       >
-                        <Ionicons name="camera-outline" size={13} color="#FFFFFF" />
+                        <Ionicons name="camera-outline" size={14} color="#FFFFFF" />
                         <Text style={styles.reviewSmallAddBtnText}>Camera</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
@@ -849,7 +851,7 @@ export default function ScanScreen() {
                         onPress={() => handlePickFromGallery('back')}
                         activeOpacity={0.8}
                       >
-                        <Ionicons name="images-outline" size={13} color={Colors.primary} />
+                        <Ionicons name="images-outline" size={14} color={Colors.primary} />
                         <Text style={styles.reviewSmallGalleryBtnText}>Gallery</Text>
                       </TouchableOpacity>
                     </View>
@@ -1739,15 +1741,15 @@ const styles = StyleSheet.create({
     color: '#0369A1',
   },
   reviewImagesGrid: {
-    flexDirection: 'row',
-    gap: 12,
+    flexDirection: 'column',
+    gap: 16,
     marginBottom: Spacing.md,
   },
   reviewBox: {
-    flex: 1,
+    width: '100%',
     backgroundColor: Colors.cardBackground,
     borderRadius: Radius.card,
-    padding: Spacing.sm,
+    padding: Spacing.md,
     borderWidth: 1,
     borderColor: Colors.borderLight,
     ...Shadows.card,
@@ -1756,58 +1758,67 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
-    minHeight: 24,
+    marginBottom: 10,
+    minHeight: 28,
   },
   reviewTitleWithBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
   },
   miniCheckDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: Colors.success,
     alignItems: 'center',
     justifyContent: 'center',
   },
   reviewBoxTitle: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
     color: Colors.textPrimary,
   },
   miniOptionalBadge: {
     backgroundColor: '#F1F1F5',
-    paddingHorizontal: 5,
-    paddingVertical: 1,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
     borderRadius: Radius.pill,
   },
   miniOptionalBadgeText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '600',
     color: Colors.textSecondary,
   },
   reviewHeaderActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   reviewSmallActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
-    paddingVertical: 2,
-    paddingHorizontal: 2,
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: Radius.pill,
+    backgroundColor: '#EFF6FF',
+  },
+  reviewRetakeBtn: {
+    backgroundColor: '#F1F5F9',
+  },
+  reviewDeleteBtn: {
+    backgroundColor: '#FEF2F2',
   },
   reviewBoxAction: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
     color: Colors.primary,
   },
   reviewBoxImageContainer: {
     width: '100%',
-    height: 190,
-    borderRadius: Radius.sm,
+    height: 200,
+    borderRadius: Radius.md,
     overflow: 'hidden',
     position: 'relative',
     backgroundColor: '#F8F8FC',
@@ -1819,40 +1830,41 @@ const styles = StyleSheet.create({
   },
   zoomBadge: {
     position: 'absolute',
-    bottom: 6,
-    right: 6,
+    bottom: 8,
+    right: 8,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    padding: 4,
-    borderRadius: 4,
+    padding: 6,
+    borderRadius: 6,
   },
   reviewBoxEmpty: {
     width: '100%',
-    height: 190,
     borderWidth: 1.5,
     borderStyle: 'dashed',
     borderColor: '#D0D0DC',
-    borderRadius: Radius.sm,
+    borderRadius: Radius.md,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FAFAFD',
-    paddingHorizontal: 6,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
   },
   reviewBoxEmptyText: {
-    fontSize: 13,
+    fontSize: 14,
     color: Colors.textPrimary,
     fontWeight: '700',
-    marginTop: 4,
+    marginTop: 2,
   },
   reviewBoxEmptySub: {
-    fontSize: 10,
+    fontSize: 12,
     color: Colors.textSecondary,
     textAlign: 'center',
     marginTop: 2,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   reviewEmptyBtnRow: {
     flexDirection: 'row',
-    gap: 4,
+    gap: 12,
+    maxWidth: 280,
     width: '100%',
   },
   reviewSmallAddBtn: {
@@ -1861,13 +1873,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.primary,
-    paddingVertical: 6,
-    paddingHorizontal: 2,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     borderRadius: Radius.pill,
-    gap: 3,
+    gap: 5,
   },
   reviewSmallAddBtnText: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '600',
     color: '#FFFFFF',
   },
@@ -1879,13 +1891,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: Colors.border,
-    paddingVertical: 6,
-    paddingHorizontal: 2,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     borderRadius: Radius.pill,
-    gap: 3,
+    gap: 5,
   },
   reviewSmallGalleryBtnText: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '600',
     color: Colors.primary,
   },
