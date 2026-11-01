@@ -72,6 +72,10 @@ export default function AIAssistantScreen() {
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const scrollViewRef = useRef<React.ElementRef<typeof ScrollView>>(null);
   const lastAutoQueryRef = useRef<string | null>(null);
+  const lastUserMessageIdRef = useRef<string | null>(null);
+  const lastUserMessageYRef = useRef<number>(0);
+  const isNewTurnRef = useRef<boolean>(false);
+  const hasInitializedScrollRef = useRef<boolean>(false);
 
   const checkConnectivityAndKey = useCallback(async () => {
     const [online, key] = await Promise.all([
@@ -202,6 +206,9 @@ export default function AIAssistantScreen() {
         content: text.trim(),
         timestamp: new Date().toISOString(),
       };
+
+      lastUserMessageIdRef.current = userMsg.id;
+      isNewTurnRef.current = true;
 
       // Persist user message to SQLite
       aiRepository.addMessage(activeConvId, userMsg);
@@ -361,7 +368,12 @@ export default function AIAssistantScreen() {
           ref={scrollViewRef}
           style={styles.scrollArea}
           contentContainerStyle={styles.scrollContent}
-          onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+          onContentSizeChange={() => {
+            if (!hasInitializedScrollRef.current && messages.length > 0) {
+              hasInitializedScrollRef.current = true;
+              scrollViewRef.current?.scrollToEnd({ animated: false });
+            }
+          }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         >
@@ -401,6 +413,30 @@ export default function AIAssistantScreen() {
                 return (
                   <View
                     key={m.id}
+                    onLayout={(e) => {
+                      const y = e.nativeEvent.layout.y;
+                      if (m.id === lastUserMessageIdRef.current) {
+                        lastUserMessageYRef.current = y;
+                        if (isNewTurnRef.current) {
+                          scrollViewRef.current?.scrollTo({
+                            y: Math.max(0, y - 12),
+                            animated: true,
+                          });
+                        }
+                      } else if (!isUser && isNewTurnRef.current) {
+                        isNewTurnRef.current = false;
+                        const targetY =
+                          lastUserMessageYRef.current > 0
+                            ? Math.max(0, lastUserMessageYRef.current - 12)
+                            : Math.max(0, y - 12);
+                        requestAnimationFrame(() => {
+                          scrollViewRef.current?.scrollTo({
+                            y: targetY,
+                            animated: true,
+                          });
+                        });
+                      }
+                    }}
                     style={[
                       styles.messageBubble,
                       isUser ? styles.userBubble : styles.assistantBubble,
@@ -416,7 +452,17 @@ export default function AIAssistantScreen() {
               })}
 
               {isTyping ? (
-                <View style={[styles.messageBubble, styles.assistantBubble]}>
+                <View
+                  style={[styles.messageBubble, styles.assistantBubble]}
+                  onLayout={() => {
+                    if (isNewTurnRef.current && lastUserMessageYRef.current > 0) {
+                      scrollViewRef.current?.scrollTo({
+                        y: Math.max(0, lastUserMessageYRef.current - 12),
+                        animated: true,
+                      });
+                    }
+                  }}
+                >
                   <Text style={styles.assistantText}>Thinking...</Text>
                 </View>
               ) : null}
