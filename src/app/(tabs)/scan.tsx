@@ -97,6 +97,31 @@ export default function ScanScreen() {
   const [medWarnings, setMedWarnings] = useState('');
   const [medCommonUses, setMedCommonUses] = useState('');
 
+  const hasSavedMedicineRef = useRef(false);
+
+  const handleResetAll = useCallback(() => {
+    setFrontOriginalUri(null);
+    setFrontCroppedUri(null);
+    setBackOriginalUri(null);
+    setBackCroppedUri(null);
+    setSavedScanImageUri(null);
+    setExtractedData(null);
+    setAnalysisError(null);
+    setCurrentStage('idle');
+    setTargetSide('front');
+    setMedName('');
+    setMedComposition('');
+    setMedStrength('');
+    setMedForm('tablet');
+    setMedExpiry('');
+    setMedBatch('');
+    setMedMfg('');
+    setMedInstructions('');
+    setMedWarnings('');
+    setMedCommonUses('');
+    setCurrentStep('capture');
+  }, []);
+
   const checkPrerequisites = useCallback(async () => {
     setIsCheckingPrerequisites(true);
     const [online, key] = await Promise.all([
@@ -117,7 +142,11 @@ export default function ScanScreen() {
   useFocusEffect(
     useCallback(() => {
       checkPrerequisites();
-    }, [checkPrerequisites]),
+      if (hasSavedMedicineRef.current) {
+        hasSavedMedicineRef.current = false;
+        handleResetAll();
+      }
+    }, [checkPrerequisites, handleResetAll]),
   );
 
   const toggleFlash = () => {
@@ -366,29 +395,6 @@ export default function ScanScreen() {
   // ---------------------------------------------------------------------------
   // Step 6: Final Result Actions
   // ---------------------------------------------------------------------------
-  const handleResetAll = () => {
-    setFrontOriginalUri(null);
-    setFrontCroppedUri(null);
-    setBackOriginalUri(null);
-    setBackCroppedUri(null);
-    setSavedScanImageUri(null);
-    setExtractedData(null);
-    setAnalysisError(null);
-    setCurrentStage('idle');
-    setTargetSide('front');
-    setMedName('');
-    setMedComposition('');
-    setMedStrength('');
-    setMedForm('tablet');
-    setMedExpiry('');
-    setMedBatch('');
-    setMedMfg('');
-    setMedInstructions('');
-    setMedWarnings('');
-    setMedCommonUses('');
-    setCurrentStep('capture');
-  };
-
   const handleCopyFullText = async () => {
     if (!extractedData?.rawText) return;
     try {
@@ -400,7 +406,7 @@ export default function ScanScreen() {
     }
   };
 
-  const handleSaveToCabinet = async () => {
+  const handleSaveToCabinet = async (directToReminder: boolean = false) => {
     if (!medName.trim()) {
       Alert.alert('Notice', 'Please provide a medicine name.');
       return;
@@ -433,6 +439,15 @@ export default function ScanScreen() {
       informationSource: 'Extracted from medication packaging scan.',
       isSample: false,
     });
+
+    // Mark as saved and immediately reset scan state back to initial camera capture
+    hasSavedMedicineRef.current = true;
+    handleResetAll();
+
+    if (directToReminder) {
+      router.push(`/reminders/create?medicineId=${newMed.id}`);
+      return;
+    }
 
     Alert.alert(
       'Added to Cabinet',
@@ -1196,7 +1211,7 @@ export default function ScanScreen() {
                 <TouchableOpacity
                   style={styles.secondaryBtn}
                   onPress={() => {
-                    handleSaveToCabinet();
+                    handleSaveToCabinet(true);
                   }}
                   activeOpacity={0.8}
                 >
