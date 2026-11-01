@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Keyboard, Platform, LayoutAnimation, UIManager } from 'react-native';
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+// Only needed in Old Architecture; New Architecture (Fabric) handles layout animations natively without this call
+if (
+  Platform.OS === 'android' &&
+  !(globalThis as any).nativeFabricUIManager &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
   try {
     UIManager.setLayoutAnimationEnabledExperimental(true);
   } catch {}
