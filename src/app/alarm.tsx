@@ -1261,7 +1261,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 10,
-    elevation: 2,
   },
   clockSubHeader: {
     fontSize: 14.5,
