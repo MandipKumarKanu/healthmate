@@ -5,6 +5,8 @@ import {
   isDuplicateReminderTime,
   formatTime12Hour,
   getTimeLabel,
+  getNextDefaultReminderSlot,
+  PRIORITY_REMINDER_PRESETS,
 } from '../src/utils/reminderValidation';
 
 describe('reminderValidation', () => {
@@ -151,6 +153,41 @@ describe('reminderValidation', () => {
       expect(getTimeLabel('14:00')).toBe('Afternoon'); // Afternoon anchor
       expect(getTimeLabel('18:00')).toBe('Evening'); // Evening anchor
       expect(getTimeLabel('22:00')).toBe('Night'); // Night anchor
+    });
+  });
+
+  describe('getNextDefaultReminderSlot (08:00 -> 14:00 -> 18:00 -> 22:00 priority sequence)', () => {
+    it('defaults to 08:00 (Morning) when no schedules exist', () => {
+      const slot = getNextDefaultReminderSlot([]);
+      expect(slot).toEqual({ time: '08:00', label: 'Morning' });
+    });
+
+    it('falls back to 14:00 (Afternoon / 2 PM) when 08:00 is already scheduled', () => {
+      const slot = getNextDefaultReminderSlot(['08:00']);
+      expect(slot).toEqual({ time: '14:00', label: 'Afternoon' });
+    });
+
+    it('falls back to 18:00 (Evening / 6 PM) when 08:00 and 14:00 are already scheduled', () => {
+      const slot = getNextDefaultReminderSlot(['08:00', '14:00']);
+      expect(slot).toEqual({ time: '18:00', label: 'Evening' });
+    });
+
+    it('falls back to 22:00 (Night / 10 PM) when 08:00, 14:00, and 18:00 are already scheduled', () => {
+      const slot = getNextDefaultReminderSlot(['08:00', '14:00', '18:00']);
+      expect(slot).toEqual({ time: '22:00', label: 'Night' });
+    });
+
+    it('falls back to first free candidate hour when all 4 priority slots are already scheduled', () => {
+      const slot = getNextDefaultReminderSlot(['08:00', '14:00', '18:00', '22:00']);
+      expect(slot.time).toBe('09:00');
+      expect(slot.label).toBe('Morning');
+    });
+
+    it('handles Sets correctly as input', () => {
+      const set = new Set(['08:00', '18:00']);
+      const slot = getNextDefaultReminderSlot(set);
+      // 14:00 is not in the set, so 14:00 (Afternoon) should be chosen
+      expect(slot).toEqual({ time: '14:00', label: 'Afternoon' });
     });
   });
 

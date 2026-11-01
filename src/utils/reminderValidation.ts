@@ -155,3 +155,46 @@ export function getTimeLabel(time: string): string {
   if (time < '21:00') return 'Evening';
   return 'Night';
 }
+
+export const PRIORITY_REMINDER_PRESETS: Array<{ time: string; label: string }> = [
+  { time: '08:00', label: 'Morning' },
+  { time: '14:00', label: 'Afternoon' },
+  { time: '18:00', label: 'Evening' },
+  { time: '22:00', label: 'Night' },
+];
+
+/**
+ * Returns the default reminder slot for a medication, following strict sequential priority:
+ * 1. Morning (08:00)
+ * 2. Afternoon (14:00 / 2:00 PM) if Morning is already scheduled
+ * 3. Evening (18:00 / 6:00 PM) if Afternoon is already scheduled
+ * 4. Night (22:00 / 10:00 PM) if Evening is already scheduled
+ * 5. Next available candidate hour if all 4 priority slots are already scheduled.
+ */
+export function getNextDefaultReminderSlot(
+  alreadyScheduledTimes: Set<string> | string[],
+): { time: string; label: string } {
+  const set =
+    alreadyScheduledTimes instanceof Set
+      ? alreadyScheduledTimes
+      : new Set(alreadyScheduledTimes);
+
+  const freePreset = PRIORITY_REMINDER_PRESETS.find((preset) => !set.has(preset.time));
+  if (freePreset) {
+    return freePreset;
+  }
+
+  // If all 4 priority slots are already taken, find the first free candidate hour (from 09:00 onward)
+  const candidateHours = [
+    '09:00', '10:00', '11:00', '12:00', '13:00', '15:00',
+    '16:00', '17:00', '19:00', '20:00', '21:00', '23:00',
+    '00:00', '01:00', '02:00', '03:00', '04:00', '05:00', '06:00', '07:00',
+  ];
+  const nextFreeCandidate = candidateHours.find((time) => !set.has(time));
+  if (nextFreeCandidate) {
+    return { time: nextFreeCandidate, label: getTimeLabel(nextFreeCandidate) };
+  }
+
+  return { time: '09:00', label: 'Morning' };
+}
+

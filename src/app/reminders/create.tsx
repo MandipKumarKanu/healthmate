@@ -36,6 +36,7 @@ import {
   isDuplicateReminderTime,
   formatTime12Hour,
   getTimeLabel,
+  getNextDefaultReminderSlot,
 } from '../../utils/reminderValidation';
 import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
 import {
@@ -131,6 +132,7 @@ export default function SetReminderScreen() {
   const [amountError, setAmountError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [editingScheduleId, setEditingScheduleId] = useState<string | undefined>(routeScheduleId);
+  const userHasCustomizedTimesRef = useRef(false);
 
   const selectedMedId = selectedMed?.id;
 
@@ -155,26 +157,42 @@ export default function SetReminderScreen() {
     [otherScheduledTimes],
   );
 
-  // When creating a new reminder, ensure initial dose time doesn't collide with existing times
+  // When creating a new reminder, select default time following strict sequential priority:
+  // 1. Morning (08:00)
+  // 2. Afternoon (14:00 / 2:00 PM) if Morning is already scheduled
+  // 3. Evening (18:00 / 6:00 PM) if Afternoon is already scheduled
+  // 4. Night (22:00 / 10:00 PM) if Evening is already scheduled
+  // 5. Next available candidate hour if all 4 priority slots are already scheduled
   useEffect(() => {
     if (!routeScheduleId && selectedMedId) {
       setTimes((prevTimes) => {
-        if (prevTimes.length === 1 && otherScheduledTimes.has(prevTimes[0].time)) {
-          const commonPresets = ['08:00', '12:00', '14:00', '18:00', '20:00', '22:00'];
-          const firstFree = commonPresets.find((p) => !otherScheduledTimes.has(p)) || '09:00';
-          return [
-            {
-              id: 't_1',
-              time: firstFree,
-              amount: prevTimes[0].amount || '1 tablet',
-              label: getTimeLabel(firstFree),
-            },
-          ];
+        if (userHasCustomizedTimesRef.current) {
+          if (prevTimes.length === 1 && otherScheduledTimes.has(prevTimes[0].time)) {
+            const nextSlot = getNextDefaultReminderSlot(otherScheduledTimes);
+            return [
+              {
+                id: prevTimes[0].id,
+                time: nextSlot.time,
+                amount: prevTimes[0].amount || amount || '1 tablet',
+                label: nextSlot.label,
+              },
+            ];
+          }
+          return prevTimes;
         }
-        return prevTimes;
+
+        const nextSlot = getNextDefaultReminderSlot(otherScheduledTimes);
+        return [
+          {
+            id: 't_1',
+            time: nextSlot.time,
+            amount: amount || '1 tablet',
+            label: nextSlot.label,
+          },
+        ];
       });
     }
-  }, [selectedMedId, routeScheduleId, otherTimesKey, otherScheduledTimes]);
+  }, [selectedMedId, routeScheduleId, otherTimesKey, otherScheduledTimes, amount]);
 
   // Time picker state and snap wheels for quick, precise minute selection.
   const [pickerTarget, setPickerTarget] = useState<{ id: string | 'new'; date: Date } | null>(null);
@@ -257,7 +275,7 @@ export default function SetReminderScreen() {
   }, [routeScheduleId, editingScheduleId]);
 
   const getNextSuggestedTime = (): string => {
-    const commonPresets = ['08:00', '12:00', '14:00', '18:00', '20:00', '22:00'];
+    const commonPresets = ['08:00', '14:00', '18:00', '22:00'];
     const currentTimes = new Set(times.map((t) => t.time));
     const available = commonPresets.find(
       (p) => !currentTimes.has(p) && !otherScheduledTimes.has(p),
@@ -275,6 +293,7 @@ export default function SetReminderScreen() {
   };
 
   const handleTimeSelected = (targetId: string | 'new', selectedTime: string) => {
+    userHasCustomizedTimesRef.current = true;
     const isDuplicate = isDuplicateReminderTime(
       times,
       selectedTime,
@@ -385,10 +404,12 @@ export default function SetReminderScreen() {
   };
 
   const togglePresetTime = (presetTime: string, label: string) => {
+    userHasCustomizedTimesRef.current = true;
     const existing = times.find((t) => t.time === presetTime);
     if (existing) {
       if (times.length <= 1) {
-        Alert.alert('Notice', 'At least one reminder time is required.');
+        // Tapping the active sole preset opens the custom time picker directly
+        openTimePicker(existing.id, existing.time);
         return;
       }
       removeTime(existing.id);
@@ -412,6 +433,7 @@ export default function SetReminderScreen() {
   };
 
   const addPresetTime = (presetTime: string) => {
+    userHasCustomizedTimesRef.current = true;
     if (isDuplicateReminderTime(times, presetTime)) {
       Alert.alert(
         'Duplicate Reminder Time',
@@ -436,6 +458,7 @@ export default function SetReminderScreen() {
   };
 
   const removeTime = (id: string) => {
+    userHasCustomizedTimesRef.current = true;
     if (times.length <= 1) {
       Alert.alert('Notice', 'At least one reminder time is required.');
       return;
@@ -725,25 +748,28 @@ export default function SetReminderScreen() {
 
             return (
               <View key={t.id} style={styles.timeRowCard}>
-                <View style={[styles.timeRowIconBadge, { backgroundColor: meta.bg }]}>
-                  <Ionicons name={meta.icon as any} size={18} color={meta.color} />
-                </View>
-
-                <View style={styles.timeRowInfo}>
-                  <Text style={styles.timeRowLabel}>{displayLabel}</Text>
-                  <Text style={styles.timeRowAmount}>{t.amount || amount || '1 dose'}</Text>
-                </View>
-
                 <TouchableOpacity
-                  style={styles.timeRowPill}
+                  style={styles.timeRowMainTouch}
                   onPress={() => openTimePicker(t.id, t.time)}
                   accessibilityRole="button"
                   accessibilityLabel={`Change time for ${displayLabel}, currently ${formatTime12Hour(t.time)}`}
+                  accessibilityHint="Tap to set custom time"
                   activeOpacity={0.7}
                 >
-                  <Feather name="clock" size={13} color={Colors.primary} style={{ marginRight: 6 }} />
-                  <Text style={styles.timeRowPillText}>{formatTime12Hour(t.time)}</Text>
-                  <Feather name="chevron-down" size={13} color={Colors.primary} style={{ marginLeft: 4 }} />
+                  <View style={[styles.timeRowIconBadge, { backgroundColor: meta.bg }]}>
+                    <Ionicons name={meta.icon as any} size={18} color={meta.color} />
+                  </View>
+
+                  <View style={styles.timeRowInfo}>
+                    <Text style={styles.timeRowLabel}>{displayLabel}</Text>
+                    <Text style={styles.timeRowAmount}>{t.amount || amount || '1 tablet'}</Text>
+                  </View>
+
+                  <View style={styles.timeRowPill}>
+                    <Feather name="clock" size={13} color={Colors.primary} style={{ marginRight: 6 }} />
+                    <Text style={styles.timeRowPillText}>{formatTime12Hour(t.time)}</Text>
+                    <Feather name="chevron-down" size={13} color={Colors.primary} style={{ marginLeft: 4 }} />
+                  </View>
                 </TouchableOpacity>
 
                 {!isOnlyOne && (
@@ -1423,6 +1449,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
+    gap: 8,
+  },
+  timeRowMainTouch: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 10,
   },
   timeRowIconBadge: {
