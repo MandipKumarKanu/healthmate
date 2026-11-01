@@ -36,9 +36,30 @@ export interface ActiveDoseItem {
   doseTime: string;
   doseLabel: string;
   dosageForm?: string;
+  recurrence?: string;
   instanceId?: string;
   sourceScheduleId?: string;
   status: 'pending' | 'taken' | 'snoozed' | 'skipped';
+}
+
+export type SliderAction = 'take' | 'snooze' | 'skip';
+
+function formatRecurrence(rec?: string): string {
+  if (!rec) return 'Daily';
+  switch (rec.toLowerCase()) {
+    case 'daily':
+      return 'Daily';
+    case 'weekly':
+      return 'Weekly';
+    case 'monthly':
+      return 'Monthly';
+    case 'once':
+      return 'One-time';
+    case 'custom':
+      return 'Scheduled';
+    default:
+      return rec.charAt(0).toUpperCase() + rec.slice(1);
+  }
 }
 
 function resolveDoseItem(
@@ -57,10 +78,12 @@ function resolveDoseItem(
   let dLabel = doseLabel ?? 'Morning Dose';
   let mId = '';
   let dForm = 'capsule';
+  let rec = 'daily';
 
   if (sId) {
     const sched = scheduleRepository.getById(sId);
     if (sched) {
+      rec = sched.recurrence || 'daily';
       mId = sched.medicineId;
       const med = medicineRepository.getById(sched.medicineId);
       if (med) {
@@ -96,6 +119,7 @@ function resolveDoseItem(
     doseTime: dTime,
     doseLabel: dLabel,
     dosageForm: dForm,
+    recurrence: rec,
     instanceId,
     sourceScheduleId,
     status: 'pending',
@@ -152,6 +176,15 @@ export default function FullScreenAlarmScreen() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+
+  const { width: screenWidth } = useWindowDimensions();
+  const SLIDER_WIDTH = Math.min(screenWidth - 40, 360);
+  const THUMB_SIZE = 54;
+  const maxSlide = SLIDER_WIDTH - THUMB_SIZE - 8;
+
+  const [sliderAction, setSliderAction] = useState<SliderAction>('take');
+  const [slideX] = useState(() => new Animated.Value(0));
+  const [sliderCompleted, setSliderCompleted] = useState(false);
 
   // Animation values
   const [chimeScale] = useState(() => new Animated.Value(1));
@@ -393,9 +426,11 @@ export default function FullScreenAlarmScreen() {
     } catch (e) {
       console.warn('Failed to record taken dose:', e);
       setErrorMessage('Could not complete action. Please try again.');
+      setSliderCompleted(false);
+      Animated.spring(slideX, { toValue: 0, useNativeDriver: false }).start();
       setIsProcessing(false);
     }
-  }, [isProcessing, currentDose, doses, router]);
+  }, [isProcessing, currentDose, doses, router, slideX]);
 
   // Action: Snooze Alarm
   const executeSnooze = useCallback(async () => {
@@ -405,25 +440,29 @@ export default function FullScreenAlarmScreen() {
 
     try {
       Vibration.vibrate(Platform.OS === 'android' ? [0, 40, 40, 80] : 100);
-      const snoozeResult = await nativeAlarmService.snoozeAlarm({
-        scheduleId: currentDose.scheduleId,
-        instanceId: currentDose.instanceId || `${currentDose.scheduleId}:${currentDose.doseTime}`,
-        medicineName: currentDose.medicineName,
-        amount: currentDose.amount,
-        time: currentDose.doseTime,
-        label: currentDose.doseLabel,
-        minutes: snoozeMinutes,
-      });
+      if (currentDose.scheduleId) {
+        const snoozeResult = await nativeAlarmService.snoozeAlarm({
+          scheduleId: currentDose.scheduleId,
+          instanceId: currentDose.instanceId || `${currentDose.scheduleId}:${currentDose.doseTime}`,
+          medicineName: currentDose.medicineName,
+          amount: currentDose.amount,
+          time: currentDose.doseTime,
+          label: currentDose.doseLabel,
+          minutes: snoozeMinutes,
+        });
 
-      if (!snoozeResult.success || !snoozeResult.data || snoozeResult.data <= Date.now()) {
-        const errorMsg =
-          snoozeResult.error?.code === 'exact_alarm_denied'
-            ? 'Alarm permission missing. Cannot snooze.'
-            : 'Could not snooze alarm. Please try again.';
-        throw new Error(errorMsg);
+        if (!snoozeResult.success || !snoozeResult.data || snoozeResult.data <= Date.now()) {
+          const errorMsg =
+            snoozeResult.error?.code === 'exact_alarm_denied'
+              ? 'Alarm permission missing. Cannot snooze.'
+              : 'Could not snooze alarm. Please try again.';
+          throw new Error(errorMsg);
+        }
+
+        await nativeAlarmService.stopAlarm(currentDose.scheduleId, currentDose.doseTime);
+      } else {
+        await nativeAlarmService.stopAlarm();
       }
-
-      await nativeAlarmService.stopAlarm(currentDose.scheduleId, currentDose.doseTime);
 
       const updated = doses.map((d) =>
         d.id === currentDose.id ? { ...d, status: 'snoozed' as const } : d,
@@ -435,6 +474,9 @@ export default function FullScreenAlarmScreen() {
         const nextIdx = updated.findIndex((d) => d.status === 'pending');
         setSelectedIndex(nextIdx);
         setToastMessage(`${currentDose.medicineName} snoozed for ${snoozeMinutes}m`);
+        setSliderAction('take');
+        setSliderCompleted(false);
+        slideX.setValue(0);
         setTimeout(() => setToastMessage(null), 2500);
         setIsProcessing(false);
       } else {
@@ -447,9 +489,11 @@ export default function FullScreenAlarmScreen() {
     } catch (e: any) {
       console.warn('Failed to snooze alarm for schedule:', currentDose.scheduleId);
       setErrorMessage(e?.message || 'Could not snooze alarm. Please try again.');
+      setSliderCompleted(false);
+      Animated.spring(slideX, { toValue: 0, useNativeDriver: false }).start();
       setIsProcessing(false);
     }
-  }, [isProcessing, currentDose, doses, snoozeMinutes, router]);
+  }, [isProcessing, currentDose, doses, snoozeMinutes, router, slideX]);
 
   // Action: Skip Dose
   const executeSkipDose = useCallback(async () => {
@@ -459,9 +503,11 @@ export default function FullScreenAlarmScreen() {
 
     try {
       Vibration.vibrate(Platform.OS === 'android' ? [0, 35, 35, 35] : 70);
-      await nativeAlarmService.stopAlarm(currentDose.scheduleId, currentDose.doseTime);
       if (currentDose.scheduleId) {
+        await nativeAlarmService.stopAlarm(currentDose.scheduleId, currentDose.doseTime);
         await nativeAlarmService.cancelSnoozesForSchedule(currentDose.scheduleId);
+      } else {
+        await nativeAlarmService.stopAlarm();
       }
 
       if (currentDose.scheduleId && currentDose.medicineId) {
@@ -492,6 +538,9 @@ export default function FullScreenAlarmScreen() {
       if (remainingPending.length > 0) {
         setSelectedIndex(updated.findIndex((d) => d.status === 'pending'));
         setToastMessage(`${currentDose.medicineName} skipped for now`);
+        setSliderAction('take');
+        setSliderCompleted(false);
+        slideX.setValue(0);
         setTimeout(() => setToastMessage(null), 2500);
         setIsProcessing(false);
       } else {
@@ -503,9 +552,11 @@ export default function FullScreenAlarmScreen() {
     } catch (error) {
       console.warn('Failed to skip dose:', error);
       setErrorMessage('Could not skip this dose. Please try again.');
+      setSliderCompleted(false);
+      Animated.spring(slideX, { toValue: 0, useNativeDriver: false }).start();
       setIsProcessing(false);
     }
-  }, [isProcessing, currentDose, doses, router]);
+  }, [isProcessing, currentDose, doses, router, slideX]);
 
   // Action: Take All Pending Simultaneous Doses
   const executeTakeAll = useCallback(async () => {
@@ -557,9 +608,11 @@ export default function FullScreenAlarmScreen() {
     } catch (e) {
       console.warn('Failed to take all doses:', e);
       setErrorMessage('Could not take all doses. Please try again.');
+      setSliderCompleted(false);
+      Animated.spring(slideX, { toValue: 0, useNativeDriver: false }).start();
       setIsProcessing(false);
     }
-  }, [isProcessing, doses, router]);
+  }, [isProcessing, doses, router, slideX]);
 
   const currentSchedule = useMemo(
     () => (currentDose?.scheduleId ? scheduleRepository.getById(currentDose.scheduleId) : null),
@@ -656,13 +709,14 @@ export default function FullScreenAlarmScreen() {
     router.replace('/(tabs)/home');
   }, [currentDose, router]);
 
-  const { width: screenWidth } = useWindowDimensions();
-  const SLIDER_WIDTH = Math.min(screenWidth - 40, 360);
-  const THUMB_SIZE = 54;
-  const maxSlide = SLIDER_WIDTH - THUMB_SIZE - 8;
-
-  const [slideX] = useState(() => new Animated.Value(0));
-  const [sliderCompleted, setSliderCompleted] = useState(false);
+  const selectSliderAction = useCallback(
+    (action: SliderAction) => {
+      setSliderAction(action);
+      setSliderCompleted(false);
+      slideX.setValue(0);
+    },
+    [slideX, setSliderAction, setSliderCompleted],
+  );
 
   // Arrow shimmer pulse animation
   const [arrowPulse] = useState(() => new Animated.Value(0));
@@ -680,8 +734,9 @@ export default function FullScreenAlarmScreen() {
   // Reset slider if dose changes
   useEffect(() => {
     setSliderCompleted(false);
+    setSliderAction('take');
     slideX.setValue(0);
-  }, [currentDose?.id, slideX]);
+  }, [currentDose?.id, slideX, setSliderCompleted, setSliderAction]);
 
   const panResponder = useMemo(
     () =>
@@ -702,10 +757,16 @@ export default function FullScreenAlarmScreen() {
               duration: 140,
               useNativeDriver: false,
             }).start(() => {
-              if (pendingDoses.length > 1) {
-                executeTakeAll();
+              if (sliderAction === 'snooze') {
+                executeSnooze();
+              } else if (sliderAction === 'skip') {
+                executeSkipDose();
               } else {
-                executeTakeDose();
+                if (pendingDoses.length > 1) {
+                  executeTakeAll();
+                } else {
+                  executeTakeDose();
+                }
               }
             });
           } else {
@@ -718,7 +779,19 @@ export default function FullScreenAlarmScreen() {
           }
         },
       }),
-    [isProcessing, sliderCompleted, maxSlide, pendingDoses.length, executeTakeAll, executeTakeDose, slideX],
+    [
+      isProcessing,
+      sliderCompleted,
+      setSliderCompleted,
+      maxSlide,
+      sliderAction,
+      pendingDoses.length,
+      executeTakeAll,
+      executeTakeDose,
+      executeSnooze,
+      executeSkipDose,
+      slideX,
+    ],
   );
 
   const textOpacity = slideX.interpolate({
@@ -733,6 +806,26 @@ export default function FullScreenAlarmScreen() {
     extrapolate: 'clamp',
   });
 
+  const sliderGuideText = useMemo(() => {
+    if (sliderAction === 'snooze') return `slide to snooze ${snoozeMinutes}m`;
+    if (sliderAction === 'skip') return 'slide to skip this dose';
+    return pendingDoses.length > 1
+      ? `slide to take all ${pendingDoses.length}`
+      : 'slide to mark as taken';
+  }, [sliderAction, snoozeMinutes, pendingDoses.length]);
+
+  const sliderThumbColor = useMemo(() => {
+    if (sliderAction === 'snooze') return '#D97706';
+    if (sliderAction === 'skip') return '#E11D48';
+    return '#0788F5';
+  }, [sliderAction]);
+
+  const sliderFillColor = useMemo(() => {
+    if (sliderAction === 'snooze') return '#FEF3C7';
+    if (sliderAction === 'skip') return '#FEE2E2';
+    return '#E0F2FE';
+  }, [sliderAction]);
+
   // Today's formatted date for lockscreen
   const lockscreenDate = useMemo(() => {
     const now = new Date();
@@ -743,33 +836,11 @@ export default function FullScreenAlarmScreen() {
     });
   }, []);
 
-  const otherDoses = useMemo(() => {
-    return doses.filter((d) => d.id !== currentDose?.id && d.status === 'pending');
-  }, [doses, currentDose?.id]);
-
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.screenContainer}>
-          {/* Top Lockscreen Status Bar */}
-          <View style={styles.topBar}>
-            <View style={styles.lockStatusBadge}>
-              <Ionicons name="notifications-outline" size={13} color="#64748B" />
-              <Text style={styles.lockStatusText}>MEDICATION REMINDER</Text>
-            </View>
-
-            <TouchableOpacity
-              style={styles.dismissButton}
-              onPress={handleDismiss}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel="Dismiss Alarm"
-            >
-              <Ionicons name="close" size={18} color="#64748B" />
-            </TouchableOpacity>
-          </View>
-
           {/* Feedback & Error Banners */}
           {toastMessage && (
             <View style={styles.toastBanner}>
@@ -833,7 +904,7 @@ export default function FullScreenAlarmScreen() {
                 {currentDose?.medicineName || 'Metformin'}
               </Text>
               <Text style={styles.heroDoseAmount}>
-                {currentDose?.amount || '500 mg · 1 tablet'}
+                {currentDose?.amount || '500 mg · 1 tablet'} · {formatRecurrence(currentDose?.recurrence)}
               </Text>
 
               <View style={styles.instructionPill}>
@@ -924,7 +995,7 @@ export default function FullScreenAlarmScreen() {
                             {dose.medicineName}
                           </Text>
                           <Text style={styles.multiRowDoseAmount} numberOfLines={1}>
-                            {dose.amount}
+                            {dose.amount} · {formatRecurrence(dose.recurrence)}
                           </Text>
                         </View>
 
@@ -953,9 +1024,9 @@ export default function FullScreenAlarmScreen() {
               </ScrollView>
 
               <View style={styles.multiCardFooter}>
-                <Ionicons name="calendar-outline" size={13} color="#8A8991" />
+                <Ionicons name="time-outline" size={13} color="#8A8991" />
                 <Text style={styles.multiCardFooterText}>
-                  {recurrenceLabel} · {startedLabel}
+                  Scheduled for {formattedCurrentTime} routine
                 </Text>
               </View>
             </View>
@@ -963,7 +1034,7 @@ export default function FullScreenAlarmScreen() {
 
           {/* Bottom Interactive Lockscreen Slider & Actions */}
           <View style={styles.bottomSection}>
-            {/* Interactive "Slide to Mark as Taken" Track */}
+            {/* Interactive Slider Track */}
             <View style={[styles.sliderTrack, { width: SLIDER_WIDTH }]}>
               {/* Fill Track */}
               <Animated.View
@@ -971,19 +1042,34 @@ export default function FullScreenAlarmScreen() {
                   styles.sliderFill,
                   {
                     width: trackFillWidth,
+                    backgroundColor: sliderFillColor,
                   },
                 ]}
               />
 
               {/* Centered Guide Text */}
               <Animated.View style={[styles.sliderTextContainer, { opacity: textOpacity }]}>
-                <Text style={styles.sliderGuideText}>
-                  {pendingDoses.length > 1
-                    ? `slide to take all ${pendingDoses.length}`
-                    : 'slide to mark as taken'}
+                <Text
+                  style={[
+                    styles.sliderGuideText,
+                    sliderAction === 'snooze' && { color: '#B45309' },
+                    sliderAction === 'skip' && { color: '#BE123C' },
+                  ]}
+                >
+                  {sliderGuideText}
                 </Text>
                 <Animated.View style={{ transform: [{ translateX: arrowPulse }] }}>
-                  <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+                  <Ionicons
+                    name="chevron-forward"
+                    size={16}
+                    color={
+                      sliderAction === 'snooze'
+                        ? '#B45309'
+                        : sliderAction === 'skip'
+                          ? '#BE123C'
+                          : '#94A3B8'
+                    }
+                  />
                 </Animated.View>
               </Animated.View>
 
@@ -992,6 +1078,7 @@ export default function FullScreenAlarmScreen() {
                 style={[
                   styles.sliderThumb,
                   {
+                    backgroundColor: sliderThumbColor,
                     transform: [{ translateX: slideX }],
                   },
                 ]}
@@ -999,37 +1086,58 @@ export default function FullScreenAlarmScreen() {
               >
                 {sliderCompleted ? (
                   <Ionicons name="checkmark" size={24} color="#FFFFFF" />
+                ) : sliderAction === 'snooze' ? (
+                  <MaterialCommunityIcons name="alarm-snooze" size={22} color="#FFFFFF" />
+                ) : sliderAction === 'skip' ? (
+                  <Ionicons name="close" size={24} color="#FFFFFF" />
                 ) : (
                   <Ionicons name="arrow-forward" size={22} color="#FFFFFF" />
                 )}
               </Animated.View>
             </View>
 
-            {/* Secondary Controls: Snooze & Skip */}
+            {/* Secondary Controls: Switch mode to Snooze/Skip or Cancel */}
             <View style={styles.secondaryControlsRow}>
-              <TouchableOpacity
-                style={styles.secondaryBtn}
-                onPress={executeSnooze}
-                disabled={isProcessing}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel={`Snooze for ${snoozeMinutes} minutes`}
-              >
-                <MaterialCommunityIcons name="alarm-snooze" size={17} color="#475569" />
-                <Text style={styles.secondaryBtnText}>Snooze {snoozeMinutes}m</Text>
-              </TouchableOpacity>
+              {sliderAction === 'take' ? (
+                <>
+                  <TouchableOpacity
+                    style={styles.secondaryBtn}
+                    onPress={() => selectSliderAction('snooze')}
+                    disabled={isProcessing}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Switch to snooze ${snoozeMinutes} minutes`}
+                  >
+                    <MaterialCommunityIcons name="alarm-snooze" size={17} color="#475569" />
+                    <Text style={styles.secondaryBtnText}>Snooze {snoozeMinutes}m</Text>
+                  </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.secondaryBtn}
-                onPress={executeSkipDose}
-                disabled={isProcessing}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel="Skip this dose"
-              >
-                <Ionicons name="close" size={17} color="#94A3B8" />
-                <Text style={[styles.secondaryBtnText, { color: '#64748B' }]}>Skip for now</Text>
-              </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.secondaryBtn}
+                    onPress={() => selectSliderAction('skip')}
+                    disabled={isProcessing}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel="Switch to skip dose"
+                  >
+                    <Ionicons name="close" size={17} color="#94A3B8" />
+                    <Text style={[styles.secondaryBtnText, { color: '#64748B' }]}>
+                      Skip for now
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <TouchableOpacity
+                  style={styles.cancelModeBtn}
+                  onPress={() => selectSliderAction('take')}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel and return to take dose"
+                >
+                  <Ionicons name="arrow-back" size={16} color="#0788F5" />
+                  <Text style={styles.cancelModeBtnText}>Back to Take Dose</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
             {/* Discreet Upcoming Note */}
@@ -1064,47 +1172,13 @@ const styles = StyleSheet.create({
   },
 
   // ---------------------------------------------------------------------------
-  // Top Status Bar
-  // ---------------------------------------------------------------------------
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-  },
-  lockStatusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  lockStatusText: {
-    fontSize: 10.5,
-    fontWeight: '700',
-    color: '#64748B',
-    letterSpacing: 0.8,
-  },
-  dismissButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // ---------------------------------------------------------------------------
   // Monumental Clock
   // ---------------------------------------------------------------------------
   lockClockSection: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 4,
+    marginTop: 18,
+    marginBottom: 6,
   },
   clockTime: {
     fontSize: 72,
@@ -1469,6 +1543,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#334155',
+  },
+  cancelModeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  cancelModeBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0788F5',
   },
   nextNote: {
     alignItems: 'center',
