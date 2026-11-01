@@ -879,51 +879,94 @@ export default function FullScreenAlarmScreen() {
             </View>
           )}
 
-          {/* Monumental Lockscreen Clock */}
+          {/* Ambient Radial Rings behind clock */}
+          <View style={styles.ambientRingsContainer} pointerEvents="none">
+            <View style={styles.ambientRingOuter} />
+            <View style={styles.ambientRingInner} />
+          </View>
+
+          {/* Monumental Lockscreen Clock with radiating rays */}
           <View style={styles.lockClockSection}>
-            <Text style={styles.clockTime}>{clockDisplayTime}</Text>
-            <Text style={styles.clockDateText}>
-              {lockscreenDate} · {currentDose?.doseLabel || 'Morning Dose'}
-            </Text>
+            <Text style={styles.clockSubHeader}>Medicine Reminder</Text>
+            <View style={styles.clockRow}>
+              <View style={styles.clockRaysLeft}>
+                <View style={[styles.ray, styles.rayTopLeft]} />
+                <View style={[styles.ray, styles.rayMidLeft]} />
+                <View style={[styles.ray, styles.rayBotLeft]} />
+              </View>
+              <Text style={styles.clockTime}>{clockDisplayTime}</Text>
+              <View style={styles.clockRaysRight}>
+                <View style={[styles.ray, styles.rayTopRight]} />
+                <View style={[styles.ray, styles.rayMidRight]} />
+                <View style={[styles.ray, styles.rayBotRight]} />
+              </View>
+            </View>
+            <Text style={styles.clockSubtitle}>Time to take your medicine</Text>
           </View>
 
           {/* Hero Medicine Display: Adaptive for 1 Medicine vs 2+ Medicines */}
           {doses.length === 1 ? (
             /* Single Medicine Hero Card */
             <View style={styles.heroCard}>
-              <View style={styles.heroIconBox}>
-                <MaterialCommunityIcons
-                  name="pill"
-                  size={34}
-                  color="#0788F5"
-                  style={{ transform: [{ rotate: '-45deg' }] }}
-                />
-              </View>
-
-              <Text style={styles.heroMedName} numberOfLines={1}>
-                {currentDose?.medicineName || 'Metformin'}
-              </Text>
-              <Text style={styles.heroDoseAmount}>
-                {currentDose?.amount || '500 mg · 1 tablet'} · {formatRecurrence(currentDose?.recurrence)}
-              </Text>
-
-              <View style={styles.instructionPill}>
-                <Text style={styles.instructionPillText}>
-                  Take with a glass of water
-                </Text>
-              </View>
-
-              <View style={styles.heroCardDivider} />
-
-              <View style={styles.heroCardMetaRow}>
-                <View style={styles.metaCol}>
-                  <Text style={styles.metaLabel}>SCHEDULE</Text>
-                  <Text style={styles.metaValue}>{recurrenceLabel}</Text>
+              <View style={styles.heroCardHeader}>
+                <View style={styles.heroIconBox}>
+                  <MaterialCommunityIcons
+                    name="pill"
+                    size={28}
+                    color="#0788F5"
+                    style={{ transform: [{ rotate: '-45deg' }] }}
+                  />
                 </View>
-                <View style={styles.metaDivider} />
-                <View style={styles.metaCol}>
-                  <Text style={styles.metaLabel}>PRESCRIBED</Text>
-                  <Text style={styles.metaValue}>{startedLabel}</Text>
+                <View style={styles.heroTitleCol}>
+                  <Text style={styles.heroMedName} numberOfLines={1}>
+                    {currentDose?.medicineName || 'Metformin'}
+                  </Text>
+                  <Text style={styles.heroDoseAmount}>
+                    {currentDose?.amount || '500 mg · 1 tablet'}
+                  </Text>
+                </View>
+                <View style={styles.heroDoseTag}>
+                  <Text style={styles.heroDoseTagText}>
+                    {currentDose?.doseLabel || 'Morning Dose'}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.cardDetailBox}>
+                <View style={styles.detailRow}>
+                  <View style={styles.detailIconBox}>
+                    <Ionicons name="calendar-outline" size={17} color="#64748B" />
+                  </View>
+                  <View style={styles.detailTextCol}>
+                    <Text style={styles.detailTitle}>{recurrenceLabel}</Text>
+                    <Text style={styles.detailSubtitle}>{startedLabel}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.detailDivider} />
+
+                <View style={styles.detailRow}>
+                  <View style={styles.detailIconBox}>
+                    <Ionicons name="document-text-outline" size={17} color="#64748B" />
+                  </View>
+                  <View style={styles.detailTextCol}>
+                    <Text style={styles.detailTitle}>
+                      Take {currentDose?.amount?.split('·')[1]?.trim() || currentDose?.amount || '1 tablet'}
+                    </Text>
+                    <Text style={styles.detailSubtitle}>As directed on your label</Text>
+                  </View>
+                </View>
+
+                <View style={styles.detailDivider} />
+
+                <View style={styles.detailRow}>
+                  <View style={styles.detailIconBox}>
+                    <Ionicons name="information-circle-outline" size={17} color="#64748B" />
+                  </View>
+                  <View style={styles.detailTextCol}>
+                    <Text style={styles.detailTitle}>From your saved schedule</Text>
+                    <Text style={styles.detailSubtitle}>Follow your doctor's instructions</Text>
+                  </View>
                 </View>
               </View>
             </View>
@@ -1031,6 +1074,14 @@ export default function FullScreenAlarmScreen() {
               </View>
             </View>
           )}
+
+          {/* Gentle Health Consistency Tip */}
+          <View style={styles.tipBanner}>
+            <Ionicons name="sparkles" size={15} color="#0788F5" />
+            <Text style={styles.tipBannerText}>
+              Keeping your routine consistent helps you stay on track.
+            </Text>
+          </View>
 
           {/* Bottom Interactive Lockscreen Slider & Actions */}
           <View style={styles.bottomSection}>
@@ -1140,12 +1191,19 @@ export default function FullScreenAlarmScreen() {
               )}
             </View>
 
-            {/* Discreet Upcoming Note */}
+            {/* Upcoming Dose Card */}
             {displayNextDose && (
-              <View style={styles.nextNote}>
-                <Text style={styles.nextNoteText}>
-                  Next up: {displayNextDose.medicineName} · {displayNextDose.doseTime}
-                </Text>
+              <View style={styles.nextDoseCard}>
+                <View style={styles.nextDoseIconBox}>
+                  <Ionicons name="document-text-outline" size={15} color="#0788F5" />
+                </View>
+                <View style={styles.nextDoseTextCol}>
+                  <Text style={styles.nextDoseTitle}>Next: {displayNextDose.medicineName}</Text>
+                  <Text style={styles.nextDoseSubtitle}>
+                    {displayNextDose.doseTime} · {displayNextDose.amount}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
               </View>
             )}
           </View>
@@ -1166,138 +1224,227 @@ const styles = StyleSheet.create({
   screenContainer: {
     flex: 1,
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 6,
-    paddingBottom: 16,
+    paddingHorizontal: 18,
+    paddingTop: 4,
+    paddingBottom: 14,
   },
 
   // ---------------------------------------------------------------------------
-  // Monumental Clock
+  // Ambient Rings & Monumental Clock
   // ---------------------------------------------------------------------------
+  ambientRingsContainer: {
+    position: 'absolute',
+    top: -30,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ambientRingOuter: {
+    position: 'absolute',
+    width: 320,
+    height: 320,
+    borderRadius: 160,
+    backgroundColor: 'rgba(235, 244, 255, 0.4)',
+  },
+  ambientRingInner: {
+    position: 'absolute',
+    width: 230,
+    height: 230,
+    borderRadius: 115,
+    backgroundColor: 'rgba(235, 244, 255, 0.65)',
+  },
   lockClockSection: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 18,
-    marginBottom: 6,
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  clockSubHeader: {
+    fontSize: 14.5,
+    fontWeight: '600',
+    color: '#64748B',
+    marginBottom: 4,
+    letterSpacing: -0.2,
+  },
+  clockRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clockRaysLeft: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    marginRight: 12,
+    height: 60,
+  },
+  clockRaysRight: {
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    marginLeft: 12,
+    height: 60,
+  },
+  ray: {
+    width: 14,
+    height: 3.5,
+    borderRadius: 2,
+    backgroundColor: '#0788F5',
+    marginVertical: 4,
+  },
+  rayTopLeft: {
+    transform: [{ rotate: '25deg' }],
+  },
+  rayMidLeft: {
+    width: 17,
+  },
+  rayBotLeft: {
+    transform: [{ rotate: '-25deg' }],
+  },
+  rayTopRight: {
+    transform: [{ rotate: '-25deg' }],
+  },
+  rayMidRight: {
+    width: 17,
+  },
+  rayBotRight: {
+    transform: [{ rotate: '25deg' }],
   },
   clockTime: {
-    fontSize: 72,
+    fontSize: 74,
     fontWeight: '800',
     color: '#0F172A',
     letterSpacing: -2,
-    lineHeight: 78,
+    lineHeight: 80,
   },
-  clockDateText: {
-    fontSize: 14.5,
+  clockSubtitle: {
+    fontSize: 14,
     fontWeight: '500',
     color: '#64748B',
-    marginTop: 2,
+    marginTop: 4,
   },
 
   // ---------------------------------------------------------------------------
-  // Hero Medicine Card
+  // Hero Medicine Card (Inspiring, rich structured layout)
   // ---------------------------------------------------------------------------
   heroCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
-    paddingVertical: 20,
-    paddingHorizontal: 20,
-    alignItems: 'center',
+    padding: 18,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    shadowColor: '#0F172A',
+    shadowColor: '#0788F5',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06,
-    shadowRadius: 14,
+    shadowRadius: 16,
     elevation: 3,
-    marginVertical: 6,
+    marginVertical: 4,
+  },
+  heroCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
   },
   heroIconBox: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
+    width: 50,
+    height: 50,
+    borderRadius: 16,
     backgroundColor: '#EFF6FF',
     borderWidth: 1,
     borderColor: '#DBEAFE',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
+    marginRight: 12,
+  },
+  heroTitleCol: {
+    flex: 1,
+    justifyContent: 'center',
   },
   heroMedName: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '800',
     color: '#0F172A',
     letterSpacing: -0.4,
-    textAlign: 'center',
   },
   heroDoseAmount: {
-    fontSize: 15,
+    fontSize: 14.5,
     fontWeight: '500',
     color: '#64748B',
     marginTop: 2,
-    textAlign: 'center',
   },
-  instructionPill: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-  },
-  instructionPillText: {
-    fontSize: 13,
-    color: '#334155',
-    fontWeight: '600',
-  },
-  simultaneousNotice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 12,
+  heroDoseTag: {
     backgroundColor: '#EFF6FF',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
   },
-  simultaneousNoticeText: {
-    fontSize: 12.5,
-    fontWeight: '600',
+  heroDoseTagText: {
+    fontSize: 12,
+    fontWeight: '700',
     color: '#0788F5',
   },
-  heroCardDivider: {
-    width: '100%',
-    height: 1,
-    backgroundColor: '#F1F5F9',
-    marginTop: 16,
-    marginBottom: 12,
+  cardDetailBox: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
-  heroCardMetaRow: {
-    width: '100%',
+  detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
+    paddingVertical: 4,
   },
-  metaCol: {
+  detailIconBox: {
+    width: 30,
     alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
   },
-  metaLabel: {
-    fontSize: 10,
+  detailTextCol: {
+    flex: 1,
+  },
+  detailTitle: {
+    fontSize: 14,
     fontWeight: '700',
-    color: '#94A3B8',
-    letterSpacing: 0.6,
+    color: '#1E293B',
+    letterSpacing: -0.2,
   },
-  metaValue: {
+  detailSubtitle: {
+    fontSize: 12.5,
+    fontWeight: '500',
+    color: '#64748B',
+    marginTop: 1,
+  },
+  detailDivider: {
+    height: 1,
+    backgroundColor: '#EEF2F6',
+    marginVertical: 8,
+  },
+
+  // ---------------------------------------------------------------------------
+  // Health Tip / Consistency Banner
+  // ---------------------------------------------------------------------------
+  tipBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+    marginVertical: 4,
+  },
+  tipBannerText: {
+    flex: 1,
     fontSize: 13,
     fontWeight: '600',
-    color: '#1E293B',
-    marginTop: 2,
-  },
-  metaDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: '#E2E8F0',
+    color: '#0369A1',
+    lineHeight: 18,
   },
 
   // ---------------------------------------------------------------------------
@@ -1560,13 +1707,43 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0788F5',
   },
-  nextNote: {
+  nextDoseCard: {
+    width: '100%',
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
   },
-  nextNoteText: {
-    fontSize: 12,
-    color: '#94A3B8',
-    fontWeight: '500',
+  nextDoseIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nextDoseTextCol: {
+    flex: 1,
+  },
+  nextDoseTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  nextDoseSubtitle: {
+    fontSize: 11.5,
+    color: '#64748B',
+    marginTop: 1,
   },
 
   // ---------------------------------------------------------------------------
