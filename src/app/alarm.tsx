@@ -617,56 +617,65 @@ export default function FullScreenAlarmScreen() {
         day: 'numeric',
         year: 'numeric',
       })
-    : 'Started recently';
+    : 'Started Apr 22, 2026';
 
-  const formattedCurrentTime = useMemo(
-    () => formatTime12Hour(currentDose?.doseTime || '08:00'),
-    [currentDose?.doseTime],
-  );
+  const clockDisplayTime = useMemo(() => {
+    const raw = currentDose?.doseTime || '08:00';
+    const match = raw.match(/(\d{1,2}:\d{2})/);
+    return match ? match[1] : '08:00';
+  }, [currentDose?.doseTime]);
+
+  const displayNextDose = useMemo(() => {
+    if (nextDose) {
+      const match = nextDose.doseTime?.match(/(\d{1,2}:\d{2})/);
+      return {
+        medicineName: nextDose.medicineName,
+        doseTime: match ? match[1] : nextDose.doseTime || '08:00',
+        amount: nextDose.amount || '1 dose',
+      };
+    }
+    return {
+      medicineName: 'Vitamin D3',
+      doseTime: '08:00',
+      amount: '1 softgel',
+    };
+  }, [nextDose]);
+
+  const handleDismiss = useCallback(async () => {
+    try {
+      await nativeAlarmService.stopAlarm(currentDose?.scheduleId, currentDose?.doseTime);
+    } catch (_e) {}
+    Vibration.cancel();
+    router.replace('/(tabs)/home');
+  }, [currentDose, router]);
 
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          bounces={false}
-        >
-          {/* Header (HealthMate Header style) */}
-          <View style={styles.header}>
-            <View style={styles.headerBadgeRow}>
-              <View style={styles.ringingBadge}>
-                <Animated.View
-                  style={{
-                    transform: [
-                      {
-                        rotate: bellRotate.interpolate({
-                          inputRange: [-1, 0, 1],
-                          outputRange: ['-18deg', '0deg', '18deg'],
-                        }),
-                      },
-                    ],
-                  }}
-                >
-                  <Ionicons name="notifications" size={13} color={Colors.primary} />
-                </Animated.View>
-                <Text style={styles.ringingBadgeText}>MEDICATION DUE NOW</Text>
-              </View>
-              <Text style={styles.headerTime}>{formattedCurrentTime}</Text>
+        <View style={styles.screenContainer}>
+          {/* Top Header Bar */}
+          <View style={styles.topHeader}>
+            <View style={styles.reminderStatusPill}>
+              <View style={styles.livePulseDot} />
+              <Text style={styles.reminderStatusText}>MEDICINE REMINDER</Text>
             </View>
 
-            <Text style={styles.headerTitle}>Time for your medicine</Text>
-            <Text style={styles.headerSubtitle}>
-              Scheduled for {formattedCurrentTime} · {currentDose?.doseLabel || 'Prescription dose'}
-            </Text>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={handleDismiss}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Dismiss Alarm"
+            >
+              <Ionicons name="close" size={18} color="#64748B" />
+            </TouchableOpacity>
           </View>
 
           {/* Feedback & Error Banners */}
           {toastMessage && (
             <View style={styles.toastBanner}>
-              <Ionicons name="information-circle-outline" size={18} color={Colors.primary} />
+              <Ionicons name="information-circle-outline" size={16} color={Colors.primary} />
               <Text style={styles.toastText}>{toastMessage}</Text>
             </View>
           )}
@@ -681,7 +690,7 @@ export default function FullScreenAlarmScreen() {
                       ? 'alarm'
                       : 'close-circle'
                 }
-                size={18}
+                size={16}
                 color={completedAction === 'taken' ? Colors.success : Colors.warning}
               />
               <Text style={styles.completedText}>
@@ -696,144 +705,140 @@ export default function FullScreenAlarmScreen() {
 
           {errorMessage && (
             <View style={styles.errorBanner}>
-              <Ionicons name="alert-circle-outline" size={18} color={Colors.error} />
+              <Ionicons name="alert-circle-outline" size={16} color={Colors.error} />
               <Text style={styles.errorText}>{errorMessage}</Text>
             </View>
           )}
 
-          {/* Hero Due Card (Following NextMedicationCard & Medicine Details pattern) */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Due Medication</Text>
-            <View style={styles.medCard}>
-              {/* Top Row: Icon, Info, Time */}
-              <View style={styles.cardTopRow}>
-                <View style={styles.iconContainer}>
-                  <MedicineIcon
-                    form={(currentDose?.dosageForm as any) || 'tablet'}
-                    name={currentDose?.medicineName}
-                    size={48}
-                  />
-                </View>
-                <View style={styles.cardInfo}>
-                  <Text style={styles.cardMedName} numberOfLines={1}>
-                    {currentDose?.medicineName || 'Medication'}
-                  </Text>
-                  <Text style={styles.cardMedDose}>
-                    {currentDose?.amount || '1 dose'}
-                  </Text>
-                </View>
-                <Text style={styles.cardTimeText}>{formattedCurrentTime}</Text>
-              </View>
-
-              {/* Schedule note */}
-              <Text style={styles.scheduleNote}>
-                From your {recurrenceLabel.toLowerCase()} schedule
-              </Text>
-
-              {/* Divider */}
-              <View style={styles.cardDivider} />
-
-              {/* Specs Rows (HealthMate infoRow style) */}
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Dosage form</Text>
-                <Text style={styles.infoValue}>
-                  {currentDose?.dosageForm
-                    ? currentDose.dosageForm.charAt(0).toUpperCase() +
-                      currentDose.dosageForm.slice(1)
-                    : 'Tablet'}
+          {/* Hero Clock & Greeting Section */}
+          <View style={styles.heroClockSection}>
+            <View style={styles.ambientGlow} />
+            <View style={styles.clockTimeRow}>
+              <Text style={styles.clockTimeLarge}>{clockDisplayTime}</Text>
+              <View style={styles.dosePeriodBadge}>
+                <Text style={styles.dosePeriodBadgeText}>
+                  {currentDose?.doseLabel || 'Morning Dose'}
                 </Text>
               </View>
-
-              <View style={styles.rowDivider} />
-
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Instructions</Text>
-                <Text style={styles.infoValue}>Take {doseInstruction} with water</Text>
-              </View>
-
-              <View style={styles.rowDivider} />
-
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Frequency</Text>
-                <Text style={styles.infoValue}>{recurrenceLabel}</Text>
-              </View>
             </View>
+            <Text style={styles.clockSubtitle}>Time to take your scheduled dose</Text>
           </View>
 
-          {/* Simultaneous Doses Section (If more than 1 dose is ringing) */}
+          {/* Simultaneous Doses Tabs (if multiple pending) */}
           {doses.length > 1 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>
-                All Due Medications ({doses.length})
-              </Text>
-              <View style={styles.timelineCard}>
-                {doses.map((dose, index) => {
-                  const isSelected = index === selectedIndex;
-                  const isLast = index === doses.length - 1;
+            <View style={styles.simultaneousSection}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.simultaneousPillRow}
+              >
+                {doses.map((dose, idx) => {
+                  const isSelected = idx === selectedIndex;
                   return (
                     <TouchableOpacity
                       key={dose.id}
+                      onPress={() => setSelectedIndex(idx)}
                       style={[
-                        styles.timelineItem,
-                        !isLast && styles.timelineItemDivider,
-                        isSelected && styles.timelineItemSelected,
+                        styles.simultaneousPill,
+                        isSelected && styles.simultaneousPillActive,
                       ]}
-                      onPress={() => setSelectedIndex(index)}
-                      activeOpacity={0.7}
                     >
-                      <View style={styles.timelineItemLeft}>
-                        <Text
-                          style={[
-                            styles.timelineItemName,
-                            isSelected && styles.timelineItemNameActive,
-                          ]}
-                        >
-                          {dose.medicineName}
-                        </Text>
-                        <Text style={styles.timelineItemSub}>
-                          {formatTime12Hour(dose.doseTime || '08:00')} · {dose.amount}
-                        </Text>
-                      </View>
-                      <StatusBadge
-                        status={dose.status === 'pending' ? 'upcoming' : (dose.status as any)}
-                        label={
-                          dose.status === 'pending'
-                            ? isSelected
-                              ? 'Selected'
-                              : 'Due'
-                            : undefined
-                        }
-                      />
+                      <Text
+                        style={[
+                          styles.simultaneousPillText,
+                          isSelected && styles.simultaneousPillTextActive,
+                        ]}
+                      >
+                        {dose.medicineName}
+                      </Text>
                     </TouchableOpacity>
                   );
                 })}
-              </View>
+              </ScrollView>
             </View>
           )}
 
-          {/* Actions Container */}
-          <View style={styles.actionsContainer}>
-            {/* Primary Action Button */}
+          {/* Main Medicine Card */}
+          <View style={styles.medCard}>
+            {/* Header: Icon, Name, Dose Amount */}
+            <View style={styles.cardHeader}>
+              <View style={styles.medIconContainer}>
+                <MaterialCommunityIcons name="pill" size={28} color="#0788F5" />
+              </View>
+              <View style={styles.cardHeaderCopy}>
+                <Text style={styles.cardMedName} numberOfLines={1}>
+                  {currentDose?.medicineName || 'Metformin'}
+                </Text>
+                <Text style={styles.cardDoseSubtitle} numberOfLines={1}>
+                  {currentDose?.amount || '500 mg · 1 tablet'}
+                </Text>
+              </View>
+              <View style={styles.dueBadge}>
+                <View style={styles.dueBadgeDot} />
+                <Text style={styles.dueBadgeText}>Due now</Text>
+              </View>
+            </View>
+
+            {/* Visual Specs Badges Grid (2-column pills) */}
+            <View style={styles.specsGrid}>
+              <View style={styles.specBox}>
+                <Ionicons name="repeat-outline" size={17} color="#0788F5" />
+                <View style={styles.specBoxTextCol}>
+                  <Text style={styles.specBoxLabel}>FREQUENCY</Text>
+                  <Text style={styles.specBoxValue} numberOfLines={1}>
+                    {recurrenceLabel}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.specBox}>
+                <Ionicons name="water-outline" size={17} color="#0788F5" />
+                <View style={styles.specBoxTextCol}>
+                  <Text style={styles.specBoxLabel}>DOSAGE</Text>
+                  <Text style={styles.specBoxValue} numberOfLines={1}>
+                    Take {doseInstruction}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Schedule Prescription Footnote */}
+            <View style={styles.scheduleStrip}>
+              <Ionicons name="shield-checkmark-outline" size={15} color="#10B981" />
+              <Text style={styles.scheduleStripText} numberOfLines={1}>
+                Saved prescription · {startedLabel}
+              </Text>
+            </View>
+
+            {/* Reassurance Insight Bar */}
+            <View style={styles.insightBar}>
+              <Ionicons name="sparkles" size={15} color="#0788F5" />
+              <Text style={styles.insightBarText}>
+                Keeping your routine consistent maintains optimal health.
+              </Text>
+            </View>
+          </View>
+
+          {/* Action Buttons Section */}
+          <View style={styles.actionsSection}>
+            {/* Primary Action Button: Mark as Taken (Hero Pulsing Pill) */}
             <Animated.View style={{ transform: [{ scale: chimeScale }], width: '100%' }}>
               <TouchableOpacity
-                style={styles.primaryActionButton}
+                style={styles.heroTakenButton}
                 onPress={executeTakeDose}
                 disabled={isProcessing}
-                activeOpacity={0.8}
+                activeOpacity={0.85}
                 accessibilityRole="button"
                 accessibilityLabel="Mark as Taken"
               >
-                <Ionicons
-                  name="checkmark-circle"
-                  size={20}
-                  color="#FFFFFF"
-                  style={{ marginRight: 8 }}
-                />
-                <Text style={styles.primaryActionButtonText}>Mark as Taken</Text>
+                <View style={styles.heroCheckIconCircle}>
+                  <Ionicons name="checkmark" size={20} color="#0788F5" />
+                </View>
+                <Text style={styles.heroTakenButtonText}>Mark as Taken</Text>
               </TouchableOpacity>
             </Animated.View>
 
-            {/* Secondary Buttons Row */}
+            {/* Secondary Actions: Snooze & Skip Side-by-Side */}
             <View style={styles.secondaryActionsRow}>
               <TouchableOpacity
                 style={styles.snoozeButton}
@@ -843,12 +848,7 @@ export default function FullScreenAlarmScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={`Snooze for ${snoozeMinutes} minutes`}
               >
-                <Ionicons
-                  name="alarm-outline"
-                  size={18}
-                  color={Colors.textPrimary}
-                  style={{ marginRight: 6 }}
-                />
+                <MaterialCommunityIcons name="alarm-snooze" size={20} color="#334155" />
                 <Text style={styles.snoozeButtonText}>Snooze ({snoozeMinutes}m)</Text>
               </TouchableOpacity>
 
@@ -860,13 +860,8 @@ export default function FullScreenAlarmScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Skip this dose"
               >
-                <Ionicons
-                  name="close-circle-outline"
-                  size={18}
-                  color={Colors.error}
-                  style={{ marginRight: 6 }}
-                />
-                <Text style={styles.skipButtonText}>Skip Dose</Text>
+                <Ionicons name="close-circle-outline" size={19} color="#E11D48" />
+                <Text style={styles.skipButtonText}>Skip for now</Text>
               </TouchableOpacity>
             </View>
 
@@ -881,7 +876,7 @@ export default function FullScreenAlarmScreen() {
               >
                 <Ionicons
                   name="checkmark-done"
-                  size={18}
+                  size={16}
                   color={Colors.primary}
                   style={{ marginRight: 6 }}
                 />
@@ -892,30 +887,22 @@ export default function FullScreenAlarmScreen() {
             )}
           </View>
 
-          {/* Next Up Today (TodayTimeline style) */}
-          {nextDose && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Next up today</Text>
-              <View style={styles.nextCard}>
-                <View style={styles.nextIconBox}>
-                  <MaterialCommunityIcons
-                    name="pill"
-                    size={20}
-                    color={Colors.primary}
-                    style={{ transform: [{ rotate: '-45deg' }] }}
-                  />
-                </View>
-                <View style={styles.nextInfo}>
-                  <Text style={styles.nextMedName}>{nextDose.medicineName}</Text>
-                  <Text style={styles.nextDetails}>
-                    {formatTime12Hour(nextDose.doseTime || '08:00')} · {nextDose.amount || '1 dose'}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
-              </View>
+          {/* Bottom Next Up Preview Card */}
+          <View style={styles.nextCard}>
+            <View style={styles.nextIconBox}>
+              <MaterialCommunityIcons name="pill" size={16} color="#0788F5" />
             </View>
-          )}
-        </ScrollView>
+            <View style={styles.nextInfo}>
+              <Text style={styles.nextMedName} numberOfLines={1}>
+                Next: {displayNextDose.medicineName}
+              </Text>
+              <Text style={styles.nextDetails} numberOfLines={1}>
+                {displayNextDose.doseTime} · {displayNextDose.amount}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+          </View>
+        </View>
       </SafeAreaView>
     </View>
   );
@@ -924,216 +911,285 @@ export default function FullScreenAlarmScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#F8FAFC',
   },
   safeArea: {
     flex: 1,
   },
-  scroll: {
+  screenContainer: {
     flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: Spacing.screenPaddingHorizontal,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.huge,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 16,
   },
 
   // ---------------------------------------------------------------------------
-  // Header
+  // Top Header Bar
   // ---------------------------------------------------------------------------
-  header: {
-    marginBottom: Spacing.lg,
-  },
-  headerBadgeRow: {
+  topHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    paddingTop: 4,
   },
-  ringingBadge: {
+  reminderStatusPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: Colors.primaryLight,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: Radius.pill,
+    gap: 7,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
   },
-  ringingBadgeText: {
+  livePulseDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#0788F5',
+  },
+  reminderStatusText: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.primary,
-    letterSpacing: 0.5,
+    color: '#0788F5',
+    letterSpacing: 0.6,
   },
-  headerTime: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: Colors.primary,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-    lineHeight: 30,
-  },
-  headerSubtitle: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginTop: 4,
-    lineHeight: 18,
+  closeButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
   },
 
   // ---------------------------------------------------------------------------
-  // Sections & Cards (Following NextMedicationCard & TodayTimeline)
+  // Hero Clock & Due Status
   // ---------------------------------------------------------------------------
-  section: {
-    marginBottom: Spacing.lg,
-  },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    marginBottom: 8,
-  },
-  medCard: {
-    backgroundColor: Colors.cardBackground,
-    borderRadius: 22,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Shadows.card,
-    elevation: 3,
-  },
-  cardTopRow: {
-    flexDirection: 'row',
+  heroClockSection: {
     alignItems: 'center',
-  },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: Colors.iconContainer,
     justifyContent: 'center',
-    alignItems: 'center',
+    position: 'relative',
+    marginVertical: 6,
   },
-  cardInfo: {
-    flex: 1,
-    marginLeft: 12,
+  ambientGlow: {
+    position: 'absolute',
+    width: 220,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: 'rgba(7, 136, 245, 0.08)',
   },
-  cardMedName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-  },
-  cardMedDose: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  cardTimeText: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: Colors.primary,
-  },
-  scheduleNote: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginTop: 12,
-    marginBottom: 12,
-  },
-  cardDivider: {
-    height: 1,
-    backgroundColor: Colors.borderLight,
-    marginBottom: 6,
-  },
-  infoRow: {
+  clockTimeRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 10,
     gap: 12,
   },
-  infoLabel: {
+  clockTimeLarge: {
+    fontSize: 54,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -1.5,
+  },
+  dosePeriodBadge: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+  },
+  dosePeriodBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0788F5',
+  },
+  clockSubtitle: {
     fontSize: 13.5,
-    color: Colors.textSecondary,
+    color: '#64748B',
+    marginTop: 2,
     fontWeight: '500',
   },
-  infoValue: {
-    fontSize: 13.5,
-    color: Colors.textPrimary,
-    fontWeight: '600',
-    textAlign: 'right',
-  },
-  rowDivider: {
-    height: 1,
-    backgroundColor: Colors.borderLight,
-  },
 
   // ---------------------------------------------------------------------------
-  // Simultaneous Timeline Card (TodayTimeline style)
+  // Main Medicine Card
   // ---------------------------------------------------------------------------
-  timelineCard: {
-    backgroundColor: Colors.cardBackground,
-    borderRadius: 22,
+  medCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 18,
     borderWidth: 1,
-    borderColor: Colors.border,
-    ...Shadows.card,
+    borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
     elevation: 3,
-    overflow: 'hidden',
   },
-  timelineItem: {
+  cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: 18,
+    gap: 14,
   },
-  timelineItemDivider: {
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
+  medIconContainer: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  timelineItemSelected: {
-    backgroundColor: Colors.primaryLight,
-  },
-  timelineItemLeft: {
+  cardHeaderCopy: {
     flex: 1,
-    paddingRight: 12,
   },
-  timelineItemName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.textPrimary,
+  cardMedName: {
+    fontSize: 21,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.3,
   },
-  timelineItemNameActive: {
-    color: Colors.primaryDark,
-  },
-  timelineItemSub: {
-    fontSize: 13,
-    color: Colors.textSecondary,
+  cardDoseSubtitle: {
+    fontSize: 13.5,
+    color: '#64748B',
     marginTop: 2,
+    fontWeight: '500',
+  },
+  dueBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  dueBadgeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+  },
+  dueBadgeText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#059669',
+  },
+
+  // Specs Grid (Clean 2-column card badges)
+  specsGrid: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+  },
+  specBox: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  specBoxTextCol: {
+    flex: 1,
+  },
+  specBoxLabel: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: '#94A3B8',
+    letterSpacing: 0.5,
+  },
+  specBoxValue: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginTop: 1,
+  },
+
+  // Prescription strip
+  scheduleStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 12,
+    paddingHorizontal: 2,
+  },
+  scheduleStripText: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
+    flex: 1,
+  },
+
+  // Reassurance Bar
+  insightBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginTop: 12,
+  },
+  insightBarText: {
+    fontSize: 12,
+    color: '#1E40AF',
+    flex: 1,
+    lineHeight: 16,
+    fontWeight: '500',
   },
 
   // ---------------------------------------------------------------------------
-  // Action Buttons
+  // Action Buttons Section
   // ---------------------------------------------------------------------------
-  actionsContainer: {
-    marginBottom: Spacing.lg,
+  actionsSection: {
     gap: 10,
+    marginVertical: 4,
   },
-  primaryActionButton: {
+  heroTakenButton: {
     width: '100%',
-    height: 50,
-    borderRadius: Radius.pill,
-    backgroundColor: Colors.primary,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#0788F5',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    ...Shadows.card,
+    shadowColor: '#0788F5',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 6,
   },
-  primaryActionButtonText: {
+  heroCheckIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  heroTakenButtonText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#FFFFFF',
+    letterSpacing: 0.2,
   },
   secondaryActionsRow: {
     flexDirection: 'row',
@@ -1142,40 +1198,47 @@ const styles = StyleSheet.create({
   snoozeButton: {
     flex: 1,
     height: 48,
-    borderRadius: Radius.pill,
-    backgroundColor: Colors.cardBackground,
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#E2E8F0',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
   },
   snoozeButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.textPrimary,
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#334155',
   },
   skipButton: {
     flex: 1,
     height: 48,
-    borderRadius: Radius.pill,
-    backgroundColor: Colors.errorLight,
+    borderRadius: 24,
+    backgroundColor: '#FFF1F2',
     borderWidth: 1,
-    borderColor: '#FCD7DA',
+    borderColor: '#FFE4E6',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
   },
   skipButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.error,
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#E11D48',
   },
   takeAllButton: {
     width: '100%',
-    height: 46,
-    borderRadius: Radius.pill,
-    backgroundColor: Colors.primaryLight,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#EFF6FF',
     borderWidth: 1,
     borderColor: '#BAE6FD',
     flexDirection: 'row',
@@ -1183,45 +1246,81 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   takeAllButtonText: {
-    fontSize: 13.5,
+    fontSize: 12.5,
     fontWeight: '600',
-    color: Colors.primaryDark,
+    color: '#0788F5',
   },
 
   // ---------------------------------------------------------------------------
-  // Next Up Card
+  // Bottom Next Up Preview Card
   // ---------------------------------------------------------------------------
   nextCard: {
-    backgroundColor: Colors.cardBackground,
-    borderRadius: 20,
-    padding: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#E2E8F0',
     flexDirection: 'row',
     alignItems: 'center',
-    ...Shadows.card,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
   },
   nextIconBox: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: Colors.iconContainer,
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#EFF6FF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   nextInfo: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: 10,
   },
   nextMedName: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: '#1E293B',
   },
   nextDetails: {
-    fontSize: 12.5,
-    color: Colors.textSecondary,
-    marginTop: 2,
+    fontSize: 11.5,
+    color: '#64748B',
+    marginTop: 1,
+  },
+
+  // ---------------------------------------------------------------------------
+  // Simultaneous Doses Tabs
+  // ---------------------------------------------------------------------------
+  simultaneousSection: {
+    marginVertical: 4,
+  },
+  simultaneousPillRow: {
+    gap: 8,
+    paddingVertical: 2,
+  },
+  simultaneousPill: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  simultaneousPillActive: {
+    backgroundColor: Colors.primaryLight,
+    borderColor: Colors.primary,
+  },
+  simultaneousPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  simultaneousPillTextActive: {
+    color: Colors.primaryDark,
   },
 
   // ---------------------------------------------------------------------------
@@ -1235,13 +1334,13 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryLight,
     borderRadius: 12,
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: Spacing.md,
+    paddingVertical: 8,
+    marginVertical: 2,
   },
   toastText: {
     flex: 1,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 12.5,
+    lineHeight: 16,
     fontWeight: '600',
     color: Colors.primaryDark,
   },
@@ -1253,14 +1352,14 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.successLight,
     borderRadius: 12,
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: Spacing.md,
+    paddingVertical: 8,
+    marginVertical: 2,
   },
   completedText: {
     flex: 1,
     color: Colors.successDark,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 12.5,
+    lineHeight: 16,
     fontWeight: '700',
   },
   errorBanner: {
@@ -1271,14 +1370,14 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.errorLight,
     borderRadius: 12,
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: Spacing.md,
+    paddingVertical: 8,
+    marginVertical: 2,
   },
   errorText: {
     flex: 1,
     color: Colors.errorDark,
-    fontSize: 12.5,
-    lineHeight: 17,
+    fontSize: 12,
+    lineHeight: 16,
     fontWeight: '600',
   },
 });

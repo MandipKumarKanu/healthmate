@@ -14,9 +14,9 @@ export default function IndexScreen() {
     router.replace({
       pathname: '/alarm',
       params: {
-        medicineName: 'Amoxicillin',
-        amount: '500 mg · 1 Capsule',
-        time: '08:00 AM',
+        medicineName: 'Metformin',
+        amount: '500 mg · 1 tablet',
+        time: '08:00',
         label: 'Morning Dose',
       },
     });
