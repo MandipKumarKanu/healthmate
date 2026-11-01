@@ -18,6 +18,7 @@ import { useKeyboardAwareScroll } from '../../hooks/useKeyboardAwareScroll';
 interface AppScreenProps {
   children: React.ReactNode;
   scrollable?: boolean;
+  scrollEnabled?: boolean;
   style?: StyleProp<ViewStyle>;
   contentContainerStyle?: StyleProp<ViewStyle>;
   extraScrollHeight?: number;
@@ -28,6 +29,7 @@ interface AppScreenProps {
 export function AppScreen({
   children,
   scrollable = false,
+  scrollEnabled = true,
   style,
   contentContainerStyle,
   extraScrollHeight = 80,
@@ -96,6 +98,7 @@ export function AppScreen({
         >
           <ScrollView
             ref={scrollViewRef}
+            scrollEnabled={scrollEnabled}
             style={styles.scroll}
             contentContainerStyle={[styles.contentContainer, contentContainerStyle]}
             showsVerticalScrollIndicator={false}

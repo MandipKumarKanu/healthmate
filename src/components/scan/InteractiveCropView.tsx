@@ -19,6 +19,8 @@ interface InteractiveCropViewProps {
   sideLabel?: string;
   onDone: (options: { crop?: CropBounds; rotation: number; enhance: boolean }) => void;
   onRetake: () => void;
+  onInteractionStart?: () => void;
+  onInteractionEnd?: () => void;
 }
 
 const CORNER_HANDLE_SIZE = 28;
@@ -29,6 +31,8 @@ export function InteractiveCropView({
   sideLabel = 'Front Side',
   onDone,
   onRetake,
+  onInteractionStart,
+  onInteractionEnd,
 }: InteractiveCropViewProps) {
   const [naturalDimensions, setNaturalDimensions] = useState<{ width: number; height: number }>({
     width: 0,
@@ -117,12 +121,38 @@ export function InteractiveCropView({
   // Gestures via native Responder system
   const dragStartPos = useRef({ pageX: 0, pageY: 0 });
   const startBoxRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
+  const isInteractingRef = useRef(false);
+
+  const startInteracting = useCallback(() => {
+    if (!isInteractingRef.current) {
+      isInteractingRef.current = true;
+      onInteractionStart?.();
+    }
+  }, [onInteractionStart]);
+
+  const endInteracting = useCallback(() => {
+    if (isInteractingRef.current) {
+      isInteractingRef.current = false;
+      onInteractionEnd?.();
+    }
+  }, [onInteractionEnd]);
+
+  useEffect(() => {
+    return () => {
+      endInteracting();
+    };
+  }, [endInteracting]);
 
   const clamp = (val: number, min: number, max: number) => Math.max(min, Math.min(val, max));
 
   const handleGrant = (evt: GestureResponderEvent) => {
+    startInteracting();
     dragStartPos.current = { pageX: evt.nativeEvent.pageX, pageY: evt.nativeEvent.pageY };
     startBoxRef.current = { ...cropBox };
+  };
+
+  const handleRelease = () => {
+    endInteracting();
   };
 
   const handleMove = (
@@ -188,6 +218,7 @@ export function InteractiveCropView({
   };
 
   const handleApplyDone = () => {
+    endInteracting();
     if (imageDisplayRect.scale <= 0) {
       onDone({ rotation, enhance });
       return;
@@ -218,6 +249,11 @@ export function InteractiveCropView({
     });
   };
 
+  const handleRetakePress = () => {
+    endInteracting();
+    onRetake();
+  };
+
   return (
     <View style={styles.container}>
       {/* Top Banner with side indicator and instructions */}
@@ -233,6 +269,9 @@ export function InteractiveCropView({
       {/* Main Image Viewport with Scrim & Crop Box */}
       <View
         style={styles.viewport}
+        onTouchStart={startInteracting}
+        onTouchEnd={endInteracting}
+        onTouchCancel={endInteracting}
         onLayout={(evt: LayoutChangeEvent) => {
           const { width, height } = evt.nativeEvent.layout;
           setContainerLayout({ width, height });
@@ -327,6 +366,8 @@ export function InteractiveCropView({
                 onResponderTerminationRequest={() => false}
                 onResponderGrant={handleGrant}
                 onResponderMove={(e) => handleMove('body', e)}
+                onResponderRelease={handleRelease}
+                onResponderTerminate={handleRelease}
               >
                 <View style={[styles.gridLineH, { top: '33.3%' }]} pointerEvents="none" />
                 <View style={[styles.gridLineH, { top: '66.6%' }]} pointerEvents="none" />
@@ -351,6 +392,8 @@ export function InteractiveCropView({
                 onResponderTerminationRequest={() => false}
                 onResponderGrant={handleGrant}
                 onResponderMove={(e) => handleMove('tl', e)}
+                onResponderRelease={handleRelease}
+                onResponderTerminate={handleRelease}
               >
                 <View style={styles.handleDot} />
               </View>
@@ -364,6 +407,8 @@ export function InteractiveCropView({
                 onResponderTerminationRequest={() => false}
                 onResponderGrant={handleGrant}
                 onResponderMove={(e) => handleMove('tr', e)}
+                onResponderRelease={handleRelease}
+                onResponderTerminate={handleRelease}
               >
                 <View style={styles.handleDot} />
               </View>
@@ -377,6 +422,8 @@ export function InteractiveCropView({
                 onResponderTerminationRequest={() => false}
                 onResponderGrant={handleGrant}
                 onResponderMove={(e) => handleMove('bl', e)}
+                onResponderRelease={handleRelease}
+                onResponderTerminate={handleRelease}
               >
                 <View style={styles.handleDot} />
               </View>
@@ -390,6 +437,8 @@ export function InteractiveCropView({
                 onResponderTerminationRequest={() => false}
                 onResponderGrant={handleGrant}
                 onResponderMove={(e) => handleMove('br', e)}
+                onResponderRelease={handleRelease}
+                onResponderTerminate={handleRelease}
               >
                 <View style={styles.handleDot} />
               </View>
@@ -441,7 +490,7 @@ export function InteractiveCropView({
 
       {/* Action Footer: Retake & Done */}
       <View style={styles.footerRow}>
-        <TouchableOpacity style={styles.retakeButton} onPress={onRetake} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.retakeButton} onPress={handleRetakePress} activeOpacity={0.8}>
           <Feather name="arrow-left" size={16} color={Colors.textPrimary} />
           <Text style={styles.retakeButtonText}>Retake</Text>
         </TouchableOpacity>

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   StyleSheet,
   View,
@@ -70,6 +70,14 @@ export default function ScanScreen() {
   const [backOriginalUri, setBackOriginalUri] = useState<string | null>(null);
   const [backCroppedUri, setBackCroppedUri] = useState<string | null>(null);
   const [savedScanImageUri, setSavedScanImageUri] = useState<string | null>(null);
+  const [isCropDragging, setIsCropDragging] = useState(false);
+
+  // Safety: reset crop dragging state if flow step navigates away
+  useEffect(() => {
+    if (currentStep !== 'crop') {
+      setIsCropDragging(false);
+    }
+  }, [currentStep]);
 
   // Analysis progress
   const [currentStage, setCurrentStage] = useState<ScanStage>('idle');
@@ -456,7 +464,8 @@ export default function ScanScreen() {
 
   return (
     <AppScreen
-      scrollable={currentStep !== 'crop'}
+      scrollable={true}
+      scrollEnabled={!isCropDragging}
       contentContainerStyle={[styles.scrollContent, isGating && styles.gatingScrollContent]}
     >
       {/* Header */}
@@ -714,6 +723,8 @@ export default function ScanScreen() {
             sideLabel={targetSide === 'front' ? 'Front Side' : 'Back Side'}
             onDone={handleCropDone}
             onRetake={handleCropRetake}
+            onInteractionStart={() => setIsCropDragging(true)}
+            onInteractionEnd={() => setIsCropDragging(false)}
           />
         )}
 
