@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Keyboard,
   Platform,
+  Animated,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -57,6 +58,35 @@ const OFFLINE_MEDICINE_ANSWERS: Readonly<Record<string, string>> = {
     "I can't tell you why this exact medicine was chosen for a specific person — that decision comes from your doctor, your symptoms, and your prescription. In general terms: '${medicineName}' is ${dosageFormLabel} with the active ingredient ${activeIngredientLabel}. Doctors prescribe medicines like this for particular conditions and doses, and only the prescription label and your prescriber can say why it's right for you. If you're unsure what it's for, ask your pharmacist or prescriber.",
 };
 
+function BlinkingCursor() {
+  const opacity = useMemo(() => new Animated.Value(1), []);
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 0.15,
+          duration: 380,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 380,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [opacity]);
+
+  return (
+    <Animated.Text style={[styles.streamingCursor, { opacity }]}>
+      ▊
+    </Animated.Text>
+  );
+}
+
 export default function AIAssistantScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -74,6 +104,19 @@ export default function AIAssistantScreen() {
   const lastAutoQueryRef = useRef<string | null>(null);
   const scrollTargetAssistantIdRef = useRef<string | null>(null);
   const hasInitializedScrollRef = useRef<boolean>(false);
+
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
+  const [streamingText, setStreamingText] = useState<string>('');
+  const streamingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopStreaming = useCallback(() => {
+    if (streamingTimerRef.current) {
+      clearInterval(streamingTimerRef.current);
+      streamingTimerRef.current = null;
+    }
+    setStreamingMessageId(null);
+    setStreamingText('');
+  }, []);
 
   const checkConnectivityAndKey = useCallback(async () => {
     const [online, key] = await Promise.all([
@@ -198,6 +241,7 @@ export default function AIAssistantScreen() {
         setConversationId(created.id);
       }
 
+      stopStreaming();
       const userMsg: AIMessage = {
         id: `msg_${Date.now()}`,
         role: 'user',
@@ -247,8 +291,9 @@ export default function AIAssistantScreen() {
         reply = generateOfflineReply(text);
       }
 
+      const assistantMsgId = `msg_${Date.now() + 1}`;
       const assistantMsg: AIMessage = {
-        id: `msg_${Date.now() + 1}`,
+        id: assistantMsgId,
         role: 'assistant',
         content: reply,
         timestamp: new Date().toISOString(),
@@ -263,8 +308,31 @@ export default function AIAssistantScreen() {
       }
       setMessages((prev) => [...prev, assistantMsg]);
       setIsTyping(false);
+
+      // Start ChatGPT-style typewriter streaming illusion
+      stopStreaming();
+      setStreamingMessageId(assistantMsgId);
+      setStreamingText('');
+
+      let charIndex = 0;
+      const totalChars = reply.length;
+      const chunkSize = Math.max(3, Math.ceil(totalChars / 100));
+
+      streamingTimerRef.current = setInterval(() => {
+        charIndex += chunkSize;
+        if (charIndex >= totalChars) {
+          if (streamingTimerRef.current) {
+            clearInterval(streamingTimerRef.current);
+            streamingTimerRef.current = null;
+          }
+          setStreamingMessageId(null);
+          setStreamingText('');
+        } else {
+          setStreamingText(reply.slice(0, charIndex));
+        }
+      }, 16);
     },
-    [conversationId, messages, generateOfflineReply, offlinePrefixForError],
+    [conversationId, messages, generateOfflineReply, offlinePrefixForError, stopStreaming],
   );
 
   useEffect(() => {
@@ -282,10 +350,12 @@ export default function AIAssistantScreen() {
   useEffect(() => {
     return () => {
       lastAutoQueryRef.current = null;
+      stopStreaming();
     };
-  }, []);
+  }, [stopStreaming]);
 
   const handleNewChat = () => {
+    stopStreaming();
     const newConv = aiRepository.createConversation('Medication Q&A');
     setConversationId(newConv.id);
     setMessages([]);
@@ -411,6 +481,9 @@ export default function AIAssistantScreen() {
             <View style={styles.messagesList}>
               {messages.map((m) => {
                 const isUser = m.role === 'user';
+                const isStreaming = m.id === streamingMessageId;
+                const displayContent = isStreaming ? streamingText : m.content;
+
                 return (
                   <View
                     key={m.id}
@@ -434,7 +507,14 @@ export default function AIAssistantScreen() {
                     {isUser ? (
                       <Text style={[styles.messageText, styles.userText]}>{m.content}</Text>
                     ) : (
-                      <FormattedAIMessage content={m.content} />
+                      <View>
+                        <FormattedAIMessage content={displayContent} />
+                        {isStreaming && (
+                          <View style={styles.cursorWrapper}>
+                            <BlinkingCursor />
+                          </View>
+                        )}
+                      </View>
                     )}
                   </View>
                 );
@@ -683,5 +763,15 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     opacity: 0.4,
+  },
+  cursorWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  streamingCursor: {
+    fontSize: 15,
+    color: Colors.primary,
+    fontWeight: '700',
   },
 });
