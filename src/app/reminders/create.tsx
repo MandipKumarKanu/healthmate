@@ -111,28 +111,62 @@ export default function SetReminderScreen() {
   const { saveSchedule } = useReminderStore();
   const selectedDate = useAppStore((state) => state.selectedDate);
 
+  const initialSchedule = useMemo(() => {
+    if (!routeScheduleId) return null;
+    return scheduleRepository.getById(routeScheduleId);
+  }, [routeScheduleId]);
+
   const [medicines, setMedicines] = useState<Medicine[]>([]);
-  const [selectedMed, setSelectedMed] = useState<Medicine | null>(null);
+  const [selectedMed, setSelectedMed] = useState<Medicine | null>(() => {
+    const medId = medicineId || initialSchedule?.medicineId;
+    if (medId) {
+      return medicineRepository.getById(medId) || null;
+    }
+    return null;
+  });
   const [isMedModalVisible, setIsMedModalVisible] = useState(false);
   const [modalSearch, setModalSearch] = useState('');
-  const [recurrence, setRecurrence] = useState<RecurrenceType>('daily');
-  const [startDate, setStartDate] = useState<string>(
-    date && /^\d{4}-\d{2}-\d{2}$/.test(date) && date >= getTodayDateString()
-      ? date
-      : getTodayDateString(),
+  const [recurrence, setRecurrence] = useState<RecurrenceType>(
+    () => initialSchedule?.recurrence || 'daily',
   );
-  const [endDate, setEndDate] = useState<string | undefined>(undefined);
-  const [daysOfWeek, setDaysOfWeek] = useState<number[] | undefined>(undefined);
+  const [startDate, setStartDate] = useState<string>(() => {
+    if (initialSchedule?.startDate) return initialSchedule.startDate;
+    return date && /^\d{4}-\d{2}-\d{2}$/.test(date) && date >= getTodayDateString()
+      ? date
+      : getTodayDateString();
+  });
+  const [endDate, setEndDate] = useState<string | undefined>(() => initialSchedule?.endDate);
+  const [daysOfWeek, setDaysOfWeek] = useState<number[] | undefined>(
+    () => initialSchedule?.daysOfWeek,
+  );
   const [isScheduleModalVisible, setIsScheduleModalVisible] = useState(false);
-  const [times, setTimes] = useState<ReminderTime[]>([
-    { id: 't_1', time: '08:00', amount: '1 tablet', label: 'Morning' },
-  ]);
+  const [times, setTimes] = useState<ReminderTime[]>(() => {
+    if (initialSchedule && initialSchedule.times.length > 0) {
+      return initialSchedule.times.map((t) => ({
+        ...t,
+        label: t.label || getTimeLabel(t.time),
+      }));
+    }
+    return [{ id: 't_1', time: '08:00', amount: '1 tablet', label: 'Morning' }];
+  });
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [amount, setAmount] = useState('1 tablet');
+  const [amount, setAmount] = useState<string>(() => {
+    if (
+      initialSchedule?.times &&
+      initialSchedule.times.length > 0 &&
+      initialSchedule.times[0].amount
+    ) {
+      return initialSchedule.times[0].amount;
+    }
+    return '1 tablet';
+  });
   const [amountError, setAmountError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [editingScheduleId, setEditingScheduleId] = useState<string | undefined>(routeScheduleId);
-  const userHasCustomizedTimesRef = useRef(false);
+  const [editingScheduleId, setEditingScheduleId] = useState<string | undefined>(
+    () => initialSchedule?.id || routeScheduleId,
+  );
+  const userHasCustomizedTimesRef = useRef(Boolean(initialSchedule));
+  const lastLoadedScheduleIdRef = useRef<string | undefined>(initialSchedule?.id);
 
   const selectedMedId = selectedMed?.id;
 
@@ -230,10 +264,11 @@ export default function SetReminderScreen() {
   useFocusEffect(
     useCallback(() => {
       const list = loadMedicines();
-      if (medicineId) {
+      const targetMedId = medicineId || initialSchedule?.medicineId;
+      if (targetMedId) {
         setSelectedMed((current) => {
-          if (current?.id === medicineId) return current;
-          const match = list.find((m) => m.id === medicineId);
+          if (current?.id === targetMedId) return current;
+          const match = list.find((m) => m.id === targetMedId);
           return match || current;
         });
       } else {
@@ -242,11 +277,12 @@ export default function SetReminderScreen() {
           return list.length > 0 ? list[0] : null;
         });
       }
-    }, [loadMedicines, medicineId]),
+    }, [loadMedicines, medicineId, initialSchedule?.medicineId]),
   );
 
   useEffect(() => {
-    if (routeScheduleId && editingScheduleId !== routeScheduleId) {
+    if (routeScheduleId && lastLoadedScheduleIdRef.current !== routeScheduleId) {
+      lastLoadedScheduleIdRef.current = routeScheduleId;
       const existingSched = scheduleRepository.getById(routeScheduleId);
       if (existingSched) {
         setEditingScheduleId(existingSched.id);
@@ -270,9 +306,10 @@ export default function SetReminderScreen() {
             setSelectedMed((curr) => (curr?.id === med.id ? curr : med));
           }
         }
+        userHasCustomizedTimesRef.current = true;
       }
     }
-  }, [routeScheduleId, editingScheduleId]);
+  }, [routeScheduleId]);
 
   const getNextSuggestedTime = (): string => {
     const commonPresets = ['08:00', '14:00', '18:00', '22:00'];
@@ -581,8 +618,12 @@ export default function SetReminderScreen() {
       Alert.alert(
         'Success',
         canNotify
-          ? 'Medication schedule saved and alarm reminders scheduled.'
-          : 'Medication schedule saved. Alarm reminders are OFF until you grant notification and exact-alarm access.',
+          ? editingScheduleId
+            ? 'Medication schedule updated and alarm reminders rescheduled.'
+            : 'Medication schedule saved and alarm reminders scheduled.'
+          : editingScheduleId
+            ? 'Medication schedule updated. Alarm reminders are OFF until you grant notification and exact-alarm access.'
+            : 'Medication schedule saved. Alarm reminders are OFF until you grant notification and exact-alarm access.',
         [{ text: 'OK', onPress: () => router.back() }],
       );
     } catch (error) {
@@ -613,8 +654,12 @@ export default function SetReminderScreen() {
   return (
     <AppScreen scrollable contentContainerStyle={styles.scrollContent}>
       <AppHeader
-        title="Set Reminder"
-        subtitle="Configure your medication schedule"
+        title={editingScheduleId ? 'Edit Reminder' : 'Set Reminder'}
+        subtitle={
+          editingScheduleId
+            ? 'Update your medication schedule and dose times'
+            : 'Configure your medication schedule'
+        }
         brandText="HealthMate AI"
         onBackPress={() => router.back()}
       />
@@ -900,7 +945,15 @@ export default function SetReminderScreen() {
         {/* Save Button */}
         <View style={styles.saveContainer}>
           <AppButton
-            title={isSaving ? 'Saving schedule…' : 'Save Medication Schedule'}
+            title={
+              isSaving
+                ? editingScheduleId
+                  ? 'Updating schedule…'
+                  : 'Saving schedule…'
+                : editingScheduleId
+                  ? 'Update Medication Schedule'
+                  : 'Save Medication Schedule'
+            }
             onPress={handleSave}
             variant="primary"
             size="lg"
