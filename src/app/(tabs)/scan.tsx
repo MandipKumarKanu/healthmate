@@ -69,6 +69,7 @@ export default function ScanScreen() {
   const [frontCroppedUri, setFrontCroppedUri] = useState<string | null>(null);
   const [backOriginalUri, setBackOriginalUri] = useState<string | null>(null);
   const [backCroppedUri, setBackCroppedUri] = useState<string | null>(null);
+  const [savedScanImageUri, setSavedScanImageUri] = useState<string | null>(null);
 
   // Analysis progress
   const [currentStage, setCurrentStage] = useState<ScanStage>('idle');
@@ -316,6 +317,9 @@ export default function ScanScreen() {
         let stableImageUri: string | undefined;
         try {
           stableImageUri = await saveScanImage(frontCroppedUri);
+          if (stableImageUri) {
+            setSavedScanImageUri(stableImageUri);
+          }
         } catch (copyErr) {
           console.warn('saveScanImage copy failed:', copyErr);
         }
@@ -367,6 +371,7 @@ export default function ScanScreen() {
     setFrontCroppedUri(null);
     setBackOriginalUri(null);
     setBackCroppedUri(null);
+    setSavedScanImageUri(null);
     setExtractedData(null);
     setAnalysisError(null);
     setCurrentStage('idle');
@@ -401,8 +406,14 @@ export default function ScanScreen() {
       return;
     }
 
-    // The analysis step already owns a durable history copy. Do not create a
-    // second unreferenced file when saving the medicine to the cabinet.
+    let finalImageUri: string | null | undefined = savedScanImageUri;
+    if (!finalImageUri && frontCroppedUri) {
+      try {
+        finalImageUri = await saveScanImage(frontCroppedUri);
+      } catch (copyErr) {
+        console.warn('saveScanImage copy failed in handleSaveToCabinet:', copyErr);
+      }
+    }
 
     const newMed = addMedicine({
       id: `med_${Date.now()}`,
@@ -415,7 +426,8 @@ export default function ScanScreen() {
         manufacturer: medMfg || undefined,
         expiryDate: medExpiry || undefined,
         batchNumber: medBatch || undefined,
-        packageDetailsText: 'Captured via CamScanner medicine packaging flow',
+        packageDetailsText: finalImageUri || undefined,
+        imageUri: finalImageUri || undefined,
         originalPackageChecked: false,
       },
       informationSource: 'Extracted from medication packaging scan.',

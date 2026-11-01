@@ -36,6 +36,7 @@ export interface MedicinePackageDetails {
   expiryDate?: string;
   batchNumber?: string;
   packageDetailsText?: string;
+  imageUri?: string;
   originalPackageChecked?: boolean;
 }
 

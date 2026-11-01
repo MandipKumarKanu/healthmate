@@ -34,6 +34,14 @@ function mapRowToMedicine(row: MedicineRow): Medicine {
       expiryDate: row.expiry_date ?? undefined,
       batchNumber: row.batch_number ?? undefined,
       packageDetailsText: row.package_details_text ?? undefined,
+      imageUri:
+        row.package_details_text?.startsWith('file:') ||
+        row.package_details_text?.startsWith('content:') ||
+        row.package_details_text?.startsWith('http') ||
+        row.package_details_text?.startsWith('data:image') ||
+        row.package_details_text?.startsWith('/')
+          ? row.package_details_text
+          : undefined,
     },
     informationSource: row.information_source ?? undefined,
     createdAt: row.created_at,
@@ -131,7 +139,8 @@ export const medicineRepository = {
         newMedicine.packageDetails.manufacturer ?? null,
         newMedicine.packageDetails.expiryDate ?? null,
         newMedicine.packageDetails.batchNumber ?? null,
-        newMedicine.packageDetails.packageDetailsText ?? null,
+        (newMedicine.packageDetails.imageUri ||
+          newMedicine.packageDetails.packageDetailsText) ?? null,
         newMedicine.informationSource ?? null,
         newMedicine.createdAt,
         newMedicine.updatedAt,
@@ -176,7 +185,8 @@ export const medicineRepository = {
         updated.packageDetails.manufacturer ?? null,
         updated.packageDetails.expiryDate ?? null,
         updated.packageDetails.batchNumber ?? null,
-        updated.packageDetails.packageDetailsText ?? null,
+        (updated.packageDetails.imageUri ||
+          updated.packageDetails.packageDetailsText) ?? null,
         updated.informationSource ?? null,
         updated.updatedAt,
         updated.currentInventory ?? null,

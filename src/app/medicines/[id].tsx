@@ -1,5 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
+import {
+  StyleSheet,
+  View,
+  Text,
+  TouchableOpacity,
+  ActivityIndicator,
+  Switch,
+  Image,
+  Modal,
+} from 'react-native';
 import { AppAlert as Alert } from '../../services/appAlert';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -20,6 +29,7 @@ import { scheduleRepository } from '../../database/repositories/scheduleReposito
 import { profileRepository } from '../../database/repositories/profileRepository';
 import { isLowStock } from '../../services/refillService';
 import { useMedicineStore } from '../../store/medicineStore';
+import { useReminderStore } from '../../store/reminderStore';
 import { aiAssistantService, MedicineEducationalInfo } from '../../services/aiAssistantService';
 import { networkService } from '../../services/networkService';
 import { ConnectGeminiModal } from '../../components/ai/ConnectGeminiModal';
@@ -31,9 +41,15 @@ export default function MedicineDetailsScreen() {
 
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [scheduleToDelete, setScheduleToDelete] = useState<{ id: string; time: string } | null>(
+    null,
+  );
+  const [showFullImage, setShowFullImage] = useState(false);
   const [eduInfo, setEduInfo] = useState<MedicineEducationalInfo | null>(null);
   const [isLoadingEdu, setIsLoadingEdu] = useState(false);
   const [showConnectModal, setShowConnectModal] = useState(false);
+
+  const { toggleScheduleEnabled, deleteSchedule: deleteScheduleFromStore } = useReminderStore();
 
   const storeMedicine = useMedicineStore((s) => s.medicines.find((m) => m.id === id));
   const medicine = storeMedicine || medicineRepository.getById(id || '');
@@ -179,28 +195,76 @@ export default function MedicineDetailsScreen() {
     }
   };
 
-  const formatSingleScheduleTitle = (s: ReminderSchedule): string => {
-    const timesStr = s.times.map((t) => formatTime12Hour(t.time)).join(', ');
-    let recurrenceStr = '';
-    if (s.recurrence === 'daily') {
-      recurrenceStr = 'Every Day';
-    } else if (s.recurrence === 'weekly') {
-      recurrenceStr = 'Every Week';
-    } else if (s.recurrence === 'monthly') {
-      recurrenceStr = 'Every Month';
-    } else if (s.recurrence === 'custom') {
+  const handleToggleSchedule = async (scheduleId: string, enabled: boolean) => {
+    setSchedules((prev) =>
+      prev.map((s) => (s.id === scheduleId ? { ...s, enabled } : s)),
+    );
+    try {
+      await toggleScheduleEnabled(scheduleId, enabled);
+      if (medicine?.id) {
+        setSchedules(scheduleRepository.getAllByMedicineId(medicine.id));
+      }
+    } catch (err) {
+      console.warn('Failed to toggle schedule:', err);
+      if (medicine?.id) {
+        setSchedules(scheduleRepository.getAllByMedicineId(medicine.id));
+      }
+    }
+  };
+
+  const handleConfirmDeleteSchedule = async () => {
+    if (!scheduleToDelete) return;
+    const scheduleId = scheduleToDelete.id;
+    try {
+      await deleteScheduleFromStore(scheduleId);
+      setSchedules((prev) => prev.filter((s) => s.id !== scheduleId));
+      setScheduleToDelete(null);
+    } catch (err) {
+      console.warn('Failed to delete schedule:', err);
+      Alert.alert('Error', 'Could not delete reminder schedule. Please try again.');
+    }
+  };
+
+  const formatScheduleTimes = (times: ReminderSchedule['times']): string => {
+    if (!times || times.length === 0) return 'Time not set';
+    return times.map((t) => formatTime12Hour(t.time)).join(', ');
+  };
+
+  const formatRecurrenceText = (s: ReminderSchedule): string => {
+    if (s.recurrence === 'daily') return 'Every Day';
+    if (s.recurrence === 'weekly') return 'Every Week';
+    if (s.recurrence === 'monthly') return 'Every Month';
+    if (s.recurrence === 'custom') {
       const days =
         s.daysOfWeek && s.daysOfWeek.length > 0
           ? s.daysOfWeek.map((d) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d]).join(', ')
           : 'Custom';
-      recurrenceStr = `Custom (${days})`;
-    } else if (s.recurrence === 'once') {
-      recurrenceStr = 'Once';
-    } else {
-      recurrenceStr = String(s.recurrence);
+      return `Custom (${days})`;
     }
-    return `${timesStr} · ${recurrenceStr}`;
+    if (s.recurrence === 'once') return 'Once';
+    return String(s.recurrence);
   };
+
+  const isImageUri = (uri?: string): boolean =>
+    Boolean(
+      uri &&
+        (uri.startsWith('file:') ||
+          uri.startsWith('content:') ||
+          uri.startsWith('http') ||
+          uri.startsWith('data:image') ||
+          uri.startsWith('/')),
+    );
+
+  const rawPkgText = medicine?.packageDetails?.packageDetailsText;
+  const packageImageUri =
+    medicine?.packageDetails?.imageUri || (isImageUri(rawPkgText) ? rawPkgText : null);
+
+  const hasPackageDetails = Boolean(
+    medicine?.packageDetails?.manufacturer ||
+      medicine?.packageDetails?.expiryDate ||
+      medicine?.packageDetails?.batchNumber ||
+      packageImageUri,
+  );
 
   return (
     <AppScreen scrollable contentContainerStyle={styles.scrollContent}>
@@ -707,100 +771,246 @@ export default function MedicineDetailsScreen() {
             </>
           ) : (
             <View style={styles.scheduleListContainer}>
-              {schedules.map((s, idx) => (
-                <TouchableOpacity
-                  key={s.id || idx}
-                  style={styles.scheduleDetailRow}
-                  onPress={() =>
-                    router.push(
-                      `/reminders/create?medicineId=${medicine.id}&scheduleId=${s.id}`,
-                    )
-                  }
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.scheduleDetailBadge}>
-                    <Feather
-                      name={s.enabled ? 'bell' : 'bell-off'}
-                      size={15}
-                      color={s.enabled ? Colors.primary : Colors.textSecondary}
-                    />
+              {schedules.map((s, idx) => {
+                const timesFormatted = formatScheduleTimes(s.times);
+                const recurrenceFormatted = formatRecurrenceText(s);
+                const doseAmount = s.times[0]?.amount || '1 dose';
+
+                return (
+                  <View
+                    key={s.id || idx}
+                    style={[styles.scheduleCardItem, !s.enabled && styles.scheduleCardDisabled]}
+                  >
+                    <View style={styles.scheduleItemTopRow}>
+                      <View style={styles.scheduleTimeContainer}>
+                        <View
+                          style={[
+                            styles.scheduleIconBadge,
+                            s.enabled ? styles.scheduleIconActive : styles.scheduleIconDisabled,
+                          ]}
+                        >
+                          <Ionicons
+                            name={s.enabled ? 'alarm' : 'alarm-outline'}
+                            size={18}
+                            color={s.enabled ? Colors.primary : Colors.textTertiary}
+                          />
+                        </View>
+                        <View style={styles.scheduleTimeTextCol}>
+                          <Text
+                            style={[
+                              styles.scheduleTimeText,
+                              !s.enabled && styles.disabledText,
+                            ]}
+                          >
+                            {timesFormatted}
+                          </Text>
+                          <View style={styles.scheduleMetaRow}>
+                            <Text style={styles.scheduleDoseAmount}>
+                              {doseAmount}
+                            </Text>
+                            <Text style={styles.scheduleDot}>·</Text>
+                            <Text
+                              style={styles.scheduleRecurrenceText}
+                              numberOfLines={1}
+                            >
+                              {recurrenceFormatted}
+                            </Text>
+                            <View
+                              style={[
+                                styles.statusBadge,
+                                s.enabled
+                                  ? styles.statusBadgeActive
+                                  : styles.statusBadgeInactive,
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.statusBadgeText,
+                                  s.enabled
+                                    ? styles.statusTextActive
+                                    : styles.statusTextInactive,
+                                ]}
+                              >
+                                {s.enabled ? 'Active' : 'Paused'}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+                      </View>
+                      <Switch
+                        value={s.enabled}
+                        onValueChange={(val) => handleToggleSchedule(s.id, val)}
+                        trackColor={{ false: '#E5E7EB', true: Colors.primary }}
+                        thumbColor="#FFFFFF"
+                      />
+                    </View>
+
+                    <View style={styles.scheduleItemDivider} />
+
+                    <View style={styles.scheduleItemActionsRow}>
+                      <TouchableOpacity
+                        style={styles.scheduleActionButton}
+                        onPress={() =>
+                          router.push(
+                            `/reminders/create?medicineId=${medicine.id}&scheduleId=${s.id}`,
+                          )
+                        }
+                        activeOpacity={0.7}
+                      >
+                        <Feather name="edit-2" size={14} color={Colors.primary} />
+                        <Text style={styles.scheduleActionEditText}>Edit</Text>
+                      </TouchableOpacity>
+
+                      <View style={styles.scheduleActionSep} />
+
+                      <TouchableOpacity
+                        style={styles.scheduleActionButton}
+                        onPress={() =>
+                          setScheduleToDelete({
+                            id: s.id,
+                            time: timesFormatted,
+                          })
+                        }
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="trash-outline" size={15} color={Colors.error} />
+                        <Text style={styles.scheduleActionDeleteText}>Delete</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                  <View style={styles.scheduleDetailInfo}>
-                    <Text style={styles.scheduleDetailTitle}>
-                      {formatSingleScheduleTitle(s)}
-                    </Text>
-                    <Text style={styles.scheduleDetailNote}>
-                      {s.times[0]?.amount
-                        ? `${s.times[0].amount} · ${s.enabled ? 'Active' : 'Disabled'}`
-                        : s.enabled
-                          ? 'Active'
-                          : 'Disabled'}
-                    </Text>
-                  </View>
-                  <Feather name="chevron-right" size={16} color={Colors.textTertiary} />
-                </TouchableOpacity>
-              ))}
+                );
+              })}
 
               <TouchableOpacity
-                style={styles.setReminderButton}
+                style={styles.addAnotherButton}
                 onPress={() => router.push(`/reminders/create?medicineId=${medicine.id}`)}
                 activeOpacity={0.7}
               >
-                <Text style={styles.setReminderButtonText}>+ Add Another Reminder</Text>
+                <Feather name="plus" size={15} color={Colors.primary} />
+                <Text style={styles.addAnotherButtonText}>Add Another Reminder</Text>
               </TouchableOpacity>
             </View>
           )}
         </AppCard>
 
         {/* Section: Package details */}
-        <SectionHeader title="Package details" />
-        <AppCard style={styles.packageDetailsCard}>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Manufacturer</Text>
-            <Text style={styles.infoValue}>
-              {medicine.packageDetails.manufacturer ?? 'Fictional data'}
-            </Text>
-          </View>
+        {hasPackageDetails ? (
+          <>
+            <SectionHeader title="Package details" />
+            <AppCard style={styles.packageDetailsCard}>
+              {medicine.packageDetails.manufacturer ? (
+                <>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Manufacturer</Text>
+                    <Text style={styles.infoValue}>
+                      {medicine.packageDetails.manufacturer}
+                    </Text>
+                  </View>
+                  {(medicine.packageDetails.expiryDate ||
+                    medicine.packageDetails.batchNumber ||
+                    packageImageUri) && <View style={styles.rowDivider} />}
+                </>
+              ) : null}
 
-          <View style={styles.rowDivider} />
+              {medicine.packageDetails.expiryDate ? (
+                <>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Expiry</Text>
+                    <Text style={styles.infoValue}>
+                      {medicine.packageDetails.expiryDate}
+                    </Text>
+                  </View>
+                  {(medicine.packageDetails.batchNumber || packageImageUri) && (
+                    <View style={styles.rowDivider} />
+                  )}
+                </>
+              ) : null}
 
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Expiry</Text>
-            <Text style={styles.infoValue}>{medicine.packageDetails.expiryDate ?? 'N/A'}</Text>
-          </View>
+              {medicine.packageDetails.batchNumber ? (
+                <>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Batch</Text>
+                    <Text style={styles.infoValue}>
+                      {medicine.packageDetails.batchNumber}
+                    </Text>
+                  </View>
+                  {packageImageUri && <View style={styles.rowDivider} />}
+                </>
+              ) : null}
 
-          <View style={styles.rowDivider} />
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Batch</Text>
-            <Text style={styles.infoValue}>
-              {medicine.packageDetails.batchNumber ?? 'DEMO-001'}
-            </Text>
-          </View>
-
-          <View style={styles.rowDivider} />
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Package details</Text>
-            <Text style={styles.infoValue}>
-              {medicine.packageDetails.packageDetailsText ?? 'Example values, not a verified scan'}
-            </Text>
-          </View>
-        </AppCard>
-
-        {/* Section: Information Source */}
-        <SectionHeader title="Information Source" />
-        <AppCard style={styles.sourceCard}>
-          <Text style={styles.sourceTitle}>Example package record entered for this design.</Text>
-          <Text style={styles.sourceBody}>
-            {medicine.informationSource ||
-              'No verified clinical reference is attached. Educational sections are not a substitute for the package leaflet or professional advice.'}
-          </Text>
-        </AppCard>
+              {packageImageUri ? (
+                <View style={styles.packagePhotoSection}>
+                  <View style={styles.packagePhotoHeaderRow}>
+                    <Text style={styles.infoLabel}>Packaging photo</Text>
+                    <TouchableOpacity
+                      onPress={() => setShowFullImage(true)}
+                      style={styles.viewPhotoPill}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="expand-outline" size={13} color={Colors.primary} />
+                      <Text style={styles.viewPhotoPillText}>View Photo</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <TouchableOpacity
+                    activeOpacity={0.88}
+                    onPress={() => setShowFullImage(true)}
+                    style={styles.packagePhotoWrapper}
+                  >
+                    <Image
+                      source={{ uri: packageImageUri }}
+                      style={styles.packagePhotoThumbnail}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.photoOverlayBadge}>
+                      <Ionicons name="search" size={13} color="#FFFFFF" />
+                      <Text style={styles.photoOverlayBadgeText}>Tap to zoom</Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+            </AppCard>
+          </>
+        ) : null}
 
         {/* Medical Disclaimer */}
         <MedicalDisclaimer />
       </View>
+
+      {/* Delete Confirmation Modal for Schedule */}
+      <ConfirmDialog
+        visible={Boolean(scheduleToDelete)}
+        title="Delete Reminder"
+        message={`Are you sure you want to remove the ${scheduleToDelete?.time || ''} reminder for ${medicine.name}?`}
+        confirmText="Delete"
+        destructive
+        onConfirm={handleConfirmDeleteSchedule}
+        onCancel={() => setScheduleToDelete(null)}
+      />
+
+      {/* Full Packaging Image Preview Modal */}
+      <Modal
+        visible={showFullImage}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowFullImage(false)}
+      >
+        <View style={styles.imageModalContainer}>
+          <TouchableOpacity
+            style={styles.imageModalCloseButton}
+            onPress={() => setShowFullImage(false)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="close" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          {packageImageUri ? (
+            <Image
+              source={{ uri: packageImageUri }}
+              style={styles.imageModalFull}
+              resizeMode="contain"
+            />
+          ) : null}
+        </View>
+      </Modal>
 
       {/* Delete Confirmation Modal */}
       <ConfirmDialog
@@ -857,15 +1067,17 @@ const styles = StyleSheet.create({
   },
   heroNameRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
+    gap: 8,
   },
   heroName: {
     fontSize: 22,
     fontWeight: '800',
     color: Colors.textPrimary,
     flex: 1,
-    marginRight: 8,
+    flexShrink: 1,
+    flexWrap: 'wrap',
   },
   editBadgeButton: {
     flexDirection: 'row',
@@ -884,7 +1096,8 @@ const styles = StyleSheet.create({
   heroSub: {
     fontSize: 13,
     color: Colors.textSecondary,
-    marginTop: 2,
+    marginTop: 3,
+    flexWrap: 'wrap',
   },
   exampleTag: {
     backgroundColor: '#FEF6E9',
@@ -934,17 +1147,25 @@ const styles = StyleSheet.create({
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
     paddingVertical: 12,
+    gap: 12,
   },
   infoLabel: {
     fontSize: 14,
     color: Colors.textPrimary,
     fontWeight: '500',
+    flexShrink: 0,
+    maxWidth: '45%',
   },
   infoValue: {
     fontSize: 14,
     color: Colors.textSecondary,
     fontWeight: '400',
+    flex: 1,
+    flexShrink: 1,
+    textAlign: 'right',
+    flexWrap: 'wrap',
   },
   rowDivider: {
     height: 1,
@@ -1063,35 +1284,147 @@ const styles = StyleSheet.create({
   scheduleListContainer: {
     gap: 8,
   },
-  scheduleDetailRow: {
+  scheduleCardItem: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: Radius.card,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    padding: Spacing.md,
+    marginBottom: 4,
+  },
+  scheduleCardDisabled: {
+    backgroundColor: '#FAFAFA',
+    borderColor: '#E5E7EB',
+    opacity: 0.85,
+  },
+  scheduleItemTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
+    justifyContent: 'space-between',
     gap: 10,
   },
-  scheduleDetailBadge: {
-    width: 34,
-    height: 34,
+  scheduleTimeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  scheduleIconBadge: {
+    width: 38,
+    height: 38,
     borderRadius: Radius.md,
-    backgroundColor: Colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  scheduleDetailInfo: {
+  scheduleIconActive: {
+    backgroundColor: Colors.primaryLight,
+  },
+  scheduleIconDisabled: {
+    backgroundColor: '#F3F4F6',
+  },
+  scheduleTimeTextCol: {
     flex: 1,
   },
-  scheduleDetailTitle: {
-    fontSize: 14,
+  scheduleTimeText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+  },
+  disabledText: {
+    color: Colors.textSecondary,
+  },
+  scheduleMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    flexWrap: 'wrap',
+    gap: 5,
+  },
+  scheduleDoseAmount: {
+    fontSize: 12,
     fontWeight: '700',
     color: Colors.textPrimary,
   },
-  scheduleDetailNote: {
+  scheduleDot: {
+    fontSize: 12,
+    color: Colors.textTertiary,
+  },
+  scheduleRecurrenceText: {
     fontSize: 12,
     color: Colors.textSecondary,
-    marginTop: 2,
     fontWeight: '500',
+  },
+  statusBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: Radius.pill,
+    marginLeft: 2,
+  },
+  statusBadgeActive: {
+    backgroundColor: '#ECFDF5',
+  },
+  statusBadgeInactive: {
+    backgroundColor: '#F3F4F6',
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  statusTextActive: {
+    color: '#059669',
+  },
+  statusTextInactive: {
+    color: '#6B7280',
+  },
+  scheduleItemDivider: {
+    height: 1,
+    backgroundColor: Colors.borderLight,
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  scheduleItemActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 14,
+  },
+  scheduleActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: Radius.sm,
+    gap: 5,
+  },
+  scheduleActionEditText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
+  scheduleActionDeleteText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.error,
+  },
+  scheduleActionSep: {
+    width: 1,
+    height: 14,
+    backgroundColor: Colors.borderLight,
+  },
+  addAnotherButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.primaryLight,
+    borderRadius: Radius.pill,
+    paddingVertical: 11,
+    marginTop: 6,
+    gap: 6,
+  },
+  addAnotherButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.primary,
   },
   scheduleTitle: {
     fontSize: 16,
@@ -1119,19 +1452,78 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
     paddingVertical: 6,
   },
-  sourceCard: {
-    marginBottom: Spacing.lg,
+  packagePhotoSection: {
+    paddingTop: 12,
   },
-  sourceTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-    marginBottom: 6,
+  packagePhotoHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
   },
-  sourceBody: {
+  viewPhotoPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: Radius.pill,
+    gap: 4,
+  },
+  viewPhotoPillText: {
     fontSize: 12,
-    lineHeight: 18,
-    color: Colors.textSecondary,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
+  packagePhotoWrapper: {
+    borderRadius: Radius.md,
+    overflow: 'hidden',
+    height: 140,
+    backgroundColor: '#0000000A',
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    position: 'relative',
+  },
+  packagePhotoThumbnail: {
+    width: '100%',
+    height: '100%',
+  },
+  photoOverlayBadge: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: Radius.pill,
+    gap: 4,
+  },
+  photoOverlayBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  imageModalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.md,
+  },
+  imageModalCloseButton: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderRadius: Radius.pill,
+    padding: 8,
+  },
+  imageModalFull: {
+    width: '100%',
+    height: '80%',
   },
   compositionHighlight: {
     color: Colors.primary,
