@@ -132,13 +132,15 @@ export default function SetReminderScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [editingScheduleId, setEditingScheduleId] = useState<string | undefined>(routeScheduleId);
 
+  const selectedMedId = selectedMed?.id;
+
   // Other active schedules for the selected medicine (to prevent duplicate times)
   const otherSchedules = useMemo(() => {
-    if (!selectedMed) return [];
+    if (!selectedMedId) return [];
     return scheduleRepository
-      .getAllByMedicineId(selectedMed.id)
+      .getAllByMedicineId(selectedMedId)
       .filter((s) => s.id !== editingScheduleId && s.enabled);
-  }, [selectedMed, editingScheduleId]);
+  }, [selectedMedId, editingScheduleId]);
 
   const otherScheduledTimes = useMemo(() => {
     const set = new Set<string>();
@@ -148,9 +150,14 @@ export default function SetReminderScreen() {
     return set;
   }, [otherSchedules]);
 
+  const otherTimesKey = useMemo(
+    () => Array.from(otherScheduledTimes).sort().join(','),
+    [otherScheduledTimes],
+  );
+
   // When creating a new reminder, ensure initial dose time doesn't collide with existing times
   useEffect(() => {
-    if (!routeScheduleId && selectedMed) {
+    if (!routeScheduleId && selectedMedId) {
       setTimes((prevTimes) => {
         if (prevTimes.length === 1 && otherScheduledTimes.has(prevTimes[0].time)) {
           const commonPresets = ['08:00', '12:00', '14:00', '18:00', '20:00', '22:00'];
@@ -167,7 +174,7 @@ export default function SetReminderScreen() {
         return prevTimes;
       });
     }
-  }, [selectedMed, routeScheduleId, otherScheduledTimes]);
+  }, [selectedMedId, routeScheduleId, otherTimesKey, otherScheduledTimes]);
 
   // Time picker state and snap wheels for quick, precise minute selection.
   const [pickerTarget, setPickerTarget] = useState<{ id: string | 'new'; date: Date } | null>(null);
@@ -206,16 +213,22 @@ export default function SetReminderScreen() {
     useCallback(() => {
       const list = loadMedicines();
       if (medicineId) {
-        const match = list.find((m) => m.id === medicineId);
-        if (match) setSelectedMed(match);
-      } else if (!selectedMed && list.length > 0) {
-        setSelectedMed(list[0]);
+        setSelectedMed((current) => {
+          if (current?.id === medicineId) return current;
+          const match = list.find((m) => m.id === medicineId);
+          return match || current;
+        });
+      } else {
+        setSelectedMed((current) => {
+          if (current) return current;
+          return list.length > 0 ? list[0] : null;
+        });
       }
-    }, [loadMedicines, medicineId, selectedMed]),
+    }, [loadMedicines, medicineId]),
   );
 
   useEffect(() => {
-    if (routeScheduleId) {
+    if (routeScheduleId && editingScheduleId !== routeScheduleId) {
       const existingSched = scheduleRepository.getById(routeScheduleId);
       if (existingSched) {
         setEditingScheduleId(existingSched.id);
@@ -233,9 +246,15 @@ export default function SetReminderScreen() {
           setAmount(existingSched.times[0].amount);
         }
         setNotificationsEnabled(true);
+        if (existingSched.medicineId) {
+          const med = medicineRepository.getById(existingSched.medicineId);
+          if (med) {
+            setSelectedMed((curr) => (curr?.id === med.id ? curr : med));
+          }
+        }
       }
     }
-  }, [routeScheduleId]);
+  }, [routeScheduleId, editingScheduleId]);
 
   const getNextSuggestedTime = (): string => {
     const commonPresets = ['08:00', '12:00', '14:00', '18:00', '20:00', '22:00'];
