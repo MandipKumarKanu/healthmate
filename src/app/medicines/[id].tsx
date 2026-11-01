@@ -245,39 +245,6 @@ export default function MedicineDetailsScreen() {
     return String(s.recurrence);
   };
 
-  const getTimeIconAndPeriod = (time: string) => {
-    if (time < '11:00') {
-      return {
-        period: 'Morning',
-        icon: 'sunny-outline' as const,
-        color: '#D97706',
-        bg: '#FEF3C7',
-      };
-    }
-    if (time < '17:00') {
-      return {
-        period: 'Afternoon',
-        icon: 'sunny' as const,
-        color: '#B45309',
-        bg: '#FEF9C3',
-      };
-    }
-    if (time < '21:00') {
-      return {
-        period: 'Evening',
-        icon: 'cloudy-night-outline' as const,
-        color: '#4F46E5',
-        bg: '#EEF2FF',
-      };
-    }
-    return {
-      period: 'Night',
-      icon: 'moon-outline' as const,
-      color: '#7C3AED',
-      bg: '#F5F3FF',
-    };
-  };
-
   const isImageUri = (uri?: string): boolean =>
     Boolean(
       uri &&
@@ -785,187 +752,132 @@ export default function MedicineDetailsScreen() {
         <SectionHeader
           title="Your schedule"
           count={schedules.length > 0 ? schedules.length : undefined}
-          actionText={schedules.length === 0 ? '+ Add Reminder' : undefined}
+          actionText={schedules.length > 0 ? '+ Add' : undefined}
           onActionPress={
-            schedules.length === 0
+            schedules.length > 0
               ? () => router.push(`/reminders/create?medicineId=${medicine.id}`)
               : undefined
           }
         />
         {schedules.length === 0 ? (
-          <AppCard style={styles.emptyScheduleCard}>
-            <View style={styles.emptyScheduleIconWrap}>
-              <Ionicons name="notifications-outline" size={26} color={Colors.primary} />
+          <AppCard style={styles.scheduleEmptyCard}>
+            <View style={styles.emptyBellWrap}>
+              <Feather name="bell" size={22} color={Colors.primary} />
             </View>
-            <Text style={styles.emptyScheduleTitle}>No reminder schedule set</Text>
+            <Text style={styles.emptyScheduleTitle}>No reminders scheduled</Text>
             <Text style={styles.emptyScheduleSub}>
               Set up dose alerts so you never miss a dose of {medicine.name}.
             </Text>
-            <TouchableOpacity
-              style={styles.setFirstReminderButton}
+            <AppButton
+              title="Set Reminder"
               onPress={() => router.push(`/reminders/create?medicineId=${medicine.id}`)}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="add-circle-outline" size={17} color="#FFFFFF" />
-              <Text style={styles.setFirstReminderButtonText}>Set Reminder</Text>
-            </TouchableOpacity>
+              size="md"
+              style={{ marginTop: 8 }}
+            />
           </AppCard>
         ) : (
-          <View style={styles.scheduleListWrapper}>
-            {schedules.map((s, idx) => {
-              const recurrenceFormatted = formatRecurrenceText(s);
-
-              return (
-                <View
-                  key={s.id || idx}
-                  style={[styles.scheduleCard, !s.enabled && styles.scheduleCardDisabled]}
-                >
-                  {/* Top Row: Recurrence Badge + Switch */}
-                  <View style={styles.scheduleCardHeader}>
-                    <View style={styles.recurrencePill}>
-                      <Ionicons
-                        name="repeat"
-                        size={13}
-                        color={s.enabled ? Colors.primary : Colors.textTertiary}
-                      />
-                      <Text
-                        style={[
-                          styles.recurrencePillText,
-                          !s.enabled && styles.scheduleTextDisabled,
-                        ]}
-                      >
-                        {recurrenceFormatted}
-                      </Text>
-                    </View>
-
-                    <View style={styles.switchGroup}>
-                      <Text
-                        style={[
-                          styles.switchLabel,
-                          s.enabled ? styles.switchLabelActive : styles.switchLabelInactive,
-                        ]}
-                      >
-                        {s.enabled ? 'Active' : 'Off'}
-                      </Text>
-                      <Switch
-                        value={s.enabled}
-                        onValueChange={(val) => handleToggleSchedule(s.id, val)}
-                        trackColor={{ false: '#E2E8F0', true: Colors.primary }}
-                        thumbColor="#FFFFFF"
-                      />
-                    </View>
-                  </View>
-
-                  {/* Doses breakdown: Each time displayed on its own line */}
-                  <View style={styles.doseItemsContainer}>
-                    {s.times.map((t, tIdx) => {
-                      const meta = getTimeIconAndPeriod(t.time);
-                      return (
-                        <View
-                          key={tIdx}
-                          style={[
-                            styles.doseRowItem,
-                            tIdx > 0 && styles.doseRowItemBorderTop,
-                            !s.enabled && styles.doseRowItemDisabled,
-                          ]}
-                        >
-                          <View style={styles.doseRowLeft}>
-                            <View
-                              style={[
-                                styles.periodBadge,
-                                { backgroundColor: s.enabled ? meta.bg : '#F1F5F9' },
-                              ]}
-                            >
-                              <Ionicons
-                                name={meta.icon}
-                                size={15}
-                                color={s.enabled ? meta.color : Colors.textTertiary}
-                              />
-                            </View>
-                            <View style={styles.doseTimeCol}>
-                              <Text
-                                style={[
-                                  styles.doseTimeText,
-                                  !s.enabled && styles.scheduleTextDisabled,
-                                ]}
-                              >
-                                {formatTime12Hour(t.time)}
-                              </Text>
-                              <Text style={styles.dosePeriodSub}>
-                                {meta.period} dose
-                              </Text>
-                            </View>
-                          </View>
-
-                          <View
+          <AppCard style={styles.scheduleCardContainer}>
+            {schedules.map((s, idx) => (
+              <View key={s.id || idx}>
+                {idx > 0 && <View style={styles.scheduleCardDivider} />}
+                <View style={[styles.scheduleRow, !s.enabled && styles.scheduleRowDisabled]}>
+                  {/* Left: Tappable info area */}
+                  <TouchableOpacity
+                    style={styles.scheduleLeftCol}
+                    onPress={() =>
+                      router.push(
+                        `/reminders/create?medicineId=${medicine.id}&scheduleId=${s.id}`,
+                      )
+                    }
+                    activeOpacity={0.7}
+                  >
+                    {/* Time(s) and dose amount */}
+                    <View style={styles.scheduleTimesList}>
+                      {s.times.map((t, tIdx) => (
+                        <View key={tIdx} style={styles.scheduleTimeRow}>
+                          <Text
                             style={[
-                              styles.doseAmountBadge,
-                              !s.enabled && styles.doseAmountBadgeDisabled,
+                              styles.scheduleTimeText,
+                              !s.enabled && styles.scheduleTextDisabled,
                             ]}
                           >
-                            <MaterialCommunityIcons
-                              name="pill"
-                              size={13}
-                              color={s.enabled ? Colors.primary : Colors.textSecondary}
-                            />
-                            <Text
-                              style={[
-                                styles.doseAmountText,
-                                !s.enabled && styles.scheduleTextDisabled,
-                              ]}
-                            >
-                              {t.amount || '1 dose'}
-                            </Text>
-                          </View>
+                            {formatTime12Hour(t.time)}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.scheduleDoseAmount,
+                              !s.enabled && styles.scheduleTextDisabled,
+                            ]}
+                          >
+                            {t.amount || '1 tablet'}
+                          </Text>
                         </View>
-                      );
-                    })}
-                  </View>
+                      ))}
+                    </View>
 
-                  {/* Footer action buttons: Edit & Delete */}
-                  <View style={styles.scheduleCardFooter}>
-                    <TouchableOpacity
-                      style={styles.actionButtonEdit}
-                      onPress={() =>
-                        router.push(
-                          `/reminders/create?medicineId=${medicine.id}&scheduleId=${s.id}`,
-                        )
-                      }
-                      activeOpacity={0.7}
+                    {/* Recurrence text */}
+                    <Text
+                      style={[
+                        styles.scheduleRecurrenceSub,
+                        !s.enabled && styles.scheduleTextDisabled,
+                      ]}
                     >
-                      <Feather name="edit-2" size={13} color={Colors.primary} />
-                      <Text style={styles.actionButtonEditText}>Edit</Text>
-                    </TouchableOpacity>
+                      {formatRecurrenceText(s)}
+                    </Text>
+                  </TouchableOpacity>
 
-                    <TouchableOpacity
-                      style={styles.actionButtonDelete}
-                      onPress={() =>
-                        setScheduleToDelete({
-                          id: s.id,
-                          time: formatScheduleTimes(s.times),
-                        })
-                      }
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="trash-outline" size={14} color={Colors.error} />
-                      <Text style={styles.actionButtonDeleteText}>Delete</Text>
-                    </TouchableOpacity>
+                  {/* Right: Switch + Edit + Delete */}
+                  <View style={styles.scheduleActionsCol}>
+                    <Switch
+                      value={s.enabled}
+                      onValueChange={(val) => handleToggleSchedule(s.id, val)}
+                      trackColor={{ false: '#E2E8F0', true: Colors.primary }}
+                      thumbColor="#FFFFFF"
+                    />
+
+                    <View style={styles.actionIconRow}>
+                      <TouchableOpacity
+                        style={styles.actionIconButton}
+                        onPress={() =>
+                          router.push(
+                            `/reminders/create?medicineId=${medicine.id}&scheduleId=${s.id}`,
+                          )
+                        }
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        accessibilityLabel="Edit reminder"
+                      >
+                        <Feather name="edit-2" size={15} color={Colors.textSecondary} />
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.actionIconButton}
+                        onPress={() =>
+                          setScheduleToDelete({
+                            id: s.id,
+                            time: formatScheduleTimes(s.times),
+                          })
+                        }
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        accessibilityLabel="Delete reminder"
+                      >
+                        <Ionicons name="trash-outline" size={17} color={Colors.error} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
-              );
-            })}
-
-            <TouchableOpacity
-              style={styles.addMoreButton}
-              onPress={() => router.push(`/reminders/create?medicineId=${medicine.id}`)}
-              activeOpacity={0.8}
-            >
-              <View style={styles.addMoreIconWrap}>
-                <Feather name="plus" size={15} color={Colors.primary} />
               </View>
-              <Text style={styles.addMoreButtonText}>Add Another Reminder</Text>
+            ))}
+
+            <View style={styles.scheduleCardDivider} />
+            <TouchableOpacity
+              style={styles.addReminderFooter}
+              onPress={() => router.push(`/reminders/create?medicineId=${medicine.id}`)}
+              activeOpacity={0.7}
+            >
+              <Feather name="plus" size={16} color={Colors.primary} />
+              <Text style={styles.addReminderFooterText}>Add another reminder</Text>
             </TouchableOpacity>
-          </View>
+          </AppCard>
         )}
 
         {/* Section: Package details */}
@@ -1353,208 +1265,20 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     paddingBottom: 10,
   },
-  scheduleListWrapper: {
-    gap: 12,
-    marginBottom: Spacing.lg,
-  },
-  scheduleCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: Radius.card,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    padding: Spacing.cardPadding,
-    marginBottom: 0,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  scheduleCardDisabled: {
-    backgroundColor: '#F8FAFC',
-    borderColor: '#E2E8F0',
-    opacity: 0.8,
-  },
-  scheduleCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  recurrencePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.primaryLight,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: Radius.pill,
-    gap: 5,
-  },
-  recurrencePillText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  switchGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  switchLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  switchLabelActive: {
-    color: '#059669',
-  },
-  switchLabelInactive: {
-    color: Colors.textTertiary,
-  },
-  doseItemsContainer: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: '#EDF2F7',
-    overflow: 'hidden',
-  },
-  doseRowItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-  },
-  doseRowItemBorderTop: {
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-  },
-  doseRowItemDisabled: {
-    backgroundColor: 'transparent',
-  },
-  doseRowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  periodBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  doseTimeCol: {
-    justifyContent: 'center',
-  },
-  doseTimeText: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: Colors.textPrimary,
-    letterSpacing: -0.2,
-  },
-  dosePeriodSub: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-    fontWeight: '500',
-    marginTop: 1,
-  },
-  doseAmountBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: Radius.pill,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 5,
-  },
-  doseAmountBadgeDisabled: {
-    backgroundColor: '#F1F5F9',
-    borderColor: '#E2E8F0',
-  },
-  doseAmountText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-  },
-  scheduleTextDisabled: {
-    color: Colors.textTertiary,
-  },
-  scheduleCardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    marginTop: 12,
-    gap: 8,
-  },
-  actionButtonEdit: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.primaryLight,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: Radius.pill,
-    gap: 5,
-  },
-  actionButtonEditText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  actionButtonDelete: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FEF2F2',
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: Radius.pill,
-    gap: 5,
-  },
-  actionButtonDeleteText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.error,
-  },
-  addMoreButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#DBEAFE',
-    borderStyle: 'dashed',
-    borderRadius: Radius.card,
-    paddingVertical: 12,
-    gap: 8,
-  },
-  addMoreIconWrap: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: Colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addMoreButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  emptyScheduleCard: {
+  scheduleEmptyCard: {
     alignItems: 'center',
     paddingVertical: 24,
     paddingHorizontal: 20,
     marginBottom: Spacing.lg,
   },
-  emptyScheduleIconWrap: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+  emptyBellWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: Colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   emptyScheduleTitle: {
     fontSize: 16,
@@ -1567,22 +1291,85 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
     lineHeight: 18,
-    marginBottom: 16,
     maxWidth: 260,
   },
-  setFirstReminderButton: {
+  scheduleCardContainer: {
+    marginBottom: Spacing.lg,
+    paddingVertical: 4,
+    paddingHorizontal: Spacing.cardPadding,
+  },
+  scheduleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    gap: 12,
+  },
+  scheduleRowDisabled: {
+    opacity: 0.6,
+  },
+  scheduleLeftCol: {
+    flex: 1,
+  },
+  scheduleTimesList: {
+    gap: 4,
+  },
+  scheduleTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 10,
+  },
+  scheduleTimeText: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+    letterSpacing: -0.5,
+  },
+  scheduleDoseAmount: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: Radius.pill,
+  },
+  scheduleRecurrenceSub: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  scheduleTextDisabled: {
+    color: Colors.textTertiary,
+  },
+  scheduleActionsCol: {
+    alignItems: 'flex-end',
+    gap: 10,
+  },
+  actionIconRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: Radius.pill,
+    gap: 14,
+  },
+  actionIconButton: {
+    padding: 4,
+  },
+  scheduleCardDivider: {
+    height: 1,
+    backgroundColor: Colors.borderLight,
+  },
+  addReminderFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 13,
     gap: 6,
   },
-  setFirstReminderButtonText: {
+  addReminderFooterText: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontWeight: '600',
+    color: Colors.primary,
   },
   packageDetailsCard: {
     marginBottom: Spacing.lg,
